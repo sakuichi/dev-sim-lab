@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QCDトレードオフ・シミュレーター</title>
+<meta name="description" content="品質(Q)・コスト(C)・納期(D)のトレードオフを、ドラッグ操作で体感できるシミュレーター。優先順位の対話に。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/qcd-tradeoff/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/qcd-tradeoff/">
+<meta property="og:title" content="QCDトレードオフ・シミュレーター | QCD Trade-off Simulator">
+<meta property="og:description" content="品質・コスト・納期のトレードオフを見える形に。Visualize the quality-cost-delivery trade-off.">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/qcd-tradeoff.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "QCDトレードオフ・シミュレーター",
+  "alternateName": "QCD Trade-off Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/qcd-tradeoff/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "品質(Q)・コスト(C)・納期(D)のトレードオフをドラッグ操作で体感できる無料シミュレーター。プロジェクトの優先順位の対話に。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* base tokens, header, lang-switch, mode-row/tone-btn, actions/btn, share,
+   section.text/h2/scenario, books-grid/book, footer all come from
+   ../assets/common.css. Only the QCD-specific console/chart/assessment
+   styling stays here. */
+.console{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 2px 0 rgba(34,48,46,.05);
+  padding:20px 16px 24px;
+}
+.console-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px dashed var(--line);
+  padding-bottom:10px;margin-bottom:6px;
+}
+.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
+.sum b{color:var(--ink);font-size:16px}
+
+.chart-wrap{display:flex;justify-content:center}
+svg{width:100%;max-width:440px;height:auto;touch-action:none;user-select:none}
+.grid-tri{fill:none;stroke:var(--line);stroke-width:1}
+.grid-zero{stroke:var(--ink-soft);stroke-width:1.4}
+.tick-zero{font-weight:700;fill:var(--ink)}
+.axis-line{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
+.data-poly{fill:rgba(14,124,102,.14);stroke:var(--ink);stroke-width:1.6;stroke-linejoin:round}
+.data-poly.danger{fill:rgba(179,66,58,.16);stroke:var(--alert)}
+.handle{stroke:#fff;stroke-width:2.5;cursor:grab}
+.handle.dragging{cursor:grabbing}
+.handle-hit{fill:transparent;cursor:grab}
+.axis-label{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700}
+.tick-label{font-family:"IBM Plex Mono",monospace;font-size:9px;fill:var(--ink-soft)}
+.lock-badge{font-size:15px}
+.hint{
+  min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);
+  font-weight:500;margin-top:2px;
+}
+
+/* ---- 健全度パネル ---- */
+.assess{
+  margin-top:14px;border:1px solid var(--line);border-radius:8px;
+  background:#FDFDFC;padding:14px 14px 12px;
+}
+.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
+.score-val.warn{color:var(--c)}
+.score-val.danger{color:var(--alert)}
+.score-max{font-size:14px;color:var(--ink-soft)}
+.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+.advice{list-style:none;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.advice li{
+  font-size:13px;color:var(--ink-soft);padding-left:1.5em;position:relative;margin-bottom:5px;
+}
+.advice li::before{content:"▲";position:absolute;left:0;font-size:10px;top:3px;color:var(--c)}
+.advice li.ok::before{content:"●";color:var(--q)}
+.advice li.bad::before{color:var(--alert)}
+.advice li b{color:var(--ink);font-weight:700}
+.advice li.bad b{color:var(--alert)}
+.risks{list-style:none;margin:5px 0 8px;padding:0}
+.risks li{
+  padding-left:1.3em;position:relative;margin-bottom:3px;font-size:12.5px;
+}
+.risks li::before{content:"–";position:absolute;left:.3em;top:0;color:var(--ink-soft);font-size:12.5px}
+
+/* ---- axis cards ---- */
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.axis-card{
+  border:1px solid var(--line);
+  border-top:3px solid var(--axis);
+  border-radius:8px;
+  padding:12px 12px 14px;
+  background:#FDFDFC;
+}
+.axis-card.is-locked{background:#F4F2EC;border-style:dashed;border-top-style:solid}
+.axis-card .row1{display:flex;justify-content:space-between;align-items:flex-start}
+.axis-name{font-weight:700;font-size:13.5px}
+.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
+.lock-btn{
+  border:1px solid var(--line);background:#fff;border-radius:6px;
+  font-size:15px;line-height:1;padding:6px 9px;cursor:pointer;
+}
+.lock-btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink)}
+.readout{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:34px;font-weight:700;color:var(--axis);
+  margin:4px 0 0;line-height:1.1;
+}
+.readout-sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);display:block;margin-bottom:2px}
+.axis-card input[type=range]{width:100%;accent-color:var(--axis);margin:6px 0 8px}
+.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.axis-card input[type=number]{
+  width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;
+  padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink);
+}
+.axis-card input:disabled{opacity:.45}
+
+/* ---- related links (page-local, mirrors brooks-law/utilization-trap) ---- */
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-label="QCD Simulator">
+  <div class="console-head">
+    <span class="label">TRADE-OFF CONSOLE</span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">±0</b><span id="sumNote"></span></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="chart-wrap">
+    <svg id="chart" viewBox="0 0 440 400" role="img" aria-label="QCD radar chart">
+      <g id="gridLayer"></g>
+      <g id="axisLayer"></g>
+      <polygon id="dataPoly" class="data-poly" points=""></polygon>
+      <g id="handleLayer"></g>
+      <g id="labelLayer"></g>
+    </svg>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+    <ul class="advice" id="adviceList"></ul>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secQcd"></section>
+<section class="text" id="secLock"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 id="relatedH"></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+const TOTAL = 300;
+const BASE = 100;   // 表示上の±0に対応する内部値
+const CX = 220, CY = 210, R = 150;
+const EXTREME_LOW = 40, EXTREME_HIGH = 180;   // 内部値(±表示では −60 / +80)
+
+const AXES = [
+  {key:"Q", color:"var(--q)", colorHex:"#0E7C66", angle:-90},
+  {key:"C", color:"var(--c)", colorHex:"#B07A14", angle:150},
+  {key:"D", color:"var(--d)", colorHex:"#3B6EA5", angle:30},
+];
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang:"ja",
+  docTitle:"QCDトレードオフ・シミュレーター",
+  heroTitle:"品質・コスト・納期の<br>トレードオフを、見える形に。",
+  heroLead:"3つの軸はすべて高いほど望ましい「満足度」で表します。Qは品質の高さ、Cは安さ、Dは納期の短さ。標準(±0)を基準に、どこかを高めると、必ずどこかを譲ることになります。頂点のドラッグやスライダーで動かしながら、優先順位のバランスをご一緒に確認ください。🔒で1軸を固定できます。",
+  sumLabel:"増減合計", sumNote:"(ゼロサム)",
+  scoreLabel:"健全度",
+  axes:{
+    Q:{name:"品質", short:"品質", sub:"高いほど高品質"},
+    C:{name:"コスト", short:"安さ", sub:"高いほど安い"},
+    D:{name:"納期", short:"短さ", sub:"高いほど短い"},
+  },
+  numLabel:"数値(−100〜+200)",
+  absLabel:v=>`絶対値 ${v}/300`,
+  lockAria:n=>`${n}を固定`,
+  hintLocked:(name,short,val)=>`${name}(${short})を ${val} で固定中。残る2軸の間で調整されます。`,
+  hintScenario:"D(納期の短さ)を±0で固定しました。品質を高めると、必要になるコストが数値で見えます。",
+  resetBtn:"リセット(すべて±0)",
+  scenarioBtn:"シナリオ: 納期を最優先にする",
+  comments:[
+    "バランスの取れた配分です。",
+    "概ね健全な配分です。やや重点の偏りがあります。",
+    "重点の偏りが大きくなっています。優先順位の確認をおすすめします。",
+    "偏りが大きく、抑えた軸にリスクが集中しています。",
+    "この配分のままでは、計画の持続が難しい状態です。",
+  ],
+  adviceBalanced:"バランスの取れた配分です。プロジェクトの局面に応じて、重点の置き方を一緒に調整していきましょう。",
+  adviceLowest:(name,short)=>`${name}(${short})が最も抑えられた配分です。この点について、事前に関係者間で認識を合わせておくと安心です。`,
+  advice:{
+    low:{
+      Q:{title:"品質の水準が大きく抑えられた配分です。", risks:[
+        "提供後の不具合対応により、結果的に追加のコストと時間が発生する可能性",
+        "修正・手直しの繰り返しで、当初の想定より総コストが増えるリスク",
+        "製品・サービスへの信頼に影響が及ぶ懸念",
+      ]},
+      C:{title:"予算が当初想定を大きく上回る配分です。", risks:[
+        "採算の確保が難しくなる可能性",
+        "予算の追加確保に時間を要し、スケジュールにも影響が及ぶリスク",
+        "投資対効果の観点から、対象範囲(スコープ)の見直しが必要になる場合があります",
+      ]},
+      D:{title:"スケジュールが大きく後ろ倒しの配分です。", risks:[
+        "提供開始の遅れによる機会損失の可能性",
+        "関係者の計画への影響と、調整コストの増加",
+        "期間が延びる間に前提条件や要件が変化するリスク",
+      ]},
+    },
+    high:{
+      Q:{title:"品質への投資が非常に大きい配分です。", risks:[
+        "必要以上の作り込みとなり、投資に見合う効果が得られない可能性",
+        "完成度を高めている間に、提供の好機を逃すリスク",
+        "本当に重視したい要件はどれか、優先順位の再確認をおすすめします",
+      ]},
+      C:{title:"予算を大きく抑えた配分です。", risks:[
+        "検証・確認の工程を十分に確保できず、品質面のリスクが高まる可能性",
+        "対応できる範囲が限られ、期待値との差が生まれやすくなります",
+        "体制や協力関係に無理が生じ、継続性に影響する懸念",
+      ]},
+      D:{title:"非常に短い期間を想定した配分です。", risks:[
+        "検証期間の圧縮により、提供後に問題が見つかるリスク",
+        "体制への負荷が高まり、安定した進行が難しくなる可能性",
+        "短期対応の積み重ねが、その後の改善コスト増につながる懸念",
+      ]},
+    },
+  },
+  zeroTick:"±0 標準",
+  secQcd:`<h2>QCDとは</h2>
+    <p>QCDは、ものづくりやプロジェクトの計画で広く使われる3つの評価軸です。<b>Q = Quality(品質)</b>、<b>C = Cost(コスト)</b>、<b>D = Delivery(納期)</b>。この3つは互いにトレードオフの関係にあり、限られたリソースの中ですべてを同時に最大化することはできません。</p>
+    <p>ここで注意したいのは、生の値のままだと「高くて嬉しいのはQだけ」という点です。コストは安いほど、納期は短いほど望ましい。そこでこのチャートでは、3軸すべてを<b>高いほど望ましい「満足度」</b>に揃えています。Cの+は「安い」、Dの+は「短い」。三角形が大きいほど良い状態、±0の基準線より内側に凹んだ軸が、譲っている軸です。</p>
+    <p>そのうえで制約を「増減合計±0のゼロサム」として単純化しています。ある軸を+すると、その分は必ず他の軸の−として現れます。どこに重点を置くか、関係者全員で認識を合わせるための道具としてお使いください。</p>`,
+  secLock:`<h2>ロック機能の使いかた</h2>
+    <p>プロジェクトでは「この軸は動かせない」という前提条件があることも少なくありません。各軸の🔒ボタンで、その前提を置いたときのバランスを確認できます。</p>
+    <div class="scenario"><b>例: 納期を最優先にする場合</b><br>
+    D(納期の短さ)を固定して、Q(品質)を+50にしてみてください。その分はC(安さ)が−50、つまり相応の予算の上積みが必要になります。「納期を守りながら品質も高める」という選択は可能です — そのために必要な投資を、意思決定の前に全員で確認できるのがこのツールの狙いです。</div>
+    <ul>
+      <li>固定できるのは同時に1軸まで(2軸を固定すると残る1軸も動かせなくなるため、2つ目を固定すると先の固定は自動で外れます)</li>
+      <li>値の範囲は−100〜+200。端に達するとそこで止まります</li>
+      <li>いずれかの軸が−60以下または+80以上になるとチャートが赤くなり、想定されるリスクが表示されます</li>
+    </ul>`,
+  booksH:"もっと深く知るための本",
+  books:[
+    {tag:"TRADE-OFF / TOC", title:"ザ・ゴール ― 企業の究極の目的とは何か", desc:"エリヤフ・ゴールドラット著。制約理論(TOC)を小説形式で。トレードオフとボトルネックの考え方を物語で体感できる大定番。", link:"Amazonで見る →", url:"https://amzn.to/4wwfBtL"},
+    {tag:"QCDの源流", title:"トヨタ生産方式 ― 脱規模の経営をめざして", desc:"大野耐一著。QCD改善の原点。ムダ取り・ジャストインタイムの思想を、生みの親自身が語る古典。", link:"Amazonで見る →", url:"https://amzn.to/4bAkfii"},
+    {tag:"納期と品質", title:"人月の神話", desc:"F・P・ブルックス Jr.著。「遅れているプロジェクトへの人員追加は、さらに遅らせる」。納期と品質のトレードオフを扱う不朽の名著。", link:"Amazonで見る →", url:"https://amzn.to/4guw11g"},
+    {tag:"リスク管理", title:"熊とワルツを ― リスクを愉しむプロジェクト管理", desc:"トム・デマルコ&ティモシー・リスター著。リスクと向き合わないプロジェクトは賭け事と同じ。本ツールのリスク表示を深掘りしたい方に。", link:"Amazonで見る →", url:"https://amzn.to/44Znhc9"},
+  ],
+  shareText:"QCDトレードオフ・シミュレーター | 品質・コスト・納期のバランスを見える化",
+  shareHashtags:"開発あるある図鑑",
+  relatedH:"関連する問題",
+  related:[
+    {title:"開発あるある図鑑(全シミュレーター一覧)", desc:"他のソフトウェア開発の「あるある」もあわせてどうぞ。", href:"../"},
+    {title:"人が増えれば早く終わる? | ブルックスの法則シミュレーター", desc:"増員によるコミュニケーションコストの増加を可視化する姉妹シミュレーター。", href:"../brooks-law/"},
+    {title:"全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター", desc:"稼働率が上がるほど待ち時間が急増する様子を可視化する姉妹シミュレーター。", href:"../utilization-trap/"},
+  ],
+},
+en: {
+  htmlLang:"en",
+  docTitle:"QCD Trade-off Simulator",
+  heroTitle:"Quality, cost, delivery:<br>make the trade-off visible.",
+  heroLead:"All three axes are shown as satisfaction scores — higher is always better. Q stands for quality, C for affordability, and D for speed of delivery. Starting from the baseline (±0), raising one axis always means giving something up elsewhere. Drag the vertices or use the sliders to explore priorities together. Use 🔒 to fix one axis.",
+  sumLabel:"Net change", sumNote:" (zero-sum)",
+  scoreLabel:"Balance score",
+  axes:{
+    Q:{name:"Quality", short:"Quality", sub:"higher = better quality"},
+    C:{name:"Cost", short:"Affordability", sub:"higher = lower cost"},
+    D:{name:"Delivery", short:"Speed", sub:"higher = faster delivery"},
+  },
+  numLabel:"Value (−100 to +200)",
+  absLabel:v=>`absolute ${v}/300`,
+  lockAria:n=>`Lock ${n}`,
+  hintLocked:(name,short,val)=>`${name} (${short}) is fixed at ${val}. The other two axes now balance each other.`,
+  hintScenario:"D (delivery speed) is fixed at ±0. Raise quality, and the cost required becomes visible in the numbers.",
+  resetBtn:"Reset (all ±0)",
+  scenarioBtn:"Scenario: delivery date comes first",
+  comments:[
+    "A well-balanced allocation.",
+    "A broadly sound allocation, with some emphasis on certain axes.",
+    "The allocation is significantly skewed. We recommend reviewing priorities.",
+    "Heavily skewed — risk is concentrating on the constrained axes.",
+    "This allocation would be difficult to sustain as a plan.",
+  ],
+  adviceBalanced:"A well-balanced allocation. Adjust the emphasis together as the project moves through different phases.",
+  adviceLowest:(name,short)=>`${name} (${short}) is the most constrained axis in this allocation. Aligning on this point with all stakeholders in advance is recommended.`,
+  advice:{
+    low:{
+      Q:{title:"Quality is heavily constrained in this allocation.", risks:[
+        "Post-release issues may lead to additional cost and time",
+        "Repeated fixes and rework can raise the total cost beyond the original estimate",
+        "Potential impact on trust in the product or service",
+      ]},
+      C:{title:"The budget significantly exceeds the initial assumption.", risks:[
+        "Profitability may become difficult to secure",
+        "Securing additional budget takes time and can also affect the schedule",
+        "Scope may need to be revisited from a return-on-investment perspective",
+      ]},
+      D:{title:"The schedule is significantly extended in this allocation.", risks:[
+        "Possible opportunity loss due to delayed launch",
+        "Impact on stakeholders' plans and increased coordination effort",
+        "Requirements and assumptions may change while the timeline extends",
+      ]},
+    },
+    high:{
+      Q:{title:"This allocation invests very heavily in quality.", risks:[
+        "Over-engineering beyond what is needed, with returns that may not match the investment",
+        "Risk of missing the right launch window while perfecting the product",
+        "We recommend re-confirming which requirements matter most",
+      ]},
+      C:{title:"This allocation keeps the budget very tight.", risks:[
+        "Verification and review steps may be under-resourced, raising quality risk",
+        "The achievable scope narrows, making gaps against expectations more likely",
+        "Strain on teams and partners may affect sustainability",
+      ]},
+      D:{title:"This allocation assumes a very short timeline.", risks:[
+        "Compressed verification raises the risk of issues surfacing after release",
+        "High load on the team can make stable progress difficult",
+        "Accumulated short-term fixes may increase improvement costs later",
+      ]},
+    },
+  },
+  zeroTick:"±0 baseline",
+  secQcd:`<h2>What is QCD?</h2>
+    <p>QCD is a set of three evaluation axes widely used in manufacturing and project planning: <b>Q = Quality</b>, <b>C = Cost</b>, and <b>D = Delivery</b>. The three are in a trade-off relationship — with limited resources, all three cannot be maximized at the same time.</p>
+    <p>One thing to note: with raw values, only Q is "the higher, the better". Cost is better when lower, and delivery when shorter. This chart therefore normalizes all three axes into <b>satisfaction scores where higher is always better</b>: a plus on C means "more affordable", a plus on D means "faster". A larger triangle means a better state; an axis dented inside the ±0 baseline is the one being traded away.</p>
+    <p>The constraint is simplified as a zero-sum: the net change always totals ±0. Raising one axis always appears as a minus somewhere else. Use this as a tool for aligning all stakeholders on where to place the emphasis.</p>`,
+  secLock:`<h2>Using the lock</h2>
+    <p>Projects often come with a fixed precondition — "this axis cannot move." The 🔒 button on each axis lets you explore the balance under that precondition.</p>
+    <div class="scenario"><b>Example: when the delivery date comes first</b><br>
+    Fix D (delivery speed) and raise Q (quality) by +50. That amount comes out of C (affordability) at −50 — in other words, a corresponding budget increase is required. Keeping the deadline while raising quality is a valid choice; this tool's purpose is to make the required investment visible to everyone before the decision is made.</div>
+    <ul>
+      <li>Only one axis can be locked at a time (locking two would freeze the third as well, so locking a second axis automatically releases the first)</li>
+      <li>Values range from −100 to +200 and stop at the limits</li>
+      <li>When any axis reaches −60 or below, or +80 or above, the chart turns red and the anticipated risks are shown</li>
+    </ul>`,
+  booksH:"Recommended reading",
+  books:[
+    {tag:"TRADE-OFF / TOC", title:"The Goal", desc:"Eliyahu M. Goldratt. A business novel on the Theory of Constraints — the classic on bottlenecks and trade-offs.", link:"View on Amazon →", url:"https://amzn.to/4wFkAIW"},
+    {tag:"DELIVERY", title:"The Phoenix Project", desc:"Gene Kim, Kevin Behr & George Spafford. A novel about an IT project on fire — deadlines, quality and cost colliding in the most relatable way.", link:"View on Amazon →", url:"https://amzn.to/3SWMIIK"},
+    {tag:"SCHEDULE & QUALITY", title:"The Mythical Man-Month", desc:"Frederick P. Brooks Jr. \"Adding manpower to a late software project makes it later.\" Timeless essays on schedule-quality trade-offs.", link:"View on Amazon →", url:"https://amzn.to/3R0mWTt"},
+    {tag:"QUALITY / LEAN", title:"The Toyota Way", desc:"Jeffrey K. Liker. The management principles behind Toyota's quality and efficiency — where QCD thinking comes from.", link:"View on Amazon →", url:"https://amzn.to/4eUTAz5"},
+  ],
+  shareText:"QCD Trade-off Simulator — visualize the quality-cost-delivery trade-off",
+  shareHashtags:"DevSimLab",
+  relatedH:"Related problems",
+  related:[
+    {title:"Dev Sim Lab (all simulators)", desc:"Explore the other software development misconceptions in this series.", href:"../"},
+    {title:"Will adding people make it faster? | Brooks's Law Simulator", desc:"A companion simulator on how communication overhead grows with team size.", href:"../brooks-law/"},
+    {title:"Is everyone being 100% busy actually efficient? | Utilization Trap Simulator", desc:"A companion simulator on how wait times explode as utilization rises.", href:"../utilization-trap/"},
+  ],
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hintScenario:"納期ロック完了。ここから先、品質を上げるたびに札束が静かに燃えます。",
+  comments:[
+    "奇跡のバランス。このまま誰にも触らせるな。",
+    "まだ健全。だがその偏り、誰かの睡眠時間で埋まっている。",
+    "偏りが不穏。会議室に嫌な沈黙が流れるやつ。",
+    "デスマーチの足音が聞こえてきた。",
+    "これはもうプロジェクトではない。事故報告書の下書きだ。",
+  ],
+  adviceBalanced:"逆に怖いくらいバランスがいい。この平和、いつまで持つかな。",
+  adviceLowest:(name,short)=>`${name}(${short})が静かに削られている。気づいた時には手遅れなやつ。`,
+  advice:{
+    low:{
+      Q:{title:"品質?知らない子ですね。", risks:[
+        "リリース日がそのまま障害対応の初日になる",
+        "「動けばいい」で書いたコードを、半年後の自分が泣きながら読む",
+        "問い合わせの着信音がトラウマになる",
+      ]},
+      C:{title:"予算が音を立てて溶けている。", risks:[
+        "経理から件名『ご相談』のメールが来る(ご相談ではない)",
+        "追加予算の稟議が通る頃には、メンバーがもういない",
+        "黒字化の計画がスライドの14ページ目にしか存在しない",
+      ]},
+      D:{title:"リリース日はもはや伝説。", risks:[
+        "「来月には」をすでに12回言っている",
+        "競合が先に出した。しかも良いものを",
+        "要件定義時の前提が考古学の対象になっている",
+      ]},
+    },
+    high:{
+      Q:{title:"そのこだわり、誰がお金を払うんですか?", risks:[
+        "誰も開かない設定画面が37個ある",
+        "完璧になった頃には、市場が別の場所にいる",
+        "「いいものを作れば売れる」はだいぶ前に退職した",
+      ]},
+      C:{title:"その予算、気持ちだけで開発しろと?", risks:[
+        "検証環境がない。本番が検証環境",
+        "「若手の成長機会」という名のワンオペ",
+        "協力会社が静かにフェードアウトしていく",
+      ]},
+      D:{title:"その納期、物理法則を超えていませんか?", risks:[
+        "テストはユーザーがやってくれる(本番で)",
+        "チームの語彙から「週末」が消える",
+        "動いているように見えるだけのデモを、本気で信じる人が現れる",
+      ]},
+    },
+  },
+},
+en: {
+  hintScenario:"Deadline locked. From here on, every point of quality quietly burns a small pile of cash.",
+  comments:[
+    "Suspiciously well balanced. Touch nothing.",
+    "Still healthy. But that skew is being paid for in someone's sleep.",
+    "The skew is getting spicy. Cue the awkward silence in the steering meeting.",
+    "You can hear the death-march drums from here.",
+    "This is no longer a project. It's the first draft of an incident report.",
+  ],
+  adviceBalanced:"Almost suspiciously balanced. Enjoy the peace while it lasts.",
+  adviceLowest:(name,short)=>`${name} (${short}) is being quietly squeezed. The kind you only notice when it's too late.`,
+  advice:{
+    low:{
+      Q:{title:"Quality? Never heard of her.", risks:[
+        "Launch day doubles as day one of incident response",
+        "Code written as 'good enough' will be read, six months later, by you, crying",
+        "The support ringtone becomes a trauma trigger",
+      ]},
+      C:{title:"The budget is audibly evaporating.", risks:[
+        "Finance sends an invite titled 'quick chat' (it is not a quick chat)",
+        "By the time extra budget is approved, the team is gone",
+        "Profitability exists only on slide 14",
+      ]},
+      D:{title:"The release date is now folklore.", risks:[
+        "You have said 'next month' twelve times",
+        "A competitor shipped first. And it's good",
+        "The original requirements are now archaeology",
+      ]},
+    },
+    high:{
+      Q:{title:"Gorgeous. Who exactly is paying for it?", risks:[
+        "There are 37 settings screens nobody will ever open",
+        "By the time it's perfect, the market has moved somewhere else",
+        "'Build it and they will come' retired a long time ago",
+      ]},
+      C:{title:"So we're building this on vibes and goodwill?", risks:[
+        "There is no staging environment. Production is the staging environment",
+        "'A growth opportunity for juniors' — a.k.a. one person doing everything",
+        "Your vendors quietly ghost you",
+      ]},
+      D:{title:"That deadline violates the laws of physics.", risks:[
+        "Testing will be done by the users (in production)",
+        "The word 'weekend' vanishes from the team vocabulary",
+        "Someone starts sincerely believing the demo that only looks like it works",
+      ]},
+    },
+  },
+},
+};
+
+let LANG = "ja";
+let TONE = "std";   // "std" | "dev"
+const T = () => TONE === "dev" ? {...I18N[LANG], ...DEV[LANG]} : I18N[LANG];
+
+/* ================= 基本ユーティリティ ================= */
+const toDisp = v => v - BASE;
+const fmtSigned = v => v > 0 ? `+${v}` : v === 0 ? "±0" : `−${-v}`;
+const dir = a => ({x: Math.cos(a.angle*Math.PI/180), y: Math.sin(a.angle*Math.PI/180)});
+const pointAt = (a, v) => {
+  const d = dir(a), r = (v/TOTAL)*R;
+  return {x: CX + d.x*r, y: CY + d.y*r};
+};
+
+let values = {Q:100, C:100, D:100};   // 内部は浮動小数(0〜300)
+let locked = {Q:false, C:false, D:false};
+let lastChanged = null;               // 丸め調整の対象から除外する軸
+
+/* ================= トレードオフ計算 ================= */
+function setAxis(key, raw){
+  if (locked[key]) return;
+  const others = AXES.map(a=>a.key).filter(k => k!==key && !locked[k]);
+  if (others.length === 0) return;
+
+  const lockedSum = AXES.map(a=>a.key).filter(k=>locked[k])
+                        .reduce((s,k)=>s+values[k], 0);
+  const budget = TOTAL - lockedSum;
+  const v = Math.min(Math.max(raw, 0), budget);
+  const remain = budget - v;
+  const otherSum = others.reduce((s,k)=>s+values[k], 0);
+
+  others.forEach(k => {
+    values[k] = otherSum > 1e-9
+      ? remain * (values[k]/otherSum)   // 比率按分
+      : remain / others.length;         // 全て0なら均等
+  });
+  values[key] = v;
+  lastChanged = key;
+  render();
+}
+
+/* 表示用: 整数丸め+ゼロサム厳守(操作軸以外で誤差吸収) */
+function displayValues(){
+  const d = {}; let sum = 0;
+  AXES.forEach(a => { d[a.key] = Math.round(values[a.key]); sum += d[a.key]; });
+  let diff = TOTAL - sum;
+  if (diff !== 0){
+    let cand = AXES.map(a=>a.key)
+                   .filter(k => !locked[k] && k !== lastChanged)
+                   .sort((x,y)=>values[y]-values[x]);
+    if (cand.length === 0) cand = AXES.map(a=>a.key).filter(k=>!locked[k]);
+    for (const k of cand){
+      const nv = d[k] + diff;
+      if (nv >= 0 && nv <= TOTAL){ d[k] = nv; break; }
+    }
+  }
+  return d;
+}
+
+/* ================= ロック ================= */
+function toggleLock(key){
+  if (locked[key]){
+    locked[key] = false;
+    setHint("");
+  } else {
+    AXES.forEach(a => locked[a.key] = false);   // 同時ロックは1軸まで
+    values[key] = Math.round(values[key]);       // 固定値は整数に
+    locked[key] = true;
+    showLockHint(key);
+  }
+  render();
+}
+function showLockHint(key){
+  const t = T().axes[key];
+  setHint(T().hintLocked(t.name, t.short, fmtSigned(toDisp(values[key]))));
+}
+function setHint(msg){ document.getElementById("hint").textContent = msg; }
+
+/* ================= 健全度評価 ================= */
+function assess(d){
+  const dev = AXES.reduce((s,a)=>s+Math.abs(d[a.key]-BASE), 0);
+  const score = Math.max(0, Math.round(100 - dev/4));
+
+  const extremes = [];
+  AXES.forEach(a => {
+    if (d[a.key] <= EXTREME_LOW)       extremes.push({key:a.key, type:"low"});
+    else if (d[a.key] >= EXTREME_HIGH) extremes.push({key:a.key, type:"high"});
+  });
+
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return {score, band, extremes, danger: extremes.length > 0};
+}
+
+/* ================= SVG構築 ================= */
+const svg = document.getElementById("chart");
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+let zeroTickEl = null;
+
+function buildStatic(){
+  const grid = document.getElementById("gridLayer");
+  for (let v = 50; v <= TOTAL; v += 50){
+    const pts = AXES.map(a => { const p = pointAt(a, v); return `${p.x},${p.y}`; }).join(" ");
+    grid.appendChild(el("polygon", {points: pts, class: v === BASE ? "grid-tri grid-zero" : "grid-tri"}));
+  }
+  const axisL = document.getElementById("axisLayer");
+  AXES.forEach(a => {
+    const p = pointAt(a, TOTAL);
+    axisL.appendChild(el("line", {x1:CX, y1:CY, x2:p.x, y2:p.y, class:"axis-line"}));
+  });
+  [[BASE,"zero"],[200,"+100"],[300,"+200"]].forEach(([v,label]) => {
+    const p = pointAt(AXES[0], v);
+    const t = el("text", {x:p.x+7, y:p.y+3, class: label==="zero" ? "tick-label tick-zero" : "tick-label"});
+    if (label === "zero") zeroTickEl = t; else t.textContent = label;
+    axisL.appendChild(t);
+  });
+  const hL = document.getElementById("handleLayer");
+  const lL = document.getElementById("labelLayer");
+  AXES.forEach(a => {
+    const lp = pointAt(a, TOTAL*1.16);
+    const label = el("text", {x:lp.x, y:lp.y, class:"axis-label",
+      fill:a.colorHex, "text-anchor":"middle", "dominant-baseline":"middle"});
+    lL.appendChild(label);
+    a._label = label;
+
+    const hit = el("circle", {r:24, class:"handle-hit", "data-axis":a.key});
+    const h   = el("circle", {r:9,  class:"handle", fill:a.colorHex, "data-axis":a.key});
+    hL.appendChild(hit); hL.appendChild(h);
+    a._hit = hit; a._handle = h;
+
+    const badge = el("text", {class:"lock-badge", "text-anchor":"middle",
+      "dominant-baseline":"middle", visibility:"hidden"});
+    badge.textContent = "🔒";
+    lL.appendChild(badge);
+    a._badge = badge;
+  });
+}
+
+/* ================= ドラッグ ================= */
+let dragAxis = null;
+function svgPoint(evt){
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+svg.addEventListener("pointerdown", evt => {
+  const key = evt.target.getAttribute && evt.target.getAttribute("data-axis");
+  if (!key || locked[key]) return;
+  dragAxis = key;
+  svg.setPointerCapture(evt.pointerId);
+  AXES.find(a=>a.key===key)._handle.classList.add("dragging");
+  evt.preventDefault();
+});
+svg.addEventListener("pointermove", evt => {
+  if (!dragAxis) return;
+  const a = AXES.find(x=>x.key===dragAxis);
+  const p = svgPoint(evt), d = dir(a);
+  const proj = ((p.x-CX)*d.x + (p.y-CY)*d.y) / R * TOTAL;  // 軸方向への射影
+  setAxis(dragAxis, proj);
+});
+["pointerup","pointercancel"].forEach(ev => svg.addEventListener(ev, () => {
+  if (!dragAxis) return;
+  AXES.find(a=>a.key===dragAxis)._handle.classList.remove("dragging");
+  dragAxis = null;
+}));
+
+/* ================= 操作カード ================= */
+function buildControls(){
+  const box = document.getElementById("controls");
+  AXES.forEach(a => {
+    const card = document.createElement("div");
+    card.className = "axis-card";
+    card.style.setProperty("--axis", a.colorHex);
+    card.innerHTML = `
+      <div class="row1">
+        <span class="axis-name"><span data-title></span><small data-sub2></small></span>
+        <button class="lock-btn" aria-pressed="false">🔓</button>
+      </div>
+      <div class="readout mono" data-readout>±0</div>
+      <span class="readout-sub" data-sub></span>
+      <input type="range" min="${toDisp(0)}" max="${toDisp(TOTAL)}" step="1" value="0">
+      <div class="num-row">
+        <label for="num-${a.key}" data-numlabel></label>
+        <input type="number" id="num-${a.key}" min="${toDisp(0)}" max="${toDisp(TOTAL)}" step="1" value="0">
+      </div>`;
+    box.appendChild(card);
+    a._card     = card;
+    a._title    = card.querySelector("[data-title]");
+    a._sub2     = card.querySelector("[data-sub2]");
+    a._readout  = card.querySelector("[data-readout]");
+    a._sub      = card.querySelector("[data-sub]");
+    a._numLabel = card.querySelector("[data-numlabel]");
+    a._slider   = card.querySelector("input[type=range]");
+    a._num      = card.querySelector("input[type=number]");
+    a._lockBtn  = card.querySelector(".lock-btn");
+
+    a._slider.addEventListener("input", e => setAxis(a.key, +e.target.value + BASE));
+    a._num.addEventListener("change", e => setAxis(a.key, +e.target.value + BASE));
+    a._lockBtn.addEventListener("click", () => toggleLock(a.key));
+  });
+}
+
+/* ================= シェア ================= */
+const SHARE_URL = "https://sakuichi.github.io/dev-sim-lab/qcd-tradeoff/";
+
+/* ================= 言語適用 ================= */
+function buildBooks(){
+  const grid = document.getElementById("booksGrid");
+  grid.innerHTML = "";
+  T().books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span>
+      <h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url || "#"}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>
+      ${b.note ? `<p class="placeholder-note">${b.note}</p>` : ""}`;
+    grid.appendChild(div);
+  });
+}
+
+function buildRelated(){
+  const t = T();
+  const grid = document.getElementById("relatedGrid");
+  grid.innerHTML = "";
+  document.getElementById("relatedH").textContent = t.relatedH;
+  t.related.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "sim-card";
+    a.href = item.href;
+    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
+    grid.appendChild(a);
+  });
+}
+
+function applyLang(lang){
+  LANG = lang;
+  const t = T();
+  document.documentElement.lang = t.htmlLang;
+  document.title = t.docTitle;
+
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("sumNote").textContent = t.sumNote;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("secQcd").innerHTML = t.secQcd;
+  document.getElementById("secLock").innerHTML = t.secLock;
+  document.getElementById("booksH").textContent = t.booksH;
+  if (zeroTickEl) zeroTickEl.textContent = t.zeroTick;
+  buildBooks();
+  buildRelated();
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: SHARE_URL,
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+
+  AXES.forEach(a => {
+    const ta = t.axes[a.key];
+    a._label.textContent = `${a.key} ${ta.short}`;
+    a._title.textContent = `${a.key} ${ta.name}(${ta.short})`;
+    if (LANG === "en") a._title.textContent = `${a.key} ${ta.name} (${ta.short})`;
+    a._sub2.textContent = ta.sub;
+    a._numLabel.textContent = t.numLabel;
+    a._lockBtn.setAttribute("aria-label", t.lockAria(ta.name));
+  });
+
+  const lockedKey = AXES.map(a=>a.key).find(k=>locked[k]);
+  if (lockedKey) showLockHint(lockedKey); else setHint("");
+  render();
+}
+
+/* ================= 描画 ================= */
+function render(){
+  const t = T();
+  const d = displayValues();
+  const pts = AXES.map(a => { const p = pointAt(a, values[a.key]); return `${p.x},${p.y}`; }).join(" ");
+  document.getElementById("dataPoly").setAttribute("points", pts);
+
+  AXES.forEach(a => {
+    const p = pointAt(a, values[a.key]);
+    a._handle.setAttribute("cx", p.x); a._handle.setAttribute("cy", p.y);
+    a._hit.setAttribute("cx", p.x);    a._hit.setAttribute("cy", p.y);
+    a._badge.setAttribute("x", p.x);   a._badge.setAttribute("y", p.y - 20);
+    a._badge.setAttribute("visibility", locked[a.key] ? "visible" : "hidden");
+    a._handle.style.cursor = locked[a.key] ? "not-allowed" : "grab";
+
+    a._readout.textContent = fmtSigned(toDisp(d[a.key]));
+    a._sub.textContent = t.absLabel(d[a.key]);
+    if (document.activeElement !== a._slider) a._slider.value = toDisp(d[a.key]);
+    if (document.activeElement !== a._num)    a._num.value    = toDisp(d[a.key]);
+    a._slider.disabled = locked[a.key];
+    a._num.disabled    = locked[a.key];
+    a._lockBtn.textContent = locked[a.key] ? "🔒" : "🔓";
+    a._lockBtn.setAttribute("aria-pressed", locked[a.key]);
+    a._card.classList.toggle("is-locked", locked[a.key]);
+  });
+
+  document.getElementById("sumVal").textContent =
+    fmtSigned(toDisp(d.Q) + toDisp(d.C) + toDisp(d.D));
+
+  // 健全度の反映
+  const r = assess(d);
+  document.getElementById("dataPoly").classList.toggle("danger", r.danger);
+  const sv = document.getElementById("scoreVal");
+  sv.textContent = r.score;
+  sv.className = "score-val mono" + (r.danger ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  const items = r.extremes.map(e => ({...t.advice[e.type][e.key], cls:"bad"}));
+  if (items.length === 0){
+    if (r.score >= 90){
+      items.push({title:t.adviceBalanced, risks:[], cls:"ok"});
+    } else {
+      const lowest = AXES.reduce((m,a)=> d[a.key] < d[m.key] ? a : m, AXES[0]);
+      const ta = t.axes[lowest.key];
+      items.push({title:t.adviceLowest(ta.name, ta.short), risks:[], cls:""});
+    }
+  }
+  const list = document.getElementById("adviceList");
+  list.innerHTML = "";
+  items.forEach(item => {
+    const li = document.createElement("li");
+    if (item.cls) li.className = item.cls;
+    const b = document.createElement("b");
+    b.textContent = item.title;
+    li.appendChild(b);
+    if (item.risks.length){
+      const ul = document.createElement("ul");
+      ul.className = "risks";
+      item.risks.forEach(rk => {
+        const rl = document.createElement("li");
+        rl.textContent = rk;
+        ul.appendChild(rl);
+      });
+      li.appendChild(ul);
+    }
+    list.appendChild(li);
+  });
+}
+
+/* ================= アクション ================= */
+document.getElementById("resetBtn").addEventListener("click", () => {
+  values = {Q:100, C:100, D:100};
+  locked = {Q:false, C:false, D:false};
+  lastChanged = null;
+  setHint("");
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  values = {Q:100, C:100, D:100};
+  locked = {Q:false, C:false, D:true};
+  lastChanged = null;
+  setHint(T().hintScenario);
+  render();
+});
+
+buildStatic();
+buildControls();
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyLang(LANG);
+  },
+});
+</script>
+</body>
+</html>
