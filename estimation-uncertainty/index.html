@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最初の見積もりは、そのまま信じていい? | 見積もりの不確実性シミュレーター</title>
+<meta name="description" content="プロジェクトの進行段階に応じて見積もりの誤差幅が「不確実性のコーン」として狭まっていく様子を体験できるシミュレーター。企画段階の見積もりがなぜ大きく外れうるかを可視化します。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/estimation-uncertainty/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/estimation-uncertainty/">
+<meta property="og:title" content="最初の見積もりは、そのまま信じていい? | 見積もりの不確実性シミュレーター">
+<meta property="og:description" content="プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく「不確実性のコーン」を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/estimation-uncertainty.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "見積もりの不確実性シミュレーター",
+  "alternateName": "Estimation Uncertainty Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/estimation-uncertainty/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- cone chart ---- */
+.cone-wrap{margin-top:14px}
+.cone-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.cone-grid{stroke:var(--line);stroke-width:1}
+.cone-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.cone-area{fill:var(--d);opacity:.12}
+.cone-bound{fill:none;stroke:var(--ink-soft);stroke-width:1.4;stroke-dasharray:2 3}
+.true-line{stroke:var(--q);stroke-width:1.6;stroke-dasharray:4 3}
+.true-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--q);font-weight:700}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+.phase-marker{stroke:var(--d);stroke-width:3;stroke-linecap:round;cursor:grab}
+.phase-marker.dragging{cursor:grabbing}
+.phase-cap{stroke:var(--d);stroke-width:3;stroke-linecap:round}
+.phase-hit{fill:transparent;cursor:grab}
+.phase-hit.dragging{cursor:grabbing}
+.phase-point{fill:var(--surface);stroke:var(--d);stroke-width:2}
+.phase-pct-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--d);text-anchor:middle}
+
+.related-grid{margin-top:10px}
+#scenarioBtn[aria-pressed="true"]{background:var(--alert);border-color:var(--alert);color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-label="Estimation Uncertainty Simulator">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="cone-wrap">
+    <svg class="cone-svg" id="coneChart" viewBox="0 0 640 260" role="img" aria-label="Estimation range vs project phase">
+      <g id="coneGridLayer"></g>
+      <path id="coneArea" class="cone-area"></path>
+      <path id="coneUpper" class="cone-bound"></path>
+      <path id="coneLower" class="cone-bound"></path>
+      <line id="trueLine" class="true-line" x1="0" y1="0" x2="640" y2="0"></line>
+      <text id="trueLineLabel" class="true-label"></text>
+      <g id="phaseAxisLayer"></g>
+      <line id="phaseMarker" class="phase-marker"></line>
+      <line id="phaseCapTop" class="phase-cap"></line>
+      <line id="phaseCapBottom" class="phase-cap"></line>
+      <circle id="phasePoint" class="phase-point" r="5"></circle>
+      <text id="phasePctTop" class="phase-pct-label"></text>
+      <text id="phasePctBottom" class="phase-pct-label"></text>
+      <rect id="phaseHit" class="phase-hit" x="0" y="0" width="20" height="260"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="phaseName"></span><small id="phaseSub"></small></div>
+      <div class="readout mono" id="phaseReadout" style="font-size:20px">企画・アイデア</div>
+      <input type="range" id="phaseSlider" min="1" max="5" step="1" value="1">
+      <div class="num-row">
+        <label for="phaseNum" id="numLabel1"></label>
+        <input type="number" id="phaseNum" min="1" max="5" step="1" value="1">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="baseName"></span><small id="baseSub"></small></div>
+      <div class="readout mono" id="baseReadout">10</div>
+      <input type="range" id="baseSlider" min="2" max="500" step="1" value="10">
+      <div class="num-row">
+        <label for="baseNum" id="numLabel2"></label>
+        <input type="number" id="baseNum" min="2" max="500" step="1" value="10">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 id="relatedH"></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (Cone of Uncertainty・簡略版) ================= */
+const PHASES = [
+  { low: 0.25, high: 4 },
+  { low: 0.5, high: 2 },
+  { low: 0.67, high: 1.5 },
+  { low: 0.85, high: 1.15 },
+  { low: 1, high: 1 },
+];
+const PHASE_MIN = 1, PHASE_MAX = 5;
+const BASE_MIN = 2, BASE_MAX = 500;
+
+function phaseRange(phase, baseline) {
+  const p = PHASES[phase - 1];
+  return { low: p.low * baseline, high: p.high * baseline };
+}
+function widthRatio(phase) {
+  const p = PHASES[phase - 1];
+  return p.high - p.low;
+}
+function scoreOf(phase) {
+  const maxWidth = PHASES[0].high - PHASES[0].low;
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - widthRatio(phase) / maxWidth))));
+}
+function assess(phase, baseline) {
+  const score = scoreOf(phase);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { score, band, range: phaseRange(phase, baseline) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "最初の見積もりは、そのまま信じていい? | 見積もりの不確実性シミュレーター",
+  heroTitle: "最初の見積もりは、<br>そのまま信じていい?",
+  heroLead: "見積もりの精度は、それをいつの時点で行うかによって決まります。プロジェクトの立ち上げ直後に行う見積もりは、実際の工数から大きく外れることがあります。要件や設計を固めた後の段階で見積もり直せば、疑問点が解消された分だけ、はるかに高い精度が期待できます。プロジェクトの進行段階を動かして、その変化を確認してください。",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "この段階の見積もり誤差",
+  scoreLabel: "見積もり精度スコア",
+  phaseName: "プロジェクトの進行段階", phaseSub: "後の工程ほど、その時点の見積もりが正確になります",
+  baseName: "実際にかかる工数", baseSub: "プロジェクトが最終的に必要とする工数(人月)。振り返って初めてわかる「正解」の値です",
+  chartCaption: "網掛け部分は、その段階で見積もった場合に生じうる誤差の範囲を表します。狭いほど、その時点の見積もりの精度が高いことを意味します。",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 100人月規模の大型案件を企画段階で予算確定する",
+  phaseNames: ["企画・アイデア", "要件定義完了", "設計完了", "詳細設計・実装中", "リリース直前"],
+  phaseNamesShort: ["企画", "要件定義", "設計完了", "詳細設計/実装", "リリース前"],
+  trueLineLabel: baseline => `実際の工数: ${baseline}人月`,
+  sumVal: (minPct, maxPct, fmtPct) => `${fmtPct(minPct)} 〜 ${fmtPct(maxPct)}`,
+  chartNote: "簡易モデルによる目安です。実際の誤差幅はプロジェクトの性質により異なります。",
+  hint: (phase, r, baseline, minPct, maxPct, fmtPct) => `実際の工数を${baseline}人月と仮定すると、「${I18N.ja.phaseNames[phase - 1]}」の段階で見積もった場合の誤差は最大${fmtPct(maxPct)}・最小${fmtPct(minPct)}程度(${r.low.toFixed(1)}〜${r.high.toFixed(1)}人月)になります。`,
+  hintScenario: (r, minPct, maxPct, fmtPct) => `実際には100人月かかる大型案件で、企画段階の見積もりだけを根拠に予算を確定してしまいました。この段階の見積もりは最大${fmtPct(maxPct)}・最小${fmtPct(minPct)}(${r.low.toFixed(1)}〜${r.high.toFixed(1)}人月)ブレる可能性があります。`,
+  comments: [
+    "実績に近い精度です。この数字は計画の根拠にできます。",
+    "かなり精度が上がってきました。大きな前提変更がなければ信頼できます。",
+    "まだ幅のある見積もりです。重要な意思決定には注意してください。",
+    "誤差が大きい段階です。契約条件の確定にはまだ早いかもしれません。",
+    "企画段階の見積もりです。実際の4倍近く外れる可能性があります。目安として扱ってください。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象は「不確実性のコーン(Cone of Uncertainty)」と呼ばれ、スティーブ・マコネルの著書『ソフトウェア見積り』で体系化されました。プロジェクトの初期段階で行う見積もりは、実際の工数の0.25倍から4倍まで外れることがありますが、要件や設計が固まった後の段階で見積もり直せば、その精度は大きく上がります。ただしこの幅は放っておいて自然に狭まるわけではなく、疑問点や前提を実際に解消していくことで初めて狭まります。",
+  adviceItems: [
+    "初期見積もりは単一の数字ではなく「幅」で示し、その意味をあわせて伝える",
+    "契約や予算の最終確定は、幅が十分に狭まった段階まで待つか、段階的なコミットメント(フェーズゲート)にする",
+    "見積もりの前提(スコープ・要件)が変わったら、見積もりも必ず再計算する",
+    "初期見積もりを進捗管理の基準にする場合は、誤差の範囲を関係者全員で事前に共有しておく",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "ESTIMATION", title: "ソフトウェア見積り 人月の暗黙知を解き明かす", desc: "スティーブ・マコネル著。「不確実性のコーン」を体系化した、見積もりというブラックアートを解き明かす一冊。", link: "Amazonで見る →", url: "https://amzn.to/3RuruSb" },
+  ],
+  relatedH: "関連する問題",
+  related: [
+    { title: "開発あるある図鑑(全シミュレーター一覧)", desc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。", href: "../" },
+    { title: "人が増えれば早く終わる? | ブルックスの法則シミュレーター", desc: "増員によるコミュニケーションコストの増加を可視化する姉妹シミュレーター。", href: "../brooks-law/" },
+    { title: "QCDトレードオフ・シミュレーター", desc: "品質・コスト・納期のトレードオフを可視化する姉妹シミュレーター。", href: "../qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "最初の見積もりは、そのまま信じていい? | 見積もりの不確実性シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Can you trust the first estimate? | Estimation Uncertainty Simulator",
+  heroTitle: "Can you trust<br>the first estimate?",
+  heroLead: "An estimate's accuracy depends on when in the project it's made. An estimate made right at kickoff can be wildly off from the actual effort. Re-estimate after requirements and design are locked down, once the unknowns are resolved, and you get a far more accurate number. Move the phase slider and see the difference.",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "Estimate error at this stage",
+  scoreLabel: "Estimate accuracy score",
+  phaseName: "Project phase", phaseSub: "Later stages mean a more accurate estimate made at that point",
+  baseName: "Actual effort required", baseSub: "The effort the project ultimately needs (person-months) — the \"right answer\" only known in hindsight",
+  chartCaption: "The shaded area shows the likely error range for an estimate made at that stage. Narrower means a more accurate estimate at that point in time.",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: lock the budget for a 100 PM project at concept stage",
+  phaseNames: ["Initial Concept", "Requirements Complete", "Design Complete", "Detailed Design / Build", "Pre-Release"],
+  phaseNamesShort: ["Concept", "Requirements", "Design", "Detail/Build", "Release"],
+  trueLineLabel: baseline => `Actual effort: ${baseline} PM`,
+  sumVal: (minPct, maxPct, fmtPct) => `${fmtPct(minPct)} to ${fmtPct(maxPct)}`,
+  chartNote: "A simplified estimate — actual uncertainty varies by project.",
+  hint: (phase, r, baseline, minPct, maxPct, fmtPct) => `Assuming the actual effort turns out to be ${baseline} PM, an estimate made at the "${I18N.en.phaseNames[phase - 1]}" stage would carry an error of up to ${fmtPct(maxPct)} or as little as ${fmtPct(minPct)} (${r.low.toFixed(1)}–${r.high.toFixed(1)} PM).`,
+  hintScenario: (r, minPct, maxPct, fmtPct) => `This project will actually need 100 person-months, but the budget just got locked in using only a concept-stage estimate. At this stage, the estimate could be off by as much as ${fmtPct(maxPct)} or as little as ${fmtPct(minPct)} (${r.low.toFixed(1)}–${r.high.toFixed(1)} PM).`,
+  comments: [
+    "Close to the real figure. This number can anchor a plan.",
+    "Accuracy has improved a lot. Reliable barring major scope changes.",
+    "Still a wide range. Be cautious using this for major decisions.",
+    "The margin of error is large here. Too early to lock in contract terms.",
+    "A concept-stage estimate. It could be off by nearly 4x. Treat it as a rough guide only.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This is known as the Cone of Uncertainty, formalized in Steve McConnell's book Software Estimation: Demystifying the Black Art. An estimate made at a project's earliest stage can be off by 0.25x to 4x the actual effort, but re-estimating after requirements and design solidify yields far better accuracy. Importantly, the cone doesn't narrow on its own — it only narrows as the team actually resolves open questions and assumptions.",
+  adviceItems: [
+    "Present early estimates as a range, not a single number, and explain what the range means",
+    "Delay final contract or budget commitments until the range has narrowed enough, or use phased commitments (phase gates)",
+    "Re-estimate whenever the underlying assumptions (scope, requirements) change",
+    "If an early estimate is used as a planning baseline, make sure everyone understands its margin of error upfront",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ESTIMATION", title: "Software Estimation: Demystifying the Black Art", desc: "Steve McConnell. The book that formalized the Cone of Uncertainty and demystifies the black art of software estimation.", link: "View on Amazon →", url: "https://amzn.to/4w81lre" },
+  ],
+  relatedH: "Related problems",
+  related: [
+    { title: "Dev Sim Lab (all simulators)", desc: "Explore the other software development misconceptions in this series.", href: "../" },
+    { title: "Will adding people make it faster? | Brooks's Law Simulator", desc: "A companion simulator on how communication overhead grows with team size.", href: "../brooks-law/" },
+    { title: "QCD Trade-off Simulator", desc: "A companion simulator for the quality-cost-delivery trade-off.", href: "../qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Can you trust the first estimate? — Estimation Uncertainty Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (phase, r, baseline, minPct, maxPct, fmtPct) => `実際の工数は${baseline}人月(という設定)。「${I18N.ja.phaseNames[phase - 1]}」時点の見積もりは${fmtPct(minPct)}〜${fmtPct(maxPct)}の誤差込み。もう占いです。`,
+  hintScenario: (r, minPct, maxPct, fmtPct) => `100人月案件、企画書ナプキンメモの数字で予算承認。この段階のブレは${fmtPct(minPct)}〜${fmtPct(maxPct)}(${r.low.toFixed(1)}〜${r.high.toFixed(1)}人月)。乾杯しましょう。`,
+  comments: [
+    "実績に近い。もう賭け事ではない。",
+    "だいぶ絞れてきた。まだ油断は禁物。",
+    "コーンはまだ開いている。「大体このくらいです」がまだ通用する段階。",
+    "「大体このくらい」が通用しなくなってきた頃。",
+    "企画書1枚で出した数字。的中したら宝くじ級。",
+  ],
+},
+en: {
+  hint: (phase, r, baseline, minPct, maxPct, fmtPct) => `Actual effort is (allegedly) ${baseline} PM. An estimate at "${I18N.en.phaseNames[phase - 1]}" carries ${fmtPct(minPct)} to ${fmtPct(maxPct)} of pure vibes. This is basically fortune-telling.`,
+  hintScenario: (r, minPct, maxPct, fmtPct) => `A 100 PM project, budget approved off a number scribbled on a napkin. Swing at this stage: ${fmtPct(minPct)} to ${fmtPct(maxPct)} (${r.low.toFixed(1)}–${r.high.toFixed(1)} PM). Cheers.`,
+  comments: [
+    "Close to reality. No longer a gamble.",
+    "Narrowing down nicely. Still don't get comfortable.",
+    "The cone is still wide open. \"Roughly this much\" still flies in the steering meeting.",
+    "\"Roughly this much\" stopped working a while ago.",
+    "A number from a one-page pitch deck. If it's right, buy a lottery ticket too.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let phase = 1;
+let baseline = 10;
+let scenarioActive = false;
+
+/* ================= コーンチャート ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 260, PAD_L = 46, PAD_R = 16, PAD_T = 16, PAD_B = 44;
+const xOf = p => PAD_L + ((p - PHASE_MIN) / (PHASE_MAX - PHASE_MIN)) * (PW - PAD_L - PAD_R);
+const fmtPct = v => (v > 0 ? "+" : "") + v + "%";
+const pOfX = x => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  return Math.min(PHASE_MAX, Math.max(PHASE_MIN, Math.round(PHASE_MIN + frac * (PHASE_MAX - PHASE_MIN))));
+};
+
+function buildAxisLabels() {
+  const layer = document.getElementById("phaseAxisLayer");
+  layer.innerHTML = "";
+  for (let p = PHASE_MIN; p <= PHASE_MAX; p++) {
+    const anchor = p === PHASE_MIN ? "start" : p === PHASE_MAX ? "end" : "middle";
+    const t = el("text", { class: "cone-axis-label", x: xOf(p), y: PH - PAD_B + 34, "text-anchor": anchor });
+    t.setAttribute("data-phase", p);
+    layer.appendChild(t);
+  }
+}
+
+function drawCone() {
+  const t = T();
+  const yMax = baseline * PHASES[0].high;
+  const yOf = v => PAD_T + (1 - v / yMax) * (PH - PAD_T - PAD_B);
+
+  const gridLayer = document.getElementById("coneGridLayer");
+  gridLayer.innerHTML = "";
+  [0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = PAD_T + (1 - f) * (PH - PAD_T - PAD_B);
+    gridLayer.appendChild(el("line", { class: "cone-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+  });
+
+  const uppers = [], lowers = [];
+  for (let p = PHASE_MIN; p <= PHASE_MAX; p++) {
+    const r = phaseRange(p, baseline);
+    uppers.push(`${xOf(p)},${yOf(r.high)}`);
+    lowers.push(`${xOf(p)},${yOf(r.low)}`);
+  }
+  document.getElementById("coneUpper").setAttribute("d", "M " + uppers.join(" L "));
+  document.getElementById("coneLower").setAttribute("d", "M " + lowers.join(" L "));
+  document.getElementById("coneArea").setAttribute("d", "M " + uppers.join(" L ") + " L " + lowers.slice().reverse().join(" L ") + " Z");
+
+  const trueY = yOf(baseline);
+  const trueLine = document.getElementById("trueLine");
+  trueLine.setAttribute("x1", PAD_L); trueLine.setAttribute("x2", PW - PAD_R);
+  trueLine.setAttribute("y1", trueY); trueLine.setAttribute("y2", trueY);
+  const trueLabel = document.getElementById("trueLineLabel");
+  trueLabel.setAttribute("x", PAD_L + 4);
+  trueLabel.setAttribute("y", trueY - 6);
+  trueLabel.textContent = t.trueLineLabel(baseline);
+
+  document.querySelectorAll("#phaseAxisLayer text").forEach(elm => {
+    const p = +elm.getAttribute("data-phase");
+    elm.textContent = t.phaseNamesShort[p - 1];
+  });
+
+  const r = phaseRange(phase, baseline);
+  const mx = xOf(phase), yTop = yOf(r.high), yBottom = yOf(r.low);
+  const marker = document.getElementById("phaseMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", yTop); marker.setAttribute("y2", yBottom);
+  const capTop = document.getElementById("phaseCapTop");
+  capTop.setAttribute("x1", mx - 7); capTop.setAttribute("x2", mx + 7);
+  capTop.setAttribute("y1", yTop); capTop.setAttribute("y2", yTop);
+  const capBottom = document.getElementById("phaseCapBottom");
+  capBottom.setAttribute("x1", mx - 7); capBottom.setAttribute("x2", mx + 7);
+  capBottom.setAttribute("y1", yBottom); capBottom.setAttribute("y2", yBottom);
+  const point = document.getElementById("phasePoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", (yTop + yBottom) / 2);
+
+  const maxPct = Math.round((PHASES[phase - 1].high - 1) * 100);
+  const minPct = Math.round((PHASES[phase - 1].low - 1) * 100);
+  const pctTop = document.getElementById("phasePctTop");
+  pctTop.setAttribute("x", mx); pctTop.setAttribute("y", Math.max(PAD_T - 6, yTop - 10));
+  pctTop.textContent = fmtPct(maxPct);
+  const pctBottom = document.getElementById("phasePctBottom");
+  pctBottom.setAttribute("x", mx); pctBottom.setAttribute("y", yBottom + 18);
+  pctBottom.textContent = fmtPct(minPct);
+
+  const hit = document.getElementById("phaseHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const r = assess(phase, baseline);
+
+  drawCone();
+
+  const maxPct = Math.round((PHASES[phase - 1].high - 1) * 100);
+  const minPct = Math.round((PHASES[phase - 1].low - 1) * 100);
+  document.getElementById("sumVal").textContent = t.sumVal(minPct, maxPct, fmtPct);
+  document.getElementById("hint").textContent = scenarioActive
+    ? t.hintScenario(r.range, minPct, maxPct, fmtPct)
+    : t.hint(phase, r.range, baseline, minPct, maxPct, fmtPct);
+  document.getElementById("scenarioBtn").setAttribute("aria-pressed", scenarioActive);
+
+  document.getElementById("phaseReadout").textContent = t.phaseNames[phase - 1];
+  document.getElementById("baseReadout").textContent = baseline;
+  if (document.activeElement !== document.getElementById("phaseSlider")) document.getElementById("phaseSlider").value = phase;
+  if (document.activeElement !== document.getElementById("phaseNum")) document.getElementById("phaseNum").value = phase;
+  if (document.activeElement !== document.getElementById("baseSlider")) document.getElementById("baseSlider").value = baseline;
+  if (document.activeElement !== document.getElementById("baseNum")) document.getElementById("baseNum").value = baseline;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = r.score;
+  scoreEl.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/estimation-uncertainty/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("phaseName").textContent = t.phaseName;
+  document.getElementById("phaseSub").textContent = t.phaseSub;
+  document.getElementById("baseName").textContent = t.baseName;
+  document.getElementById("baseSub").textContent = t.baseSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  document.getElementById("relatedH").textContent = t.relatedH;
+  const relGrid = document.getElementById("relatedGrid");
+  relGrid.innerHTML = "";
+  t.related.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "sim-card";
+    a.href = item.href;
+    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
+    relGrid.appendChild(a);
+  });
+}
+
+/* ================= イベント ================= */
+document.getElementById("phaseSlider").addEventListener("input", e => { phase = +e.target.value; scenarioActive = false; render(); });
+document.getElementById("phaseNum").addEventListener("change", e => {
+  phase = Math.min(PHASE_MAX, Math.max(PHASE_MIN, +e.target.value));
+  scenarioActive = false;
+  render();
+});
+document.getElementById("baseSlider").addEventListener("input", e => { baseline = +e.target.value; scenarioActive = false; render(); });
+document.getElementById("baseNum").addEventListener("change", e => {
+  baseline = Math.min(BASE_MAX, Math.max(BASE_MIN, +e.target.value));
+  scenarioActive = false;
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  phase = 1; baseline = 10; scenarioActive = false;
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  scenarioActive = !scenarioActive;
+  if (scenarioActive) { phase = 1; baseline = 100; }
+  render();
+});
+
+/* ---- drag the phase marker directly on the cone chart ---- */
+const coneChart = document.getElementById("coneChart");
+function svgPoint(evt) {
+  const pt = coneChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(coneChart.getScreenCTM().inverse());
+}
+let draggingPhase = false;
+function startPhaseDrag(evt) {
+  draggingPhase = true;
+  coneChart.setPointerCapture(evt.pointerId);
+  document.getElementById("phaseMarker").classList.add("dragging");
+  document.getElementById("phaseHit").classList.add("dragging");
+  updatePhaseFromPointer(evt);
+  evt.preventDefault();
+}
+function updatePhaseFromPointer(evt) {
+  const p = svgPoint(evt);
+  phase = pOfX(p.x);
+  render();
+}
+document.getElementById("phaseHit").addEventListener("pointerdown", startPhaseDrag);
+document.getElementById("phasePoint").addEventListener("pointerdown", startPhaseDrag);
+coneChart.addEventListener("pointermove", evt => { if (draggingPhase) updatePhaseFromPointer(evt); });
+["pointerup", "pointercancel"].forEach(ev => coneChart.addEventListener(ev, () => {
+  draggingPhase = false;
+  document.getElementById("phaseMarker").classList.remove("dragging");
+  document.getElementById("phaseHit").classList.remove("dragging");
+}));
+
+buildAxisLabels();
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
