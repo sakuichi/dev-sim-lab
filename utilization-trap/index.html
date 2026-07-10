@@ -41,6 +41,7 @@
 .sum b{color:var(--ink);font-size:16px}
 .sum b.danger{color:var(--alert)}
 .hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+.chart-note{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:8px}
 
 /* ---- queue visual ---- */
 .queue-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
@@ -143,6 +144,7 @@
       <text id="waitXLabelMax" class="wait-axis-label"></text>
     </svg>
   </div>
+  <p class="chart-note" id="chartNote"></p>
 
   <div class="assess" aria-live="polite">
     <div class="assess-head">
@@ -200,6 +202,7 @@
 </main>
 
 <footer>
+  <p data-foot-note></p>
   <p data-foot-disclosure></p>
   <p><a href="../privacy/" data-foot-privacy></a></p>
   <p>© 2026 <span data-brand></span></p>
@@ -262,6 +265,7 @@ ja: {
   resetBtn: "リセット",
   scenarioBtn: "シナリオ: 予定を目一杯詰め込む",
   serverLabel: "処理中",
+  chartNote: "簡易モデルによる目安です。実際の待ち時間は状況により異なります。",
   queueOverflow: n => `他 ${n}件`,
   hint: (rho, queued) => `稼働率 ${Math.round(rho * 100)}% では、平均で ${queued.toFixed(1)}件が着手を待っています。`,
   hintScenario: "稼働率を95%まで引き上げてみました。待ち時間がどれだけ伸びるか確認してください。",
@@ -278,7 +282,7 @@ ja: {
   unitHoursMinutes: (h, m) => `${h}時間${m}分`,
   waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
   adviceHeading: "現実には、どう向き合うか",
-  adviceIntro: "M/M/1待ち行列の近似では、待ち時間は稼働率 ρ に対して ρ/(1−ρ) のペースで増えます。稼働率が90%を超えたあたりから、わずかな稼働率の上昇が待ち時間を急激に押し上げます。「全員が常に忙しい」状態は、実は新しい依頼への応答が最も遅い状態でもあります。",
+  adviceIntro: "予定が詰まるほど、新しい依頼に着手できるまでの待ち時間は、単純な足し算以上のペースで伸びていきます。特に稼働率が90%を超えたあたりから、わずかな予定の積み増しが待ち時間を急激に押し上げます。「全員が常に忙しい」状態は、実は新しい依頼への応答が最も遅い状態でもあるのです。",
   adviceItems: [
     "意図的にスラック(余白時間)を確保する。稼働率100%を目指さない",
     "WIP(同時進行数)に上限を設け、行列そのものを増やさない",
@@ -314,6 +318,7 @@ en: {
   resetBtn: "Reset",
   scenarioBtn: "Scenario: pack the schedule to the brim",
   serverLabel: "In service",
+  chartNote: "A simplified estimate — actual wait times vary by situation.",
   queueOverflow: n => `+${n} more`,
   hint: (rho, queued) => `At ${Math.round(rho * 100)}% utilization, an average of ${queued.toFixed(1)} tasks are waiting to be started.`,
   hintScenario: "We just pushed utilization up to 95%. See how much the wait time grows.",
@@ -330,7 +335,7 @@ en: {
   unitHoursMinutes: (h, m) => `${h}h ${m}m`,
   waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
   adviceHeading: "How to actually deal with this",
-  adviceIntro: "In the M/M/1 queueing approximation, wait time grows with utilization ρ at a rate of ρ/(1−ρ). Past roughly 90% utilization, a small increase in load pushes wait time up sharply. Being \"100% busy\" is, in practice, also the state where response to any new request is slowest.",
+  adviceIntro: "The fuller a schedule gets, the faster the wait time before a new request can even be started grows — well beyond simple addition. Past roughly 90% utilization, a small increase in load pushes wait time up sharply. Being \"100% busy\" is, in practice, also the state where response to any new request is slowest.",
   adviceItems: [
     "Deliberately keep slack — don't aim for 100% utilization",
     "Cap WIP (work in progress) so the queue itself can't keep growing",
@@ -528,6 +533,7 @@ function applyStaticText() {
   document.getElementById("numLabel2").textContent = t.numLabel;
   document.getElementById("resetBtn").textContent = t.resetBtn;
   document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartNote").textContent = t.chartNote;
 
   document.getElementById("secAdvice").innerHTML = `
     <h2>${t.adviceHeading}</h2>

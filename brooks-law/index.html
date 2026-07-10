@@ -40,6 +40,8 @@ svg{width:100%;max-width:320px;height:auto}
 .edge{stroke:var(--line);stroke-width:1}
 .node{fill:var(--d);stroke:#fff;stroke-width:2}
 .hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:4px}
+.chart-note{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:10px}
 
 /* ---- team stepper (+/- above the network diagram) ---- */
 .team-stepper{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
@@ -143,6 +145,7 @@ svg{width:100%;max-width:320px;height:auto}
       <g id="nodeLayer"></g>
     </svg>
   </div>
+  <p class="chart-caption" id="chartCaption"></p>
   <p class="hint" id="hint" aria-live="polite"></p>
 
   <div class="prod-wrap">
@@ -158,6 +161,7 @@ svg{width:100%;max-width:320px;height:auto}
       <text id="prodXLabelMax" class="prod-axis-label"></text>
     </svg>
   </div>
+  <p class="chart-note" id="chartNote"></p>
 
   <div class="assess" aria-live="polite">
     <div class="assess-head">
@@ -220,6 +224,7 @@ svg{width:100%;max-width:320px;height:auto}
 </main>
 
 <footer>
+  <p data-foot-note></p>
   <p data-foot-disclosure></p>
   <p><a href="../privacy/" data-foot-privacy></a></p>
   <p>© 2026 <span data-brand></span></p>
@@ -274,12 +279,14 @@ ja: {
   scoreLabel: "生産性スコア",
   teamName: "チーム人数", teamSub: "2〜20人",
   teamUnit: "人", teamMinusAria: "人数を1人減らす", teamPlusAria: "人数を1人増やす",
-  costName: "コミュニケーションコスト係数", costSub: "経路1本あたりのコスト",
+  costName: "1つのやり取りの負担度", costSub: "大きいほど、確認・すり合わせに手間がかかることを表します",
   numLabel: "数値",
   resetBtn: "リセット",
   scenarioBtn: "シナリオ: 遅れているプロジェクトに人を追加する",
   rampBtn: "🐣 立ち上げコストを含める",
   rampSub: "ONにすると、6人目以降に加わったメンバーは立ち上がるまで生産性50%として扱われます。",
+  chartCaption: "線が多いほど、確認が必要なやり取りが増えることを表します。",
+  chartNote: "簡易モデルによる目安です。実際の生産性は状況により異なります。",
   hint: (n, paths) => `${n}人のチームで、確認が必要なコミュニケーション経路は ${paths} 本です。`,
   hintScenario: "遅れているプロジェクトに、今すぐ5人を追加してみました。人数と生産性の変化を確認してください。",
   comments: [
@@ -324,12 +331,14 @@ en: {
   scoreLabel: "Productivity score",
   teamName: "Team size", teamSub: "2 to 20 people",
   teamUnit: "", teamMinusAria: "Decrease team size by 1", teamPlusAria: "Increase team size by 1",
-  costName: "Communication cost coefficient", costSub: "cost per path",
+  costName: "Effort per hand-off", costSub: "Higher means more time spent aligning on every path",
   numLabel: "Value",
   resetBtn: "Reset",
   scenarioBtn: "Scenario: add people to a late project",
   rampBtn: "🐣 Include ramp-up cost",
   rampSub: "When on, members joining beyond the 6th are treated as 50% productive until they ramp up.",
+  chartCaption: "More lines mean more hand-offs that need to be tracked.",
+  chartNote: "A simplified estimate — actual productivity varies by situation.",
   hint: (n, paths) => `With a team of ${n}, there are ${paths} communication paths to keep track of.`,
   hintScenario: "We just added 5 people to a project that's already late. See how team size and productivity change.",
   comments: [
@@ -531,6 +540,8 @@ function applyStaticText() {
   document.getElementById("teamStepperUnit").textContent = t.teamUnit;
   document.getElementById("teamMinus").setAttribute("aria-label", t.teamMinusAria);
   document.getElementById("teamPlus").setAttribute("aria-label", t.teamPlusAria);
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
   document.getElementById("costName").textContent = t.costName;
   document.getElementById("costSub").textContent = t.costSub;
   document.getElementById("numLabel1").textContent = t.numLabel;

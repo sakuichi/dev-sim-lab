@@ -48,6 +48,7 @@ window.DevSimLab = (function () {
       shareLabel: "SHARE",
       copyBtn: "URLをコピー",
       copiedMsg: "コピーしました!",
+      footNote: "本サイトのシミュレーターおよびコンテンツは情報提供を目的としたものであり、特定のプロジェクトに関する助言を行うものではありません。詳細は免責事項をご覧ください。",
       footPrivacy: "プライバシーポリシー・免責事項",
       footDisclosure: "Amazonのアソシエイトとして、当サイトは適格販売により収入を得ています。",
       backToTop: "← 一覧に戻る",
@@ -60,6 +61,7 @@ window.DevSimLab = (function () {
       shareLabel: "SHARE",
       copyBtn: "Copy URL",
       copiedMsg: "Copied!",
+      footNote: "The simulators and content on this site are provided for informational purposes only and do not constitute advice on any specific project. See the disclaimer for details.",
       footPrivacy: "Privacy Policy & Disclaimer",
       footDisclosure: "As an Amazon Associate, this site earns from qualifying purchases.",
       backToTop: "← Back to all simulators",
@@ -162,7 +164,7 @@ window.DevSimLab = (function () {
      [data-lang-switch] wraps the ja/en buttons (button[data-lang])
      [data-brand] / [data-brand-eyebrow] show the site name
      [data-tone-btn] / [data-tone-note] wire the 🔥 dev-mode toggle
-     [data-foot-privacy] / [data-foot-disclosure] / [data-share-label] / [data-back-top]
+     [data-foot-note] / [data-foot-privacy] / [data-foot-disclosure] / [data-share-label] / [data-back-top]
      fill in shared footer/share copy.
      Pass onRender(lang, tone) for page-specific i18n re-rendering. */
   function initChrome(opts) {
@@ -189,6 +191,7 @@ window.DevSimLab = (function () {
         toneNote.textContent = t.toneNote;
         toneNote.hidden = TONE !== "dev";
       }
+      document.querySelectorAll("[data-foot-note]").forEach((elm) => (elm.textContent = t.footNote));
       document.querySelectorAll("[data-foot-privacy]").forEach((elm) => (elm.textContent = t.footPrivacy));
       document.querySelectorAll("[data-foot-disclosure]").forEach((elm) => (elm.textContent = t.footDisclosure));
       document.querySelectorAll("[data-share-label]").forEach((elm) => (elm.textContent = t.shareLabel));
