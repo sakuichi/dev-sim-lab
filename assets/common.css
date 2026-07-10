@@ -120,6 +120,54 @@ section.text li{margin-bottom:6px}
 .related-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 @media(max-width:560px){.related-grid{grid-template-columns:1fr}}
 
+/* ============================================================
+   Simulator console / assessment / controls
+   Shared shell used by every interactive simulator page
+   (qcd-tradeoff, brooks-law, utilization-trap, context-switch).
+   Each page still defines its own chart/visual-specific styles.
+   ============================================================ */
+.console{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:0 2px 0 rgba(34,48,46,.05);padding:20px 16px 24px;
+}
+.console-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:6px;
+  flex-wrap:wrap;gap:6px;
+}
+.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
+.sum b{color:var(--ink);font-size:16px}
+.sum b.danger{color:var(--alert)}
+
+.hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+.chart-note{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:8px}
+
+.assess{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:#FDFDFC;padding:14px 14px 12px}
+.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
+.score-val.warn{color:var(--c)}
+.score-val.danger{color:var(--alert)}
+.score-max{font-size:14px;color:var(--ink-soft)}
+.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.axis-card{
+  border:1px solid var(--line);border-top:3px solid var(--axis,var(--d));
+  border-radius:8px;padding:12px 12px 14px;background:#FDFDFC;
+}
+.axis-name{font-weight:700;font-size:13.5px}
+.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
+.readout{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:700;color:var(--d);margin:4px 0 0;line-height:1.1}
+.axis-card input[type=range]{width:100%;accent-color:var(--d);margin:6px 0 8px}
+.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.axis-card input[type=number]{
+  width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;
+  padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink);
+}
+
 /* ---- footer ---- */
 footer{
   margin-top:56px;padding:24px 0 40px;border-top:1px solid var(--line);

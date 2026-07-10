@@ -35,24 +35,22 @@
 <link rel="stylesheet" href="../assets/common.css">
 <style>
 /* base tokens, header, lang-switch, mode-row/tone-btn, actions/btn, share,
-   section.text/h2/scenario, books-grid/book, footer all come from
-   ../assets/common.css. Only the QCD-specific console/chart/assessment
-   styling stays here. */
-.console{
-  background:var(--surface);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  box-shadow:0 2px 0 rgba(34,48,46,.05);
-  padding:20px 16px 24px;
+   section.text/h2/scenario, books-grid/book, footer, console/assess shell,
+   .num-row, .related-grid all come from ../assets/common.css. This page
+   overrides .hint/.controls/.axis-card/.readout for the 3-axis Q/C/D
+   layout and adds the radar-chart-specific styling below. */
+.hint{
+  min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);
+  font-weight:500;margin-top:2px;
 }
-.console-head{
-  display:flex;justify-content:space-between;align-items:baseline;
-  border-bottom:1px dashed var(--line);
-  padding-bottom:10px;margin-bottom:6px;
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.readout{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:34px;font-weight:700;color:var(--axis);
+  margin:4px 0 0;line-height:1.1;
 }
-.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
-.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
-.sum b{color:var(--ink);font-size:16px}
+.axis-card input[type=range]{width:100%;accent-color:var(--axis);margin:6px 0 8px}
 
 .chart-wrap{display:flex;justify-content:center}
 svg{width:100%;max-width:440px;height:auto;touch-action:none;user-select:none}
@@ -68,23 +66,8 @@ svg{width:100%;max-width:440px;height:auto;touch-action:none;user-select:none}
 .axis-label{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700}
 .tick-label{font-family:"IBM Plex Mono",monospace;font-size:9px;fill:var(--ink-soft)}
 .lock-badge{font-size:15px}
-.hint{
-  min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);
-  font-weight:500;margin-top:2px;
-}
 
-/* ---- 健全度パネル ---- */
-.assess{
-  margin-top:14px;border:1px solid var(--line);border-radius:8px;
-  background:#FDFDFC;padding:14px 14px 12px;
-}
-.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
-.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
-.score-val.warn{color:var(--c)}
-.score-val.danger{color:var(--alert)}
-.score-max{font-size:14px;color:var(--ink-soft)}
-.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+/* ---- 健全度パネル(advice/risksはQCD固有) ---- */
 .advice{list-style:none;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
 .advice li{
   font-size:13px;color:var(--ink-soft);padding-left:1.5em;position:relative;margin-bottom:5px;
@@ -100,42 +83,16 @@ svg{width:100%;max-width:440px;height:auto;touch-action:none;user-select:none}
 }
 .risks li::before{content:"–";position:absolute;left:.3em;top:0;color:var(--ink-soft);font-size:12.5px}
 
-/* ---- axis cards ---- */
-.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
-@media(max-width:560px){.controls{grid-template-columns:1fr}}
-.axis-card{
-  border:1px solid var(--line);
-  border-top:3px solid var(--axis);
-  border-radius:8px;
-  padding:12px 12px 14px;
-  background:#FDFDFC;
-}
+/* ---- axis cards (is-locked/row1/lock-btn/readout-sub/disabled are QCD-only) ---- */
 .axis-card.is-locked{background:#F4F2EC;border-style:dashed;border-top-style:solid}
 .axis-card .row1{display:flex;justify-content:space-between;align-items:flex-start}
-.axis-name{font-weight:700;font-size:13.5px}
-.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
 .lock-btn{
   border:1px solid var(--line);background:#fff;border-radius:6px;
   font-size:15px;line-height:1;padding:6px 9px;cursor:pointer;
 }
 .lock-btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink)}
-.readout{
-  font-family:"IBM Plex Mono",monospace;
-  font-size:34px;font-weight:700;color:var(--axis);
-  margin:4px 0 0;line-height:1.1;
-}
 .readout-sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);display:block;margin-bottom:2px}
-.axis-card input[type=range]{width:100%;accent-color:var(--axis);margin:6px 0 8px}
-.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
-.axis-card input[type=number]{
-  width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;
-  padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink);
-}
 .axis-card input:disabled{opacity:.45}
-
-/* ---- related links (page-local, mirrors brooks-law/utilization-trap) ---- */
-.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
