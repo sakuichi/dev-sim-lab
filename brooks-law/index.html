@@ -41,14 +41,30 @@ svg{width:100%;max-width:320px;height:auto}
 .node{fill:var(--d);stroke:#fff;stroke-width:2}
 .hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
 
+/* ---- team stepper (+/- above the network diagram) ---- */
+.team-stepper{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
+.stepper-btn{
+  width:32px;height:32px;border-radius:50%;flex:none;
+  border:1px solid var(--line);background:#fff;color:var(--ink);
+  font-size:18px;font-weight:700;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.stepper-btn:hover:not(:disabled){border-color:var(--ink)}
+.stepper-btn:disabled{opacity:.35;cursor:not-allowed}
+.stepper-val{font-family:"IBM Plex Mono",monospace;font-size:16px;min-width:4em;text-align:center;color:var(--ink-soft)}
+.stepper-val b{color:var(--ink);font-size:20px}
+
 /* ---- productivity curve ---- */
 .prod-wrap{margin-top:18px}
-.prod-svg{width:100%;height:auto}
+.prod-svg{width:100%;height:auto;touch-action:none;user-select:none}
 .prod-grid{stroke:var(--line);stroke-width:1}
 .prod-area{fill:var(--d);opacity:.12}
 .prod-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
-.prod-current{fill:var(--d);stroke:#fff;stroke-width:2}
+.prod-current{fill:var(--d);stroke:#fff;stroke-width:2;cursor:grab}
+.prod-current.dragging{cursor:grabbing}
 .prod-current.danger{fill:var(--alert)}
+.prod-current-hit{fill:transparent;cursor:grab}
+.prod-current-hit.dragging{cursor:grabbing}
 .prod-optimal-line{stroke:var(--q);stroke-width:1.4;stroke-dasharray:3 3}
 .prod-axis-label{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-soft)}
 .prod-optimal-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--q);font-weight:700}
@@ -116,6 +132,11 @@ svg{width:100%;max-width:320px;height:auto}
     <span class="tone-note" data-tone-note hidden></span>
   </div>
 
+  <div class="team-stepper">
+    <button class="stepper-btn" id="teamMinus" type="button">−</button>
+    <span class="stepper-val mono"><b id="teamStepperVal">6</b><span id="teamStepperUnit"></span></span>
+    <button class="stepper-btn" id="teamPlus" type="button">+</button>
+  </div>
   <div class="chart-wrap">
     <svg id="netChart" viewBox="0 0 320 320" role="img" aria-label="Communication network diagram">
       <g id="edgeLayer"></g>
@@ -131,7 +152,8 @@ svg{width:100%;max-width:320px;height:auto}
       <path id="prodLine" class="prod-line"></path>
       <line id="prodOptimalLine" class="prod-optimal-line" x1="0" y1="0" x2="0" y2="200"></line>
       <text id="prodOptimalLabel" class="prod-optimal-label"></text>
-      <circle id="prodCurrent" class="prod-current" r="5"></circle>
+      <circle id="prodCurrentHit" class="prod-current-hit" r="18"></circle>
+      <circle id="prodCurrent" class="prod-current" r="6"></circle>
       <text id="prodXLabelMin" class="prod-axis-label"></text>
       <text id="prodXLabelMax" class="prod-axis-label"></text>
     </svg>
@@ -251,6 +273,7 @@ ja: {
   sumLabel: "コミュニケーション経路",
   scoreLabel: "生産性スコア",
   teamName: "チーム人数", teamSub: "2〜20人",
+  teamUnit: "人", teamMinusAria: "人数を1人減らす", teamPlusAria: "人数を1人増やす",
   costName: "コミュニケーションコスト係数", costSub: "経路1本あたりのコスト",
   numLabel: "数値",
   resetBtn: "リセット",
@@ -300,6 +323,7 @@ en: {
   sumLabel: "Communication paths",
   scoreLabel: "Productivity score",
   teamName: "Team size", teamSub: "2 to 20 people",
+  teamUnit: "", teamMinusAria: "Decrease team size by 1", teamPlusAria: "Increase team size by 1",
   costName: "Communication cost coefficient", costSub: "cost per path",
   numLabel: "Value",
   resetBtn: "Reset",
@@ -406,8 +430,12 @@ function drawNetwork(n) {
 
 /* ================= 生産性カーブ ================= */
 const PW = 640, PH = 200, PAD_L = 34, PAD_R = 16, PAD_T = 14, PAD_B = 22;
+const xOf = n => PAD_L + ((n - N_MIN) / (N_MAX - N_MIN)) * (PW - PAD_L - PAD_R);
+const nOfX = x => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  return Math.min(N_MAX, Math.max(N_MIN, Math.round(N_MIN + frac * (N_MAX - N_MIN))));
+};
 function drawProductivity(r) {
-  const xOf = n => PAD_L + ((n - N_MIN) / (N_MAX - N_MIN)) * (PW - PAD_L - PAD_R);
   const nets = r.series.map(s => s.net);
   const yMin = Math.min(0, ...nets), yMax = Math.max(...nets);
   const yOf = v => PH - PAD_B - ((v - yMin) / (yMax - yMin || 1)) * (PH - PAD_T - PAD_B);
@@ -434,10 +462,14 @@ function drawProductivity(r) {
   optLabel.setAttribute("y", PAD_T + 10);
   optLabel.textContent = T().optimalLabel(r.optimal.n);
 
+  const curX = xOf(team), curY = yOf(r.currentNet);
   const cur = document.getElementById("prodCurrent");
-  cur.setAttribute("cx", xOf(team));
-  cur.setAttribute("cy", yOf(r.currentNet));
+  cur.setAttribute("cx", curX);
+  cur.setAttribute("cy", curY);
   cur.classList.toggle("danger", r.pastPeak && r.score < 70);
+  const curHit = document.getElementById("prodCurrentHit");
+  curHit.setAttribute("cx", curX);
+  curHit.setAttribute("cy", curY);
 
   const xMin = document.getElementById("prodXLabelMin");
   xMin.setAttribute("x", PAD_L); xMin.setAttribute("y", PH - 4);
@@ -461,6 +493,9 @@ function render() {
 
   document.getElementById("teamReadout").textContent = team;
   document.getElementById("costReadout").textContent = cost.toFixed(1);
+  document.getElementById("teamStepperVal").textContent = team;
+  document.getElementById("teamMinus").disabled = team <= N_MIN;
+  document.getElementById("teamPlus").disabled = team >= N_MAX;
   if (document.activeElement !== document.getElementById("teamSlider")) document.getElementById("teamSlider").value = team;
   if (document.activeElement !== document.getElementById("teamNum")) document.getElementById("teamNum").value = team;
   if (document.activeElement !== document.getElementById("costSlider")) document.getElementById("costSlider").value = cost;
@@ -493,6 +528,9 @@ function applyStaticText() {
   document.getElementById("scoreLabel").textContent = t.scoreLabel;
   document.getElementById("teamName").textContent = t.teamName;
   document.getElementById("teamSub").textContent = t.teamSub;
+  document.getElementById("teamStepperUnit").textContent = t.teamUnit;
+  document.getElementById("teamMinus").setAttribute("aria-label", t.teamMinusAria);
+  document.getElementById("teamPlus").setAttribute("aria-label", t.teamPlusAria);
   document.getElementById("costName").textContent = t.costName;
   document.getElementById("costSub").textContent = t.costSub;
   document.getElementById("numLabel1").textContent = t.numLabel;
@@ -543,6 +581,38 @@ document.getElementById("costNum").addEventListener("change", e => {
   render();
 });
 document.getElementById("rampBtn").addEventListener("click", () => { rampOn = !rampOn; render(); });
+document.getElementById("teamMinus").addEventListener("click", () => { team = Math.max(N_MIN, team - 1); render(); });
+document.getElementById("teamPlus").addEventListener("click", () => { team = Math.min(N_MAX, team + 1); render(); });
+
+/* ---- drag the current-position marker directly on the productivity chart ---- */
+const prodChart = document.getElementById("prodChart");
+function svgPoint(evt) {
+  const pt = prodChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(prodChart.getScreenCTM().inverse());
+}
+let draggingTeam = false;
+function startTeamDrag(evt) {
+  draggingTeam = true;
+  prodChart.setPointerCapture(evt.pointerId);
+  document.getElementById("prodCurrent").classList.add("dragging");
+  document.getElementById("prodCurrentHit").classList.add("dragging");
+  updateTeamFromPointer(evt);
+  evt.preventDefault();
+}
+function updateTeamFromPointer(evt) {
+  const p = svgPoint(evt);
+  team = nOfX(p.x);
+  render();
+}
+document.getElementById("prodCurrentHit").addEventListener("pointerdown", startTeamDrag);
+document.getElementById("prodCurrent").addEventListener("pointerdown", startTeamDrag);
+prodChart.addEventListener("pointermove", evt => { if (draggingTeam) updateTeamFromPointer(evt); });
+["pointerup", "pointercancel"].forEach(ev => prodChart.addEventListener(ev, () => {
+  draggingTeam = false;
+  document.getElementById("prodCurrent").classList.remove("dragging");
+  document.getElementById("prodCurrentHit").classList.remove("dragging");
+}));
 document.getElementById("resetBtn").addEventListener("click", () => {
   team = 6; cost = 1.0; rampOn = false;
   document.getElementById("hint").textContent = "";
