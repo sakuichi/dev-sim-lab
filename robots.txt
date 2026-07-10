@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sakuichi.github.io/dev-sim-lab/sitemap.xml

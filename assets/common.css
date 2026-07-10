@@ -1,0 +1,160 @@
+/* ============================================================
+   dev-sim-lab: shared design tokens & chrome
+   Design tokens inherited from the QCD Trade-off Simulator
+   (https://github.com/sakuichi/qcd-tradeoff) to keep visual
+   consistency across every simulator page.
+   ============================================================ */
+
+:root{
+  --paper:#EDF1EF;
+  --line:#D3DCD8;
+  --surface:#FFFFFF;
+  --ink:#22302E;
+  --ink-soft:#5C6B68;
+  --q:#0E7C66;
+  --c:#B07A14;
+  --d:#3B6EA5;
+  --alert:#B3423A;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"IBM Plex Sans JP",sans-serif;
+  color:var(--ink);
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:28px 28px;
+  line-height:1.75;
+}
+.mono{font-family:"IBM Plex Mono",monospace}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+a{color:var(--d)}
+
+/* ---- header ---- */
+header{padding:32px 0 24px}
+.header-top{display:flex;justify-content:space-between;align-items:center}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12px;letter-spacing:.22em;
+  color:var(--ink-soft);text-transform:uppercase;
+}
+.eyebrow a{color:inherit;text-decoration:none}
+.lang-switch{display:flex;gap:4px}
+.lang-switch button{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+  border-radius:6px;padding:5px 10px;cursor:pointer;
+}
+.lang-switch button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+h1{font-size:clamp(22px,5vw,32px);font-weight:700;line-height:1.4;margin:14px 0 12px}
+header p{color:var(--ink-soft);font-size:14px;max-width:44em}
+
+/* ---- dev-mode toggle ---- */
+.mode-row{display:flex;align-items:center;gap:10px;margin:8px 0 2px;flex-wrap:wrap}
+.tone-btn{
+  font-family:inherit;font-size:12px;font-weight:500;
+  border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+  border-radius:999px;padding:5px 12px;cursor:pointer;
+}
+.tone-btn[aria-pressed="true"]{background:var(--alert);border-color:var(--alert);color:#fff}
+.tone-note{font-size:11.5px;color:var(--ink-soft)}
+
+/* ---- buttons ---- */
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.btn{
+  font-family:inherit;font-size:13.5px;font-weight:500;
+  border-radius:8px;padding:10px 16px;cursor:pointer;
+  border:1px solid var(--ink);background:#fff;color:var(--ink);
+}
+.btn.primary{background:var(--ink);color:#fff}
+.btn:hover{transform:translateY(-1px)}
+@media(prefers-reduced-motion:reduce){.btn:hover{transform:none}}
+
+/* ---- share ---- */
+.share{margin-top:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.share-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.15em;color:var(--ink-soft)}
+.share-btns{display:flex;gap:8px;flex-wrap:wrap}
+.share-btn{
+  font-family:inherit;font-size:12.5px;font-weight:500;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.share-btn:hover{border-color:var(--ink)}
+.share-btn.copied{background:var(--q);border-color:var(--q);color:#fff}
+.share-ico{
+  width:18px;height:18px;border-radius:50%;flex:none;
+  color:#fff;font-family:"IBM Plex Mono",monospace;
+  font-size:9.5px;font-weight:700;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+
+/* ---- content sections ---- */
+section.text{margin-top:44px}
+h2{font-size:19px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+h2::before{content:"";display:inline-block;width:14px;height:14px;border:3px solid var(--ink);border-radius:2px;flex:none}
+section.text p{font-size:14.5px;margin-bottom:12px;max-width:46em}
+section.text ul{font-size:14.5px;padding-left:1.4em;margin-bottom:12px}
+section.text li{margin-bottom:6px}
+.scenario{
+  background:var(--surface);border-left:4px solid var(--d);
+  border-radius:6px;padding:14px 16px;font-size:14px;margin:16px 0;
+}
+.scenario b{color:var(--d)}
+
+/* ---- books ---- */
+.books-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.books-grid{grid-template-columns:1fr}}
+.book{
+  background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:14px;font-size:13.5px;
+}
+.book .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.15em;color:var(--ink-soft)}
+.book h3{font-size:14.5px;margin:4px 0 6px}
+.book a{color:var(--d)}
+.placeholder-note{font-size:12px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- related-simulators cross-links ---- */
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
+
+/* ---- footer ---- */
+footer{
+  margin-top:56px;padding:24px 0 40px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--ink-soft);
+}
+footer p{margin-bottom:6px}
+footer a{color:var(--ink-soft)}
+
+:focus-visible{outline:2px solid var(--d);outline-offset:2px}
+
+/* ============================================================
+   Landing-page-only components (simulator card grid)
+   ============================================================ */
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+@media(max-width:560px){.sim-grid{grid-template-columns:1fr}}
+.sim-card{
+  display:block;position:relative;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 16px;text-decoration:none;color:var(--ink);
+  box-shadow:0 2px 0 rgba(34,48,46,.05);
+}
+a.sim-card:hover{transform:translateY(-2px);border-color:var(--ink)}
+.sim-card.is-soon{opacity:.7}
+.sim-card .sim-badge{
+  position:absolute;top:14px;right:14px;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+  border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--ink-soft);background:#FDFDFC;
+}
+.sim-card .sim-badge.live{color:#fff;background:var(--q);border-color:var(--q)}
+.sim-card .sim-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;color:var(--ink-soft);text-transform:uppercase}
+.sim-card h2{font-size:16px;margin:8px 66px 8px 0}
+.sim-card h2::before{display:none}
+.sim-card p{font-size:13px;color:var(--ink-soft)}
+.sim-card .sim-tags{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.sim-card .sim-tags span{
+  font-size:10.5px;font-family:"IBM Plex Mono",monospace;color:var(--ink-soft);
+  border:1px solid var(--line);border-radius:999px;padding:2px 8px;
+}

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>開発あるある図鑑 | Dev Sim Lab</title>
+<meta name="description" content="品質・コスト・納期、人員計画、稼働率…ソフトウェア開発でよくある誤解を、インタラクティブなシミュレーターで体験できるシリーズサイト。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/">
+<meta property="og:title" content="開発あるある図鑑 | Dev Sim Lab">
+<meta property="og:description" content="ソフトウェア開発でよくある誤解を、インタラクティブなシミュレーターで体験できるシリーズサイト。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/index.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "開発あるある図鑑",
+  "alternateName": "Dev Sim Lab",
+  "url": "https://sakuichi.github.io/dev-sim-lab/",
+  "description": "品質・コスト・納期、人員計画、稼働率…ソフトウェア開発でよくある誤解を、インタラクティブなシミュレーターで体験できるシリーズサイト。",
+  "inLanguage": ["ja", "en"],
+  "hasPart": [
+    {"@type": "WebApplication", "name": "QCDトレードオフ・シミュレーター", "url": "https://sakuichi.github.io/qcd-tradeoff/", "applicationCategory": "BusinessApplication"}
+  ]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="./" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section aria-label="Simulators">
+  <div class="sim-grid" id="simGrid"></div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+</main>
+
+<footer>
+  <p data-foot-disclosure></p>
+  <p><a href="privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="assets/common.js"></script>
+<script>
+"use strict";
+
+const SIMS = [
+  {
+    id: "qcd-tradeoff",
+    status: "live",
+    href: "https://sakuichi.github.io/qcd-tradeoff/",
+    tags: { ja: ["品質", "コスト", "納期"], en: ["Quality", "Cost", "Delivery"] },
+    ja: {
+      title: "品質・コスト・納期のトレードオフを、見える形に。",
+      desc: "品質(Q)・コスト(C)・納期(D)は互いにトレードオフの関係にあります。ドラッグ操作でバランスを体感できるシミュレーター。",
+    },
+    en: {
+      title: "Make the quality-cost-delivery trade-off visible.",
+      desc: "Quality, cost and delivery are always in tension. Drag the chart to feel the trade-off for yourself.",
+    },
+  },
+  {
+    id: "brooks-law",
+    status: "soon",
+    href: "brooks-law/",
+    tags: { ja: ["人員計画", "コミュニケーション"], en: ["Staffing", "Communication"] },
+    ja: {
+      title: "人が増えれば、早く終わる?",
+      desc: "増員によるコミュニケーションコストの増加を可視化するシミュレーター(ブルックスの法則)。",
+    },
+    en: {
+      title: "Will adding people make it faster?",
+      desc: "A simulator visualizing how communication overhead grows with team size — Brooks's Law.",
+    },
+  },
+  {
+    id: "utilization-trap",
+    status: "soon",
+    href: "utilization-trap/",
+    tags: { ja: ["稼働率", "待ち時間"], en: ["Utilization", "Wait time"] },
+    ja: {
+      title: "全員が常に忙しい = 効率的?",
+      desc: "稼働率が高まるほど待ち時間が急増する様子を可視化するシミュレーター。",
+    },
+    en: {
+      title: "Is everyone being 100% busy actually efficient?",
+      desc: "A simulator showing how wait times explode as utilization approaches 100%.",
+    },
+  },
+  {
+    id: "context-switch",
+    status: "soon",
+    href: "context-switch/",
+    tags: { ja: ["マルチタスク", "生産性"], en: ["Multitasking", "Productivity"] },
+    ja: {
+      title: "3案件並行なら、1/3ずつ進む?",
+      desc: "並行案件数が増えるほど実効作業時間が失われる様子を可視化するシミュレーター。",
+    },
+    en: {
+      title: "Three projects at once — does each move at 1/3 speed?",
+      desc: "A simulator visualizing how context-switching erodes effective work time.",
+    },
+  },
+];
+
+const PAGE_I18N = {
+  ja: {
+    docTitle: "開発あるある図鑑 | ソフトウェア開発シミュレーターシリーズ",
+    description: "品質・コスト・納期、人員計画、稼働率…ソフトウェア開発でよくある誤解を、インタラクティブなシミュレーターで体験できるシリーズサイト。",
+    heroTitle: "「あるある」を、体験でわかる形に。",
+    heroLead: "ソフトウェア開発の現場ではよく知られているのに、経営層やステークホルダーには伝わりにくい「あるある」を、インタラクティブなシミュレーターで体験できるシリーズです。1つの問い、1つのシミュレーター。気になるテーマから触ってみてください。",
+    badgeLive: "公開中",
+    badgeSoon: "準備中",
+    shareText: "開発あるある図鑑 | ソフトウェア開発の「あるある」を体験できるシミュレーターシリーズ",
+    shareHashtags: "開発あるある図鑑",
+  },
+  en: {
+    docTitle: "Dev Sim Lab | Software Development Misconception Simulators",
+    description: "A series of interactive simulators that make common software-development misconceptions — about quality, cost, delivery, staffing, and utilization — tangible for stakeholders.",
+    heroTitle: "Things every engineer knows — now something you can feel.",
+    heroLead: "Software teams know these patterns by heart, but they rarely land with management or stakeholders. This series turns each misconception into a hands-on simulator: one question, one simulator. Pick a topic and try it yourself.",
+    badgeLive: "Live",
+    badgeSoon: "Coming soon",
+    shareText: "Dev Sim Lab — an interactive simulator series for common software development misconceptions",
+    shareHashtags: "DevSimLab",
+  },
+};
+
+const SITE_URL = "https://sakuichi.github.io/dev-sim-lab/";
+
+function renderCards(lang) {
+  const t = PAGE_I18N[lang];
+  const grid = document.getElementById("simGrid");
+  grid.innerHTML = "";
+  SIMS.forEach((sim) => {
+    const isLive = sim.status === "live";
+    const el = document.createElement(isLive ? "a" : "div");
+    el.className = "sim-card" + (isLive ? "" : " is-soon");
+    if (isLive) el.href = sim.href;
+    const badge = isLive ? t.badgeLive : t.badgeSoon;
+    const content = sim[lang];
+    el.innerHTML = `
+      <span class="sim-badge${isLive ? " live" : ""}">${badge}</span>
+      <div class="sim-eyebrow">${sim.id}</div>
+      <h2>${content.title}</h2>
+      <p>${content.desc}</p>
+      <div class="sim-tags">${sim.tags[lang].map((tag) => `<span>${tag}</span>`).join("")}</div>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function render(lang) {
+  const t = PAGE_I18N[lang];
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.description);
+  document.getElementById("heroTitle").textContent = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  renderCards(lang);
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: SITE_URL,
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+DevSimLab.initChrome({ onRender: (lang) => render(lang) });
+</script>
+</body>
+</html>
