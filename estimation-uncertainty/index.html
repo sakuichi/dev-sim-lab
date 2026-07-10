@@ -156,7 +156,7 @@
 </section>
 
 <section class="text">
-  <h2 id="relatedH"></h2>
+  <h2 data-related-h></h2>
   <div class="related-grid" id="relatedGrid"></div>
 </section>
 </main>
@@ -245,12 +245,6 @@ ja: {
   books: [
     { tag: "ESTIMATION", title: "ソフトウェア見積り 人月の暗黙知を解き明かす", desc: "スティーブ・マコネル著。「不確実性のコーン」を体系化した、見積もりというブラックアートを解き明かす一冊。", link: "Amazonで見る →", url: "https://amzn.to/3RuruSb" },
   ],
-  relatedH: "関連する問題",
-  related: [
-    { title: "開発あるある図鑑(全シミュレーター一覧)", desc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。", href: "../" },
-    { title: "人が増えれば早く終わる? | ブルックスの法則シミュレーター", desc: "増員によるコミュニケーションコストの増加を可視化する姉妹シミュレーター。", href: "../brooks-law/" },
-    { title: "QCDトレードオフ・シミュレーター", desc: "品質・コスト・納期のトレードオフを可視化する姉妹シミュレーター。", href: "../qcd-tradeoff/" },
-  ],
   toneBtn: "🔥 開発者モード",
   toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
   shareText: "最初の見積もりは、そのまま信じていい? | 見積もりの不確実性シミュレーター",
@@ -295,12 +289,6 @@ en: {
   booksH: "Recommended reading",
   books: [
     { tag: "ESTIMATION", title: "Software Estimation: Demystifying the Black Art", desc: "Steve McConnell. The book that formalized the Cone of Uncertainty and demystifies the black art of software estimation.", link: "View on Amazon →", url: "https://amzn.to/4w81lre" },
-  ],
-  relatedH: "Related problems",
-  related: [
-    { title: "Dev Sim Lab (all simulators)", desc: "Explore the other software development misconceptions in this series.", href: "../" },
-    { title: "Will adding people make it faster? | Brooks's Law Simulator", desc: "A companion simulator on how communication overhead grows with team size.", href: "../brooks-law/" },
-    { title: "QCD Trade-off Simulator", desc: "A companion simulator for the quality-cost-delivery trade-off.", href: "../qcd-tradeoff/" },
   ],
   toneBtn: "🔥 Developer mode",
   toneNote: "* Joke mode. Switch back to standard before client meetings.",
@@ -505,16 +493,7 @@ function applyStaticText() {
     booksGrid.appendChild(div);
   });
 
-  document.getElementById("relatedH").textContent = t.relatedH;
-  const relGrid = document.getElementById("relatedGrid");
-  relGrid.innerHTML = "";
-  t.related.forEach(item => {
-    const a = document.createElement("a");
-    a.className = "sim-card";
-    a.href = item.href;
-    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
-    relGrid.appendChild(a);
-  });
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "estimation-uncertainty" });
 }
 
 /* ================= イベント ================= */

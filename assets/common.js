@@ -52,6 +52,9 @@ window.DevSimLab = (function () {
       footPrivacy: "プライバシーポリシー・免責事項",
       footDisclosure: "Amazonのアソシエイトとして、当サイトは適格販売により収入を得ています。",
       backToTop: "← 一覧に戻る",
+      homeCardTitle: "開発あるある図鑑(全シミュレーター一覧)",
+      homeCardDesc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。",
+      relatedH: "関連する問題",
     },
     en: {
       brand: "Dev Sim Lab",
@@ -65,8 +68,46 @@ window.DevSimLab = (function () {
       footPrivacy: "Privacy Policy & Disclaimer",
       footDisclosure: "As an Amazon Associate, this site earns from qualifying purchases.",
       backToTop: "← Back to all simulators",
+      homeCardTitle: "Dev Sim Lab (all simulators)",
+      homeCardDesc: "Explore the other software development misconceptions in this series.",
+      relatedH: "Related problems",
     },
   };
+
+  /* ---- registry of every simulator page (single source of truth for the
+     landing-page card grid and every page's "related problems" section) ---- */
+  const SIMS = [
+    {
+      id: "qcd-tradeoff", href: "qcd-tradeoff/", status: "live",
+      tags: { ja: ["品質", "コスト", "納期"], en: ["Quality", "Cost", "Delivery"] },
+      ja: { name: "QCDトレードオフ・シミュレーター", title: "品質・コスト・納期のトレードオフを、見える形に。", desc: "品質(Q)・コスト(C)・納期(D)は互いにトレードオフの関係にあります。ドラッグ操作でバランスを体感できるシミュレーター。" },
+      en: { name: "QCD Trade-off Simulator", title: "Make the quality-cost-delivery trade-off visible.", desc: "Quality, cost and delivery are always in tension. Drag the chart to feel the trade-off for yourself." },
+    },
+    {
+      id: "brooks-law", href: "brooks-law/", status: "live",
+      tags: { ja: ["人員計画", "コミュニケーション"], en: ["Staffing", "Communication"] },
+      ja: { name: "ブルックスの法則シミュレーター", title: "人が増えれば、早く終わる?", desc: "増員によるコミュニケーションコストの増加を可視化するシミュレーター。" },
+      en: { name: "Brooks's Law Simulator", title: "Will adding people make it faster?", desc: "A simulator visualizing how communication overhead grows with team size." },
+    },
+    {
+      id: "utilization-trap", href: "utilization-trap/", status: "live",
+      tags: { ja: ["稼働率", "待ち時間"], en: ["Utilization", "Wait time"] },
+      ja: { name: "稼働率100%の罠シミュレーター", title: "全員が常に忙しい = 効率的?", desc: "稼働率が高まるほど待ち時間が急増する様子を可視化するシミュレーター。" },
+      en: { name: "Utilization Trap Simulator", title: "Is everyone being 100% busy actually efficient?", desc: "A simulator showing how wait times explode as utilization approaches 100%." },
+    },
+    {
+      id: "context-switch", href: "context-switch/", status: "live",
+      tags: { ja: ["マルチタスク", "生産性"], en: ["Multitasking", "Productivity"] },
+      ja: { name: "コンテキストスイッチ・シミュレーター", title: "3案件並行なら、1/3ずつ進む?", desc: "並行案件数が増えるほど実効作業時間が失われる様子を可視化するシミュレーター。" },
+      en: { name: "Context Switch Simulator", title: "Three projects at once — does each move at 1/3 speed?", desc: "A simulator visualizing how context-switching erodes effective work time." },
+    },
+    {
+      id: "estimation-uncertainty", href: "estimation-uncertainty/", status: "live",
+      tags: { ja: ["見積もり", "計画"], en: ["Estimation", "Planning"] },
+      ja: { name: "見積もりの不確実性シミュレーター", title: "最初の見積もりは、そのまま信じていい?", desc: "プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく「不確実性のコーン」を可視化するシミュレーター。" },
+      en: { name: "Estimation Uncertainty Simulator", title: "Can you trust the first estimate?", desc: "A simulator visualizing the Cone of Uncertainty — how estimate accuracy narrows as a project progresses." },
+    },
+  ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
   const NETWORKS = {
@@ -160,6 +201,27 @@ window.DevSimLab = (function () {
     container.appendChild(copy);
   }
 
+  // container: element to fill. opts: {exclude: id of the current page's own sim}
+  function renderRelated(container, opts) {
+    if (!container) return;
+    opts = opts || {};
+    const t = CHROME[LANG];
+    container.innerHTML = "";
+    const home = document.createElement("a");
+    home.className = "sim-card";
+    home.href = "../";
+    home.innerHTML = `<h2>${t.homeCardTitle}</h2><p>${t.homeCardDesc}</p>`;
+    container.appendChild(home);
+    SIMS.filter((s) => s.id !== opts.exclude).forEach((s) => {
+      const c = s[LANG];
+      const a = document.createElement("a");
+      a.className = "sim-card";
+      a.href = "../" + s.href;
+      a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>`;
+      container.appendChild(a);
+    });
+  }
+
   /* ---- header/footer wiring via data-* attributes ----
      [data-lang-switch] wraps the ja/en buttons (button[data-lang])
      [data-brand] / [data-brand-eyebrow] show the site name
@@ -196,6 +258,7 @@ window.DevSimLab = (function () {
       document.querySelectorAll("[data-foot-disclosure]").forEach((elm) => (elm.textContent = t.footDisclosure));
       document.querySelectorAll("[data-share-label]").forEach((elm) => (elm.textContent = t.shareLabel));
       document.querySelectorAll("[data-back-top]").forEach((elm) => (elm.textContent = t.backToTop));
+      document.querySelectorAll("[data-related-h]").forEach((elm) => (elm.textContent = t.relatedH));
       if (typeof opts.onRender === "function") opts.onRender(LANG, TONE);
     }
     onChange(render);
@@ -209,7 +272,9 @@ window.DevSimLab = (function () {
     toggleTone,
     onChange,
     renderShare,
+    renderRelated,
     initChrome,
     CHROME,
+    SIMS,
   };
 })();

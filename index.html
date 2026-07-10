@@ -72,78 +72,9 @@
 <script>
 "use strict";
 
-const SIMS = [
-  {
-    id: "qcd-tradeoff",
-    status: "live",
-    href: "qcd-tradeoff/",
-    tags: { ja: ["品質", "コスト", "納期"], en: ["Quality", "Cost", "Delivery"] },
-    ja: {
-      title: "品質・コスト・納期のトレードオフを、見える形に。",
-      desc: "品質(Q)・コスト(C)・納期(D)は互いにトレードオフの関係にあります。ドラッグ操作でバランスを体感できるシミュレーター。",
-    },
-    en: {
-      title: "Make the quality-cost-delivery trade-off visible.",
-      desc: "Quality, cost and delivery are always in tension. Drag the chart to feel the trade-off for yourself.",
-    },
-  },
-  {
-    id: "brooks-law",
-    status: "live",
-    href: "brooks-law/",
-    tags: { ja: ["人員計画", "コミュニケーション"], en: ["Staffing", "Communication"] },
-    ja: {
-      title: "人が増えれば、早く終わる?",
-      desc: "増員によるコミュニケーションコストの増加を可視化するシミュレーター(ブルックスの法則)。",
-    },
-    en: {
-      title: "Will adding people make it faster?",
-      desc: "A simulator visualizing how communication overhead grows with team size — Brooks's Law.",
-    },
-  },
-  {
-    id: "utilization-trap",
-    status: "live",
-    href: "utilization-trap/",
-    tags: { ja: ["稼働率", "待ち時間"], en: ["Utilization", "Wait time"] },
-    ja: {
-      title: "全員が常に忙しい = 効率的?",
-      desc: "稼働率が高まるほど待ち時間が急増する様子を可視化するシミュレーター。",
-    },
-    en: {
-      title: "Is everyone being 100% busy actually efficient?",
-      desc: "A simulator showing how wait times explode as utilization approaches 100%.",
-    },
-  },
-  {
-    id: "context-switch",
-    status: "live",
-    href: "context-switch/",
-    tags: { ja: ["マルチタスク", "生産性"], en: ["Multitasking", "Productivity"] },
-    ja: {
-      title: "3案件並行なら、1/3ずつ進む?",
-      desc: "並行案件数が増えるほど実効作業時間が失われる様子を可視化するシミュレーター。",
-    },
-    en: {
-      title: "Three projects at once — does each move at 1/3 speed?",
-      desc: "A simulator visualizing how context-switching erodes effective work time.",
-    },
-  },
-  {
-    id: "estimation-uncertainty",
-    status: "live",
-    href: "estimation-uncertainty/",
-    tags: { ja: ["見積もり", "計画"], en: ["Estimation", "Planning"] },
-    ja: {
-      title: "最初の見積もりは、そのまま信じていい?",
-      desc: "プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく「不確実性のコーン」を可視化するシミュレーター。",
-    },
-    en: {
-      title: "Can you trust the first estimate?",
-      desc: "A simulator visualizing the Cone of Uncertainty — how estimate accuracy narrows as a project progresses.",
-    },
-  },
-];
+// Simulator metadata lives in one place: assets/common.js (DevSimLab.SIMS),
+// shared by this landing page's card grid and every page's related-links section.
+const SIMS = DevSimLab.SIMS;
 
 const PAGE_I18N = {
   ja: {
