@@ -180,6 +180,11 @@
 <section class="text" id="secAdvice"></section>
 
 <section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
   <h2 id="relatedH"></h2>
   <div class="related-grid" id="relatedGrid"></div>
 </section>
@@ -246,12 +251,17 @@ ja: {
   ],
   barNLabel: n => `${n}件`,
   adviceHeading: "現実には、どう向き合うか",
-  adviceIntro: "案件を切り替えるたびに、頭の中の文脈(コンテキスト)を組み立て直すコストがかかります。同時に抱える案件が増えるほど、この「組み立て直し」の回数が増え、実質的な作業時間はかけ算どころか大きく目減りします。",
+  adviceIntro: "案件を切り替えるたびに、頭の中の文脈(コンテキスト)を組み立て直すコストがかかります。これは「コンテキストスイッチ(切り替えコスト)」と呼ばれ、システム思考の研究者ジェラルド・M・ワインバーグが示したロスモデルとしても知られています。同時に抱える案件が増えるほど、この「組み立て直し」の回数が増え、実質的な作業時間はかけ算どころか大きく目減りします。",
   adviceItems: [
     "専任化できる範囲を見極め、掛け持ちの数そのものを減らす",
     "関連する会議・確認をまとめて処理し、切り替えの回数自体を減らす",
     "集中時間帯(ノー会議タイムなど)を確保し、割り込みを構造的に防ぐ",
     "並行案件数の上限をチームであらかじめ合意しておく",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "チーム・集中", title: "ピープルウエア 第3版", desc: "トム・デマルコ&ティモシー・リスター著。割り込みや環境が生産性を奪う様子を、多くの実証データとともに描いた不朽の名著。", link: "Amazonで見る →", url: "https://amzn.to/4w3yUuU" },
+    { tag: "集中・注意残留", title: "大事なことに集中する", desc: "カル・ニューポート著。タスクを切り替えた後も注意力が前のタスクに引きずられる「注意残留」など、切り替えコストを科学的に扱う一冊。", link: "Amazonで見る →", url: "https://amzn.to/4fbkkKu" },
   ],
   relatedH: "関連する問題",
   related: [
@@ -291,12 +301,17 @@ en: {
   ],
   barNLabel: n => `${n}`,
   adviceHeading: "How to actually deal with this",
-  adviceIntro: "Every time you switch projects, you pay a cost to rebuild context in your head. The more projects you carry at once, the more often you pay that cost — so effective work time shrinks far more than simple division would suggest.",
+  adviceIntro: "Every time you switch projects, you pay a cost to rebuild context in your head. This is known as context switching, and the loss model used here comes from systems-thinking researcher Gerald M. Weinberg. The more projects you carry at once, the more often you pay that cost — so effective work time shrinks far more than simple division would suggest.",
   adviceItems: [
     "Identify where dedicated focus is possible and reduce the number of concurrent projects",
     "Batch related meetings and check-ins to cut down on the number of switches itself",
     "Block dedicated focus time (e.g. no-meeting blocks) to structurally prevent interruptions",
     "Agree on a team-wide cap for how many projects can run in parallel",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "TEAM / FOCUS", title: "Peopleware: Productive Projects and Teams (3rd Edition)", desc: "Tom DeMarco & Tim Lister. A classic on how interruptions and environment quietly destroy productivity, backed by decades of field data.", link: "View on Amazon →", url: "https://amzn.to/4eTMURH" },
+    { tag: "FOCUS / ATTENTION RESIDUE", title: "Deep Work: Rules for Focused Success in a Distracted World", desc: "Cal Newport. A science-backed look at switching costs, including \"attention residue\" — how focus lingers on the previous task after you've moved on.", link: "View on Amazon →", url: "https://amzn.to/4wzpCq7" },
   ],
   relatedH: "Related problems",
   related: [
@@ -480,6 +495,17 @@ function applyStaticText() {
     <p>${t.adviceIntro}</p>
     <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
   `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
 
   document.getElementById("relatedH").textContent = t.relatedH;
   const relGrid = document.getElementById("relatedGrid");

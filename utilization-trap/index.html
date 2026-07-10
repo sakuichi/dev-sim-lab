@@ -282,7 +282,7 @@ ja: {
   unitHoursMinutes: (h, m) => `${h}時間${m}分`,
   waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
   adviceHeading: "現実には、どう向き合うか",
-  adviceIntro: "予定が詰まるほど、新しい依頼に着手できるまでの待ち時間は、単純な足し算以上のペースで伸びていきます。特に稼働率が90%を超えたあたりから、わずかな予定の積み増しが待ち時間を急激に押し上げます。「全員が常に忙しい」状態は、実は新しい依頼への応答が最も遅い状態でもあるのです。",
+  adviceIntro: "予定が詰まるほど、新しい依頼に着手できるまでの待ち時間は、単純な足し算以上のペースで伸びていきます。この現象はリーン・カンバンの分野で「稼働率の罠(Utilization Trap)」と呼ばれ、待ち行列理論の基本法則である「リトルの法則」で説明されます。特に稼働率が90%を超えたあたりから、わずかな予定の積み増しが待ち時間を急激に押し上げます。「全員が常に忙しい」状態は、実は新しい依頼への応答が最も遅い状態でもあるのです。",
   adviceItems: [
     "意図的にスラック(余白時間)を確保する。稼働率100%を目指さない",
     "WIP(同時進行数)に上限を設け、行列そのものを増やさない",
@@ -292,6 +292,7 @@ ja: {
   booksH: "もっと深く知るための本",
   books: [
     { tag: "TRADE-OFF / TOC", title: "ザ・ゴール ― 企業の究極の目的とは何か", desc: "エリヤフ・ゴールドラット著。制約理論(TOC)を小説形式で。ボトルネックと稼働率の関係を物語で体感できる大定番。", link: "Amazonで見る →", url: "https://amzn.to/4wwfBtL" },
+    { tag: "効率のパラドックス", title: "This is Lean 「リソース」にとらわれずチームを変える新時代のリーン・マネジメント", desc: "ニクラス・モーディグ&パール・オールストローム著。稼働率(リソース効率)を追うほど、実はフロー効率が下がるという「効率のパラドックス」を正面から扱う一冊。", link: "Amazonで見る →", url: "https://amzn.to/4wvJ3jx" },
   ],
   relatedH: "関連する問題",
   related: [
@@ -336,7 +337,7 @@ en: {
   unitHoursMinutes: (h, m) => `${h}h ${m}m`,
   waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
   adviceHeading: "How to actually deal with this",
-  adviceIntro: "The fuller a schedule gets, the faster the wait time before a new request can even be started grows — well beyond simple addition. Past roughly 90% utilization, a small increase in load pushes wait time up sharply. Being \"100% busy\" is, in practice, also the state where response to any new request is slowest.",
+  adviceIntro: "The fuller a schedule gets, the faster the wait time before a new request can even be started grows — well beyond simple addition. This is known in Lean and Kanban circles as the utilization trap, and is explained by queueing theory's foundational principle, Little's Law. Past roughly 90% utilization, a small increase in load pushes wait time up sharply. Being \"100% busy\" is, in practice, also the state where response to any new request is slowest.",
   adviceItems: [
     "Deliberately keep slack — don't aim for 100% utilization",
     "Cap WIP (work in progress) so the queue itself can't keep growing",
@@ -346,6 +347,7 @@ en: {
   booksH: "Recommended reading",
   books: [
     { tag: "TRADE-OFF / TOC", title: "The Goal", desc: "Eliyahu M. Goldratt. A business novel on the Theory of Constraints — the classic on bottlenecks and utilization.", link: "View on Amazon →", url: "https://amzn.to/4wFkAIW" },
+    { tag: "EFFICIENCY PARADOX", title: "This is Lean: Resolving the Efficiency Paradox", desc: "Niklas Modig & Pär Åhlström. A direct treatment of why chasing resource efficiency (utilization) undermines flow efficiency — the efficiency paradox.", link: "View on Amazon →", url: "https://amzn.to/4y6ftTo" },
   ],
   relatedH: "Related problems",
   related: [
