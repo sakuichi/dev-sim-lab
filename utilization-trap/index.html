@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター</title>
+<meta name="description" content="稼働率が上がるほど待ち時間が非線形に急増する様子を、キューの可視化とM/M/1近似のグラフで体験できるシミュレーター。90%を超えると何が起きるかを確認できます。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/utilization-trap/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/utilization-trap/">
+<meta property="og:title" content="全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター">
+<meta property="og:description" content="稼働率が上がるほど待ち時間が非線形に急増する様子を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/utilization-trap.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "稼働率100%の罠シミュレーター",
+  "alternateName": "Utilization Trap Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/utilization-trap/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "稼働率が上がるほど待ち時間が非線形に急増する様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+.console{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 2px 0 rgba(34,48,46,.05);padding:20px 16px 24px}
+.console-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
+.sum b{color:var(--ink);font-size:16px}
+.sum b.danger{color:var(--alert)}
+.hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+
+/* ---- queue visual ---- */
+.queue-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.queue-wrap{flex:1;display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:44px;padding:10px;border:1px dashed var(--line);border-radius:8px;background:#FDFDFC}
+.task-chip{width:15px;height:15px;border-radius:3px;background:var(--d);opacity:.85;flex:none;animation:chipIn .25s ease-out}
+.queue-overflow{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft)}
+@keyframes chipIn{from{opacity:0;transform:scale(.4)}to{opacity:.85;transform:scale(1)}}
+.server-box{
+  flex:none;padding:10px 14px;border:1px solid var(--q);border-radius:8px;background:rgba(14,124,102,.08);
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;color:var(--q);text-align:center;
+}
+.server-box .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--q);margin-right:5px;animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+@media(prefers-reduced-motion:reduce){.task-chip{animation:none}.server-box .dot{animation:none}}
+
+/* ---- wait-time curve ---- */
+.wait-wrap{margin-top:18px}
+.wait-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.wait-grid{stroke:var(--line);stroke-width:1}
+.wait-area{fill:var(--d);opacity:.12}
+.wait-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.wait-line-danger{fill:none;stroke:var(--alert);stroke-width:2;stroke-linejoin:round}
+.wait-current{fill:var(--d);stroke:#fff;stroke-width:2;cursor:grab}
+.wait-current.dragging{cursor:grabbing}
+.wait-current.danger{fill:var(--alert)}
+.wait-current-hit{fill:transparent;cursor:grab}
+.wait-current-hit.dragging{cursor:grabbing}
+.wait-threshold-line{stroke:var(--c);stroke-width:1.4;stroke-dasharray:3 3}
+.wait-axis-label{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-soft)}
+.wait-threshold-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--c);font-weight:700}
+
+/* ---- assessment ---- */
+.assess{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:#FDFDFC;padding:14px 14px 12px}
+.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
+.score-val.warn{color:var(--c)}
+.score-val.danger{color:var(--alert)}
+.score-max{font-size:14px;color:var(--ink-soft)}
+.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+
+/* ---- controls ---- */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.axis-card{border:1px solid var(--line);border-top:3px solid var(--axis,var(--d));border-radius:8px;padding:12px 12px 14px;background:#FDFDFC}
+.axis-name{font-weight:700;font-size:13.5px}
+.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
+.readout{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:700;color:var(--d);margin:4px 0 0;line-height:1.1}
+.axis-card input[type=range]{width:100%;accent-color:var(--d);margin:6px 0 8px}
+.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.axis-card input[type=number]{width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
+
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-label="Utilization Trap Simulator">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="queue-row">
+    <div class="queue-wrap" id="queueWrap" role="img" aria-label="Task queue"></div>
+    <div class="server-box" id="serverBox"><span class="dot"></span><span id="serverLabel"></span></div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="wait-wrap">
+    <svg class="wait-svg" id="waitChart" viewBox="0 0 640 200" role="img" aria-label="Wait time vs utilization">
+      <g id="waitGridLayer"></g>
+      <path id="waitArea" class="wait-area"></path>
+      <path id="waitLineOk" class="wait-line"></path>
+      <path id="waitLineDanger" class="wait-line-danger"></path>
+      <line id="waitThresholdLine" class="wait-threshold-line" x1="0" y1="0" x2="0" y2="200"></line>
+      <text id="waitThresholdLabel" class="wait-threshold-label"></text>
+      <circle id="waitCurrentHit" class="wait-current-hit" r="18"></circle>
+      <circle id="waitCurrent" class="wait-current" r="6"></circle>
+      <text id="waitXLabelMin" class="wait-axis-label"></text>
+      <text id="waitXLabelMax" class="wait-axis-label"></text>
+    </svg>
+  </div>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="utilName"></span><small id="utilSub"></small></div>
+      <div class="readout mono" id="utilReadout">70%</div>
+      <input type="range" id="utilSlider" min="50" max="99" step="1" value="70">
+      <div class="num-row">
+        <label for="utilNum" id="numLabel1"></label>
+        <input type="number" id="utilNum" min="50" max="99" step="1" value="70">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="timeName"></span><small id="timeSub"></small></div>
+      <div class="readout mono" id="timeReadout">30</div>
+      <input type="range" id="timeSlider" min="5" max="120" step="5" value="30">
+      <div class="num-row">
+        <label for="timeNum" id="numLabel2"></label>
+        <input type="number" id="timeNum" min="5" max="120" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 id="relatedH"></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (M/M/1 近似) ================= */
+const RHO_MIN = 0.50, RHO_MAX = 0.99;
+const RHO_THRESHOLD = 0.90;
+const QUEUE_CAP = 24; // 表示するタスクチップの上限
+
+function L(rho) { return rho / (1 - rho); }        // 平均系内数
+function Lq(rho) { return (rho * rho) / (1 - rho); } // 平均待ち行列長
+function waitMinutes(rho, avgTime) { return L(rho) * avgTime; } // 平均待ち時間(分)
+
+function buildSeries(avgTime) {
+  const arr = [];
+  for (let p = RHO_MIN * 100; p <= RHO_MAX * 100; p += 1) {
+    const rho = p / 100;
+    arr.push({ rho, wait: waitMinutes(rho, avgTime) });
+  }
+  return arr;
+}
+
+function scoreOf(rho) {
+  const score = Math.round(100 - ((rho - RHO_MIN) / (RHO_MAX - RHO_MIN)) * 100);
+  return Math.max(0, Math.min(100, score));
+}
+function assess(rho, avgTime) {
+  const score = scoreOf(rho);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { score, band, series: buildSeries(avgTime), wait: waitMinutes(rho, avgTime), queued: Lq(rho) };
+}
+
+function formatDuration(minutes, t) {
+  const m = Math.round(minutes);
+  if (m < 60) return t.unitMinutes(m);
+  const h = Math.floor(m / 60), rem = m % 60;
+  return rem === 0 ? t.unitHours(h) : t.unitHoursMinutes(h, rem);
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター",
+  heroTitle: "全員が常に忙しい<br>= 効率的?",
+  heroLead: "稼働率を高く保つほど無駄がない — そう見えます。しかし依頼してから着手されるまでの待ち時間は、稼働率が上がるほど比例以上のペースで伸びていきます。稼働率と平均処理時間を動かして、待ち行列がどう膨らむかを確認してください。",
+  consoleLabel: "QUEUE CONSOLE",
+  sumLabel: "推定待ち時間",
+  scoreLabel: "余裕度スコア",
+  utilName: "稼働率", utilSub: "50%〜99%",
+  timeName: "平均処理時間", timeSub: "1件あたり(分)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 予定を目一杯詰め込む",
+  serverLabel: "処理中",
+  queueOverflow: n => `他 ${n}件`,
+  hint: (rho, queued) => `稼働率 ${Math.round(rho * 100)}% では、平均で ${queued.toFixed(1)}件が着手を待っています。`,
+  hintScenario: "稼働率を95%まで引き上げてみました。待ち時間がどれだけ伸びるか確認してください。",
+  comments: [
+    "十分な余裕があります。突発的な依頼にも動じません。",
+    "概ね安定していますが、余裕は少なくなってきています。",
+    "小さな変動でも、待ち時間が目に見えて伸びる状態です。",
+    "ちょっとした割り込みが、行列全体を押し流してしまいます。",
+    "ほぼ常に満杯。1件の遅れが、その後すべてを遅らせます。",
+  ],
+  thresholdLabel: "90%ライン",
+  unitMinutes: m => `${m}分`,
+  unitHours: h => `${h}時間`,
+  unitHoursMinutes: (h, m) => `${h}時間${m}分`,
+  waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "M/M/1待ち行列の近似では、待ち時間は稼働率 ρ に対して ρ/(1−ρ) のペースで増えます。稼働率が90%を超えたあたりから、わずかな稼働率の上昇が待ち時間を急激に押し上げます。「全員が常に忙しい」状態は、実は新しい依頼への応答が最も遅い状態でもあります。",
+  adviceItems: [
+    "意図的にスラック(余白時間)を確保する。稼働率100%を目指さない",
+    "WIP(同時進行数)に上限を設け、行列そのものを増やさない",
+    "緊急対応用の割り込みレーンを別に確保し、通常の行列を乱さないようにする",
+    "稼働率だけでなく、依頼から着手までのリードタイムを指標として追う",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "TRADE-OFF / TOC", title: "ザ・ゴール ― 企業の究極の目的とは何か", desc: "エリヤフ・ゴールドラット著。制約理論(TOC)を小説形式で。ボトルネックと稼働率の関係を物語で体感できる大定番。", link: "Amazonで見る →", url: "https://amzn.to/4wwfBtL" },
+  ],
+  relatedH: "関連する問題",
+  related: [
+    { title: "開発あるある図鑑(全シミュレーター一覧)", desc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。", href: "../" },
+    { title: "人が増えれば早く終わる? | ブルックスの法則シミュレーター", desc: "増員によるコミュニケーションコストの増加を可視化する姉妹シミュレーター。", href: "../brooks-law/" },
+    { title: "QCDトレードオフ・シミュレーター", desc: "品質・コスト・納期のトレードオフを可視化する姉妹シミュレーター。", href: "https://sakuichi.github.io/qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Is everyone being 100% busy actually efficient? | Utilization Trap Simulator",
+  heroTitle: "Everyone's 100% busy<br>— is that efficient?",
+  heroLead: "Keeping utilization high looks like zero waste. But the time between a request arriving and someone actually starting it grows faster than utilization itself. Move the sliders and watch how the queue builds up.",
+  consoleLabel: "QUEUE CONSOLE",
+  sumLabel: "Estimated wait time",
+  scoreLabel: "Slack score",
+  utilName: "Utilization", utilSub: "50% to 99%",
+  timeName: "Average processing time", timeSub: "per task (minutes)",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: pack the schedule to the brim",
+  serverLabel: "In service",
+  queueOverflow: n => `+${n} more`,
+  hint: (rho, queued) => `At ${Math.round(rho * 100)}% utilization, an average of ${queued.toFixed(1)} tasks are waiting to be started.`,
+  hintScenario: "We just pushed utilization up to 95%. See how much the wait time grows.",
+  comments: [
+    "Plenty of slack. Unexpected requests won't throw things off.",
+    "Broadly stable, but the margin is shrinking.",
+    "Even small fluctuations now visibly stretch the wait time.",
+    "A minor interruption is enough to sweep the whole queue along with it.",
+    "Almost always full. One delay now delays everything after it.",
+  ],
+  thresholdLabel: "90% line",
+  unitMinutes: m => `${m} min`,
+  unitHours: h => `${h}h`,
+  unitHoursMinutes: (h, m) => `${h}h ${m}m`,
+  waitXLabelMin: `${RHO_MIN * 100}%`, waitXLabelMax: `${RHO_MAX * 100}%`,
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "In the M/M/1 queueing approximation, wait time grows with utilization ρ at a rate of ρ/(1−ρ). Past roughly 90% utilization, a small increase in load pushes wait time up sharply. Being \"100% busy\" is, in practice, also the state where response to any new request is slowest.",
+  adviceItems: [
+    "Deliberately keep slack — don't aim for 100% utilization",
+    "Cap WIP (work in progress) so the queue itself can't keep growing",
+    "Reserve a separate interrupt lane for urgent work so it doesn't disrupt the normal queue",
+    "Track lead time from request to start, not just utilization",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "TRADE-OFF / TOC", title: "The Goal", desc: "Eliyahu M. Goldratt. A business novel on the Theory of Constraints — the classic on bottlenecks and utilization.", link: "View on Amazon →", url: "https://amzn.to/4wFkAIW" },
+  ],
+  relatedH: "Related problems",
+  related: [
+    { title: "Dev Sim Lab (all simulators)", desc: "Explore the other software development misconceptions in this series.", href: "../" },
+    { title: "Will adding people make it faster? | Brooks's Law Simulator", desc: "A companion simulator on how communication overhead grows with team size.", href: "../brooks-law/" },
+    { title: "QCD Trade-off Simulator", desc: "A companion simulator for the quality-cost-delivery trade-off.", href: "https://sakuichi.github.io/qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Is everyone being 100% busy actually efficient? — Utilization Trap Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (rho, queued) => `稼働率 ${Math.round(rho * 100)}%。「ちょっとだけ」の依頼が ${queued.toFixed(1)}件、静かに列を作っています。`,
+  hintScenario: "予定表を隙間なく埋めました。次の1件が入ってくるまでの、つかの間の静寂をお楽しみください。",
+  comments: [
+    "奇跡の余白。カレンダーが白い。",
+    "まだ息はできる。ただし深呼吸はできない。",
+    "「今ちょっといい?」が、その日の予定を全部壊す威力を持ち始めた。",
+    "誰かが5分だけ話しかけただけで、行列全体が明日にずれ込む。",
+    "予定表という名の満員電車。次の駅で人は乗れない。",
+  ],
+},
+en: {
+  hint: (rho, queued) => `${Math.round(rho * 100)}% utilization. ${queued.toFixed(1)} \"just a quick thing\" requests are quietly forming a line.`,
+  hintScenario: "The calendar is now wall-to-wall. Enjoy this brief moment of silence before the next request lands.",
+  comments: [
+    "A miraculous amount of white space on the calendar.",
+    "Still breathing. Deep breaths, however, are no longer available.",
+    "\"Got a quick sec?\" now has the power to destroy the entire day's plan.",
+    "One 5-minute interruption and the whole queue slides into tomorrow.",
+    "The calendar is a packed train. Nobody boards at the next stop.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let util = 70;   // percent, integer 50-99
+let avgTime = 30; // minutes
+
+/* ================= キュー可視化 ================= */
+function drawQueue(rho, t) {
+  const wrap = document.getElementById("queueWrap");
+  wrap.innerHTML = "";
+  const queued = Math.round(Lq(rho));
+  const shown = Math.min(queued, QUEUE_CAP);
+  for (let i = 0; i < shown; i++) {
+    const chip = document.createElement("div");
+    chip.className = "task-chip";
+    wrap.appendChild(chip);
+  }
+  if (queued > QUEUE_CAP) {
+    const overflow = document.createElement("span");
+    overflow.className = "queue-overflow";
+    overflow.textContent = t.queueOverflow(queued - QUEUE_CAP);
+    wrap.appendChild(overflow);
+  }
+  if (queued === 0) {
+    const empty = document.createElement("span");
+    empty.className = "queue-overflow";
+    empty.textContent = "—";
+    wrap.appendChild(empty);
+  }
+}
+
+/* ================= 待ち時間カーブ ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 200, PAD_L = 46, PAD_R = 16, PAD_T = 14, PAD_B = 22;
+const xOf = rho => PAD_L + ((rho - RHO_MIN) / (RHO_MAX - RHO_MIN)) * (PW - PAD_L - PAD_R);
+const rhoOfX = x => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  return Math.min(RHO_MAX, Math.max(RHO_MIN, RHO_MIN + frac * (RHO_MAX - RHO_MIN)));
+};
+
+function drawWaitChart(r) {
+  const t = T();
+  const waits = r.series.map(s => s.wait);
+  const yMax = Math.max(...waits);
+  const yOf = v => PH - PAD_B - (v / (yMax || 1)) * (PH - PAD_T - PAD_B);
+
+  const gridLayer = document.getElementById("waitGridLayer");
+  gridLayer.innerHTML = "";
+  [0.25, 0.5, 0.75].forEach(f => {
+    const y = PAD_T + f * (PH - PAD_T - PAD_B);
+    gridLayer.appendChild(el("line", { class: "wait-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+  });
+  gridLayer.appendChild(el("line", { class: "wait-grid", x1: PAD_L, y1: PH - PAD_B, x2: PW - PAD_R, y2: PH - PAD_B }));
+
+  const okPts = r.series.filter(s => s.rho <= RHO_THRESHOLD);
+  const dangerPts = r.series.filter(s => s.rho >= RHO_THRESHOLD);
+  const toPath = pts => "M " + pts.map(s => `${xOf(s.rho)},${yOf(s.wait)}`).join(" L ");
+  document.getElementById("waitLineOk").setAttribute("d", okPts.length ? toPath(okPts) : "");
+  document.getElementById("waitLineDanger").setAttribute("d", dangerPts.length ? toPath(dangerPts) : "");
+
+  const areaPts = r.series.map(s => `${xOf(s.rho)},${yOf(s.wait)}`).join(" L ");
+  document.getElementById("waitArea").setAttribute("d", `M ${xOf(RHO_MIN)},${yOf(0)} L ${areaPts} L ${xOf(RHO_MAX)},${yOf(0)} Z`);
+
+  const thX = xOf(RHO_THRESHOLD);
+  const thLine = document.getElementById("waitThresholdLine");
+  thLine.setAttribute("x1", thX); thLine.setAttribute("x2", thX);
+  thLine.setAttribute("y1", PAD_T); thLine.setAttribute("y2", PH - PAD_B);
+  const thLabel = document.getElementById("waitThresholdLabel");
+  thLabel.setAttribute("x", thX + 6);
+  thLabel.setAttribute("y", PAD_T + 10);
+  thLabel.textContent = t.thresholdLabel;
+
+  const curX = xOf(util / 100), curY = yOf(r.wait);
+  const cur = document.getElementById("waitCurrent");
+  cur.setAttribute("cx", curX);
+  cur.setAttribute("cy", curY);
+  cur.classList.toggle("danger", util / 100 >= RHO_THRESHOLD);
+  const curHit = document.getElementById("waitCurrentHit");
+  curHit.setAttribute("cx", curX);
+  curHit.setAttribute("cy", curY);
+
+  const xMin = document.getElementById("waitXLabelMin");
+  xMin.setAttribute("x", PAD_L); xMin.setAttribute("y", PH - 4);
+  xMin.textContent = t.waitXLabelMin;
+  const xMax = document.getElementById("waitXLabelMax");
+  xMax.setAttribute("x", PW - PAD_R); xMax.setAttribute("y", PH - 4);
+  xMax.setAttribute("text-anchor", "end");
+  xMax.textContent = t.waitXLabelMax;
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const rho = util / 100;
+  const r = assess(rho, avgTime);
+
+  drawQueue(rho, t);
+  drawWaitChart(r);
+
+  const sv = document.getElementById("sumVal");
+  sv.textContent = formatDuration(r.wait, t);
+  sv.className = rho >= RHO_THRESHOLD ? "danger" : "";
+  document.getElementById("serverLabel").textContent = t.serverLabel;
+  document.getElementById("hint").textContent = t.hint(rho, r.queued);
+
+  document.getElementById("utilReadout").textContent = util + "%";
+  document.getElementById("timeReadout").textContent = avgTime;
+  if (document.activeElement !== document.getElementById("utilSlider")) document.getElementById("utilSlider").value = util;
+  if (document.activeElement !== document.getElementById("utilNum")) document.getElementById("utilNum").value = util;
+  if (document.activeElement !== document.getElementById("timeSlider")) document.getElementById("timeSlider").value = avgTime;
+  if (document.activeElement !== document.getElementById("timeNum")) document.getElementById("timeNum").value = avgTime;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = r.score;
+  scoreEl.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/utilization-trap/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("utilName").textContent = t.utilName;
+  document.getElementById("utilSub").textContent = t.utilSub;
+  document.getElementById("timeName").textContent = t.timeName;
+  document.getElementById("timeSub").textContent = t.timeSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  document.getElementById("relatedH").textContent = t.relatedH;
+  const relGrid = document.getElementById("relatedGrid");
+  relGrid.innerHTML = "";
+  t.related.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "sim-card";
+    a.href = item.href;
+    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
+    relGrid.appendChild(a);
+  });
+}
+
+/* ================= イベント ================= */
+document.getElementById("utilSlider").addEventListener("input", e => { util = +e.target.value; render(); });
+document.getElementById("utilNum").addEventListener("change", e => {
+  util = Math.min(99, Math.max(50, +e.target.value));
+  render();
+});
+document.getElementById("timeSlider").addEventListener("input", e => { avgTime = +e.target.value; render(); });
+document.getElementById("timeNum").addEventListener("change", e => {
+  avgTime = Math.min(120, Math.max(5, +e.target.value));
+  render();
+});
+/* ---- drag the current-position marker directly on the chart ---- */
+const waitChart = document.getElementById("waitChart");
+function svgPoint(evt) {
+  const pt = waitChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(waitChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  waitChart.setPointerCapture(evt.pointerId);
+  document.getElementById("waitCurrent").classList.add("dragging");
+  document.getElementById("waitCurrentHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  util = Math.round(rhoOfX(p.x) * 100);
+  render();
+}
+document.getElementById("waitCurrentHit").addEventListener("pointerdown", startDrag);
+document.getElementById("waitCurrent").addEventListener("pointerdown", startDrag);
+waitChart.addEventListener("pointermove", evt => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach(ev => waitChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("waitCurrent").classList.remove("dragging");
+  document.getElementById("waitCurrentHit").classList.remove("dragging");
+}));
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  util = 70; avgTime = 30;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  util = 95;
+  render();
+  document.getElementById("hint").textContent = T().hintScenario;
+});
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
