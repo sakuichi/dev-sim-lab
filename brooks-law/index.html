@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人が増えれば早く終わる? | ブルックスの法則シミュレーター</title>
+<meta name="description" content="人数を増やすとコミュニケーションコストがどう増えるかを、インタラクティブなネットワーク図と生産性グラフで体験できるシミュレーター。「人月の神話」のブルックスの法則を可視化。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/brooks-law/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/brooks-law/">
+<meta property="og:title" content="人が増えれば早く終わる? | ブルックスの法則シミュレーター">
+<meta property="og:description" content="人数を増やすとコミュニケーションコストがどう増えるかを、インタラクティブなネットワーク図と生産性グラフで体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/brooks-law.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ブルックスの法則シミュレーター",
+  "alternateName": "Brooks's Law Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/brooks-law/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "人数を増やすとコミュニケーションコストがどう増えるかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* ---- network diagram ---- */
+.chart-wrap{display:flex;justify-content:center}
+svg{width:100%;max-width:320px;height:auto}
+.edge{stroke:var(--line);stroke-width:1}
+.node{fill:var(--d);stroke:#fff;stroke-width:2}
+.hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+
+/* ---- productivity curve ---- */
+.prod-wrap{margin-top:18px}
+.prod-svg{width:100%;height:auto}
+.prod-grid{stroke:var(--line);stroke-width:1}
+.prod-area{fill:var(--d);opacity:.12}
+.prod-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.prod-current{fill:var(--d);stroke:#fff;stroke-width:2}
+.prod-current.danger{fill:var(--alert)}
+.prod-optimal-line{stroke:var(--q);stroke-width:1.4;stroke-dasharray:3 3}
+.prod-axis-label{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-soft)}
+.prod-optimal-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--q);font-weight:700}
+
+/* ---- console readouts ---- */
+.console-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:6px}
+.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
+.sum b{color:var(--ink);font-size:16px}
+.console{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 2px 0 rgba(34,48,46,.05);padding:20px 16px 24px}
+
+/* ---- assessment panel (reuses QCD pattern) ---- */
+.assess{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:#FDFDFC;padding:14px 14px 12px}
+.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
+.score-val.warn{color:var(--c)}
+.score-val.danger{color:var(--alert)}
+.score-max{font-size:14px;color:var(--ink-soft)}
+.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+
+/* ---- controls ---- */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.axis-card{border:1px solid var(--line);border-top:3px solid var(--axis,var(--d));border-radius:8px;padding:12px 12px 14px;background:#FDFDFC}
+.axis-name{font-weight:700;font-size:13.5px}
+.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
+.readout{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:700;color:var(--d);margin:4px 0 0;line-height:1.1}
+.axis-card input[type=range]{width:100%;accent-color:var(--d);margin:6px 0 8px}
+.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.axis-card input[type=number]{width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
+.ramp-row{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ramp-btn{font-family:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink-soft);border-radius:999px;padding:6px 13px;cursor:pointer}
+.ramp-btn[aria-pressed="true"]{background:var(--d);border-color:var(--d);color:#fff}
+.ramp-sub{font-size:12px;color:var(--ink-soft);max-width:32em}
+
+/* ---- related links ---- */
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-label="Brooks's Law Simulator">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="chart-wrap">
+    <svg id="netChart" viewBox="0 0 320 320" role="img" aria-label="Communication network diagram">
+      <g id="edgeLayer"></g>
+      <g id="nodeLayer"></g>
+    </svg>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="prod-wrap">
+    <svg class="prod-svg" id="prodChart" viewBox="0 0 640 200" role="img" aria-label="Productivity vs team size">
+      <g id="prodGridLayer"></g>
+      <path id="prodArea" class="prod-area"></path>
+      <path id="prodLine" class="prod-line"></path>
+      <line id="prodOptimalLine" class="prod-optimal-line" x1="0" y1="0" x2="0" y2="200"></line>
+      <text id="prodOptimalLabel" class="prod-optimal-label"></text>
+      <circle id="prodCurrent" class="prod-current" r="5"></circle>
+      <text id="prodXLabelMin" class="prod-axis-label"></text>
+      <text id="prodXLabelMax" class="prod-axis-label"></text>
+    </svg>
+  </div>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="teamName"></span><small id="teamSub"></small></div>
+      <div class="readout mono" id="teamReadout">6</div>
+      <input type="range" id="teamSlider" min="2" max="20" step="1" value="6">
+      <div class="num-row">
+        <label for="teamNum" id="numLabel1"></label>
+        <input type="number" id="teamNum" min="2" max="20" step="1" value="6">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="costName"></span><small id="costSub"></small></div>
+      <div class="readout mono" id="costReadout">1.0</div>
+      <input type="range" id="costSlider" min="0" max="3" step="0.1" value="1">
+      <div class="num-row">
+        <label for="costNum" id="numLabel2"></label>
+        <input type="number" id="costNum" min="0" max="3" step="0.1" value="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="ramp-row">
+    <button class="ramp-btn" id="rampBtn" aria-pressed="false"></button>
+    <span class="ramp-sub" id="rampSub"></span>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 id="relatedH"></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル ================= */
+const P = 10;              // 1人あたりの個人生産性(単位)
+const BASE_TEAM = 5;       // 立ち上げコスト適用の基準人数
+const RAMP_FACTOR = 0.5;   // 立ち上げコストON時、基準を超える増員メンバーの生産性係数
+const N_MIN = 2, N_MAX = 20;
+
+function grossProd(n, rampOn) {
+  if (!rampOn || n <= BASE_TEAM) return n * P;
+  return BASE_TEAM * P + (n - BASE_TEAM) * P * RAMP_FACTOR;
+}
+function pathCount(n) { return n * (n - 1) / 2; }
+function netProd(n, c, rampOn) { return grossProd(n, rampOn) - pathCount(n) * c; }
+
+function buildSeries(c, rampOn) {
+  const arr = [];
+  for (let n = N_MIN; n <= N_MAX; n++) arr.push({ n, net: netProd(n, c, rampOn) });
+  return arr;
+}
+function optimalOf(series) {
+  return series.reduce((best, cur) => (cur.net > best.net ? cur : best), series[0]);
+}
+function assess(n, c, rampOn) {
+  const series = buildSeries(c, rampOn);
+  const optimal = optimalOf(series);
+  const currentNet = netProd(n, c, rampOn);
+  const ratio = optimal.net > 0 ? currentNet / optimal.net : 1;
+  const score = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { series, optimal, currentNet, score, band, pastPeak: n > optimal.n };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "人が増えれば早く終わる? | ブルックスの法則シミュレーター",
+  heroTitle: "人が増えれば、<br>早く終わる?",
+  heroLead: "遅れているプロジェクトに人を追加すれば、その分だけ早く終わる — そう考えたくなります。しかし増員のたびに、確認すべきコミュニケーション経路も増えていきます。人数とコミュニケーションコストを動かしながら、実際に何が起きるかを確認してください。",
+  consoleLabel: "TEAM CONSOLE",
+  sumLabel: "コミュニケーション経路",
+  scoreLabel: "生産性スコア",
+  teamName: "チーム人数", teamSub: "2〜20人",
+  costName: "コミュニケーションコスト係数", costSub: "経路1本あたりのコスト",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 遅れているプロジェクトに人を追加する",
+  rampBtn: "🐣 立ち上げコストを含める",
+  rampSub: "ONにすると、6人目以降に加わったメンバーは立ち上がるまで生産性50%として扱われます。",
+  hint: (n, paths) => `${n}人のチームで、確認が必要なコミュニケーション経路は ${paths} 本です。`,
+  hintScenario: "遅れているプロジェクトに、今すぐ5人を追加してみました。人数と生産性の変化を確認してください。",
+  comments: [
+    "理想的な人数配分です。",
+    "概ね効率的な配分です。増員の効果は逓減し始めています。",
+    "増員の効果はほぼ相殺されています。これ以上の増員は慎重に。",
+    "増員がすでに逆効果になっています。コミュニケーションコストが生産性の伸びを上回りつつあります。",
+    "この人数では、増員するほどプロジェクトは遅れます。",
+  ],
+  optimalLabel: n => `最適 ${n}人`,
+  prodXLabelMin: `${N_MIN}人`, prodXLabelMax: `${N_MAX}人`,
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "「遅れているソフトウェアプロジェクトへの要員追加は、プロジェクトをさらに遅らせる」— フレデリック・ブルックス Jr.『人月の神話』の中心的な主張です。新しいメンバーは、コードベースを学び、既存メンバーから説明を受けている間は生産性がマイナスに近く、しかもチーム全体のコミュニケーション経路を増やします。",
+  adviceItems: [
+    "チームを疎結合な単位に分割し、コミュニケーション経路そのものを減らす",
+    "インターフェース(API・仕様)を明確にし、調整のたびに発生する確認コストを下げる",
+    "増員するなら、プロジェクトの早い段階で行う。立ち上げコストを吸収する時間的余裕があるうちに",
+    "「遅れているから人を増やす」と判断する前に、本当のボトルネックが人手不足なのかを見極める",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "SCHEDULE & QUALITY", title: "人月の神話", desc: "F・P・ブルックス Jr.著。「遅れているプロジェクトへの人員追加は、さらに遅らせる」。本シミュレーターが扱うテーマの原典。", link: "Amazonで見る →", url: "https://amzn.to/4guw11g" },
+  ],
+  relatedH: "関連する問題",
+  related: [
+    { title: "開発あるある図鑑(全シミュレーター一覧)", desc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。", href: "../" },
+    { title: "QCDトレードオフ・シミュレーター", desc: "品質・コスト・納期のトレードオフを可視化する姉妹シミュレーター。", href: "https://sakuichi.github.io/qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "人が増えれば早く終わる? | ブルックスの法則シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Will adding people make it faster? | Brooks's Law Simulator",
+  heroTitle: "Will adding people<br>make it faster?",
+  heroLead: "It's tempting to think that adding people to a late project speeds it up proportionally. But every new member also adds communication paths that need to be maintained. Move the sliders and see what actually happens.",
+  consoleLabel: "TEAM CONSOLE",
+  sumLabel: "Communication paths",
+  scoreLabel: "Productivity score",
+  teamName: "Team size", teamSub: "2 to 20 people",
+  costName: "Communication cost coefficient", costSub: "cost per path",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: add people to a late project",
+  rampBtn: "🐣 Include ramp-up cost",
+  rampSub: "When on, members joining beyond the 6th are treated as 50% productive until they ramp up.",
+  hint: (n, paths) => `With a team of ${n}, there are ${paths} communication paths to keep track of.`,
+  hintScenario: "We just added 5 people to a project that's already late. See how team size and productivity change.",
+  comments: [
+    "An ideal team size for this configuration.",
+    "A broadly efficient allocation. Returns from adding people are starting to diminish.",
+    "The benefit of adding people is nearly offset by coordination cost. Add more with caution.",
+    "Adding people is already counterproductive — communication cost is outpacing the productivity gained.",
+    "At this size, every additional person makes the project later, not sooner.",
+  ],
+  optimalLabel: n => `Optimal: ${n}`,
+  prodXLabelMin: `${N_MIN}`, prodXLabelMax: `${N_MAX}`,
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "\"Adding manpower to a late software project makes it later.\" — the central thesis of Frederick P. Brooks Jr.'s The Mythical Man-Month. New members are close to negative productivity while they learn the codebase and take time from existing members, and they also add communication paths for the whole team.",
+  adviceItems: [
+    "Split the team into loosely-coupled units to reduce the number of communication paths itself",
+    "Clarify interfaces (APIs, specs) to lower the coordination cost of every hand-off",
+    "If you must add people, do it early — while there's still time to absorb the ramp-up cost",
+    "Before deciding to add people to a late project, confirm the real bottleneck is actually headcount",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "SCHEDULE & QUALITY", title: "The Mythical Man-Month", desc: "Frederick P. Brooks Jr. \"Adding manpower to a late software project makes it later.\" The source of the idea this simulator explores.", link: "View on Amazon →", url: "https://amzn.to/3R0mWTt" },
+  ],
+  relatedH: "Related problems",
+  related: [
+    { title: "Dev Sim Lab (all simulators)", desc: "Explore the other software development misconceptions in this series.", href: "../" },
+    { title: "QCD Trade-off Simulator", desc: "A companion simulator for the quality-cost-delivery trade-off.", href: "https://sakuichi.github.io/qcd-tradeoff/" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Will adding people make it faster? — Brooks's Law Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (n, paths) => `${n}人。誰が誰に何を言ったか、もう誰も把握していない経路が ${paths} 本。`,
+  hintScenario: "納期直前の火消し要員、投入完了。新人の質問に答えている間に、火はさらに燃え広がります。",
+  comments: [
+    "奇跡の人数構成。誰も机を増やすな。",
+    "まだ大丈夫。ただし会議室の予約が地獄になり始めている。",
+    "もう1人増やしたら、進捗会議が「進捗会議について話す会議」になる。",
+    "新しい人が入るたびに、既存メンバーの生産性が溶けていく音がする。",
+    "これはもうチームではない。伝言ゲームの被害者たちだ。",
+  ],
+},
+en: {
+  hint: (n, paths) => `${n} people. ${paths} paths nobody fully tracks who said what to whom on anymore.`,
+  hintScenario: "Panic hires deployed right before the deadline. While they ask onboarding questions, the fire spreads.",
+  comments: [
+    "A miraculous headcount. Nobody move a single desk.",
+    "Still fine. But the meeting room booking calendar is turning into a warzone.",
+    "One more person and the status meeting becomes a meeting about the status meeting.",
+    "Every new hire comes with the faint sound of existing productivity evaporating.",
+    "This is no longer a team. It's a support group for a very long game of telephone.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let team = 6;
+let cost = 1.0;
+let rampOn = false;
+
+/* ================= ネットワーク図 ================= */
+const CX = 160, CY = 160, RN = 120;
+const netChart = document.getElementById("netChart");
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+
+function drawNetwork(n) {
+  const edgeLayer = document.getElementById("edgeLayer");
+  const nodeLayer = document.getElementById("nodeLayer");
+  edgeLayer.innerHTML = "";
+  nodeLayer.innerHTML = "";
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    pts.push({ x: CX + Math.cos(angle) * RN, y: CY + Math.sin(angle) * RN });
+  }
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      edgeLayer.appendChild(el("line", { class: "edge", x1: pts[i].x, y1: pts[i].y, x2: pts[j].x, y2: pts[j].y }));
+    }
+  }
+  pts.forEach(p => nodeLayer.appendChild(el("circle", { class: "node", cx: p.x, cy: p.y, r: n > 14 ? 5 : 7 })));
+}
+
+/* ================= 生産性カーブ ================= */
+const PW = 640, PH = 200, PAD_L = 34, PAD_R = 16, PAD_T = 14, PAD_B = 22;
+function drawProductivity(r) {
+  const xOf = n => PAD_L + ((n - N_MIN) / (N_MAX - N_MIN)) * (PW - PAD_L - PAD_R);
+  const nets = r.series.map(s => s.net);
+  const yMin = Math.min(0, ...nets), yMax = Math.max(...nets);
+  const yOf = v => PH - PAD_B - ((v - yMin) / (yMax - yMin || 1)) * (PH - PAD_T - PAD_B);
+
+  const gridLayer = document.getElementById("prodGridLayer");
+  gridLayer.innerHTML = "";
+  [0.25, 0.5, 0.75].forEach(f => {
+    const y = PAD_T + f * (PH - PAD_T - PAD_B);
+    gridLayer.appendChild(el("line", { class: "prod-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+  });
+  gridLayer.appendChild(el("line", { class: "prod-grid", x1: PAD_L, y1: PH - PAD_B, x2: PW - PAD_R, y2: PH - PAD_B }));
+
+  const linePts = r.series.map(s => `${xOf(s.n)},${yOf(s.net)}`).join(" ");
+  document.getElementById("prodLine").setAttribute("d", `M ${linePts.split(" ").join(" L ")}`);
+  const areaPts = `M ${xOf(N_MIN)},${yOf(yMin)} L ${linePts.split(" ").join(" L ")} L ${xOf(N_MAX)},${yOf(yMin)} Z`;
+  document.getElementById("prodArea").setAttribute("d", areaPts);
+
+  const optX = xOf(r.optimal.n);
+  const optLine = document.getElementById("prodOptimalLine");
+  optLine.setAttribute("x1", optX); optLine.setAttribute("x2", optX);
+  optLine.setAttribute("y1", PAD_T); optLine.setAttribute("y2", PH - PAD_B);
+  const optLabel = document.getElementById("prodOptimalLabel");
+  optLabel.setAttribute("x", optX + 6);
+  optLabel.setAttribute("y", PAD_T + 10);
+  optLabel.textContent = T().optimalLabel(r.optimal.n);
+
+  const cur = document.getElementById("prodCurrent");
+  cur.setAttribute("cx", xOf(team));
+  cur.setAttribute("cy", yOf(r.currentNet));
+  cur.classList.toggle("danger", r.pastPeak && r.score < 70);
+
+  const xMin = document.getElementById("prodXLabelMin");
+  xMin.setAttribute("x", PAD_L); xMin.setAttribute("y", PH - 4);
+  xMin.textContent = T().prodXLabelMin;
+  const xMax = document.getElementById("prodXLabelMax");
+  xMax.setAttribute("x", PW - PAD_R); xMax.setAttribute("y", PH - 4);
+  xMax.setAttribute("text-anchor", "end");
+  xMax.textContent = T().prodXLabelMax;
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const r = assess(team, cost, rampOn);
+
+  drawNetwork(team);
+  drawProductivity(r);
+
+  document.getElementById("sumVal").textContent = pathCount(team);
+  document.getElementById("hint").textContent = t.hint(team, pathCount(team));
+
+  document.getElementById("teamReadout").textContent = team;
+  document.getElementById("costReadout").textContent = cost.toFixed(1);
+  if (document.activeElement !== document.getElementById("teamSlider")) document.getElementById("teamSlider").value = team;
+  if (document.activeElement !== document.getElementById("teamNum")) document.getElementById("teamNum").value = team;
+  if (document.activeElement !== document.getElementById("costSlider")) document.getElementById("costSlider").value = cost;
+  if (document.activeElement !== document.getElementById("costNum")) document.getElementById("costNum").value = cost;
+
+  const sv = document.getElementById("scoreVal");
+  sv.textContent = r.score;
+  sv.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  const rampBtn = document.getElementById("rampBtn");
+  rampBtn.setAttribute("aria-pressed", rampOn);
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/brooks-law/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("teamName").textContent = t.teamName;
+  document.getElementById("teamSub").textContent = t.teamSub;
+  document.getElementById("costName").textContent = t.costName;
+  document.getElementById("costSub").textContent = t.costSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("rampBtn").textContent = t.rampBtn;
+  document.getElementById("rampSub").textContent = t.rampSub;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  document.getElementById("relatedH").textContent = t.relatedH;
+  const relGrid = document.getElementById("relatedGrid");
+  relGrid.innerHTML = "";
+  t.related.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "sim-card";
+    a.href = item.href;
+    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
+    relGrid.appendChild(a);
+  });
+}
+
+/* ================= イベント ================= */
+document.getElementById("teamSlider").addEventListener("input", e => { team = +e.target.value; render(); });
+document.getElementById("teamNum").addEventListener("change", e => {
+  team = Math.min(N_MAX, Math.max(N_MIN, +e.target.value));
+  render();
+});
+document.getElementById("costSlider").addEventListener("input", e => { cost = +e.target.value; render(); });
+document.getElementById("costNum").addEventListener("change", e => {
+  cost = Math.min(3, Math.max(0, +e.target.value));
+  render();
+});
+document.getElementById("rampBtn").addEventListener("click", () => { rampOn = !rampOn; render(); });
+document.getElementById("resetBtn").addEventListener("click", () => {
+  team = 6; cost = 1.0; rampOn = false;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  team = Math.min(N_MAX, team + 5);
+  rampOn = true;
+  render();
+  document.getElementById("hint").textContent = T().hintScenario;
+});
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
