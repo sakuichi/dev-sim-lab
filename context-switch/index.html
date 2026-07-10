@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3案件並行なら、1/3ずつ進む? | コンテキストスイッチ・シミュレーター</title>
+<meta name="description" content="並行して抱える案件数が増えるほど、切り替えロスで実効作業時間が失われる様子を積み上げ棒グラフで体験できるシミュレーター。Weinbergのロスモデルを可視化。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/context-switch/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/context-switch/">
+<meta property="og:title" content="3案件並行なら、1/3ずつ進む? | コンテキストスイッチ・シミュレーター">
+<meta property="og:description" content="並行案件数が増えるほど、切り替えロスで実効作業時間が失われる様子を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/context-switch.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "コンテキストスイッチ・シミュレーター",
+  "alternateName": "Context Switch Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/context-switch/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "並行案件数が増えるほど切り替えロスで実効作業時間が失われる様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+.console{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 2px 0 rgba(34,48,46,.05);padding:20px 16px 24px}
+.console-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+.console-head .label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.sum{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-soft)}
+.sum b{color:var(--ink);font-size:16px}
+.hint{min-height:1.5em;text-align:center;font-size:12.5px;color:var(--d);font-weight:500;margin-top:8px}
+.chart-note{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- stacked bar chart ---- */
+.bar-wrap{display:flex;justify-content:center}
+.bar-svg{width:100%;max-width:640px;height:auto;touch-action:none;user-select:none}
+.bar-grid{stroke:var(--line);stroke-width:1}
+.bar-axis-label{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-soft)}
+.bar-seg{cursor:pointer}
+.bar-group{cursor:pointer}
+.bar-group.is-selected .bar-outline{stroke:var(--ink);stroke-width:2}
+.bar-group:not(.is-selected){opacity:.55}
+.bar-group:not(.is-selected):hover{opacity:.8}
+.bar-outline{fill:none;stroke:transparent;stroke-width:2}
+.bar-n-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--ink);text-anchor:middle}
+.bar-loss-label{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700;fill:var(--alert);text-anchor:middle}
+
+/* ---- legend ---- */
+.bar-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--ink-soft)}
+.bar-legend .swatch{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+.bar-legend .swatch.work{background:var(--d)}
+.bar-legend .swatch.loss{
+  background-color:rgba(179,66,58,.28);
+  background-image:repeating-linear-gradient(45deg, var(--alert) 0, var(--alert) 2px, transparent 2px, transparent 6px);
+}
+
+/* ---- assessment ---- */
+.assess{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:#FDFDFC;padding:14px 14px 12px}
+.assess-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;color:var(--ink-soft)}
+.score-val{font-size:38px;font-weight:700;line-height:1;color:var(--q)}
+.score-val.warn{color:var(--c)}
+.score-val.danger{color:var(--alert)}
+.score-max{font-size:14px;color:var(--ink-soft)}
+.score-comment{font-size:14px;font-weight:500;flex:1;min-width:12em}
+
+/* ---- controls ---- */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.axis-card{border:1px solid var(--line);border-top:3px solid var(--axis,var(--d));border-radius:8px;padding:12px 12px 14px;background:#FDFDFC}
+.axis-name{font-weight:700;font-size:13.5px}
+.axis-name small{display:block;font-weight:400;font-size:11px;color:var(--ink-soft)}
+.readout{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:700;color:var(--d);margin:4px 0 0;line-height:1.1}
+.axis-card input[type=range]{width:100%;accent-color:var(--d);margin:6px 0 8px}
+.num-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.axis-card input[type=number]{width:76px;font-family:"IBM Plex Mono",monospace;font-size:14px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
+
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.related-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-label="Context Switch Simulator">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="bar-wrap">
+    <svg class="bar-svg" id="barChart" viewBox="0 0 640 280" role="img" aria-label="Effective work time vs number of parallel projects">
+      <defs>
+        <pattern id="lossPattern" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+          <rect width="8" height="8" fill="rgba(179,66,58,.22)"></rect>
+          <line x1="0" y1="0" x2="0" y2="8" stroke="var(--alert)" stroke-width="3"></line>
+        </pattern>
+      </defs>
+      <g id="barGridLayer"></g>
+      <g id="barsLayer"></g>
+    </svg>
+  </div>
+  <div class="bar-legend">
+    <span><span class="swatch work"></span><span id="legendWork"></span></span>
+    <span><span class="swatch loss"></span><span id="legendLoss"></span></span>
+  </div>
+  <p class="chart-note" id="chartNote"></p>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="projName"></span><small id="projSub"></small></div>
+      <div class="readout mono" id="projReadout">3</div>
+      <input type="range" id="projSlider" min="1" max="5" step="1" value="3">
+      <div class="num-row">
+        <label for="projNum" id="numLabel1"></label>
+        <input type="number" id="projNum" min="1" max="5" step="1" value="3">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="lossName"></span><small id="lossSub"></small></div>
+      <div class="readout mono" id="lossReadout">20%</div>
+      <input type="range" id="lossSlider" min="5" max="30" step="5" value="20">
+      <div class="num-row">
+        <label for="lossNum" id="numLabel2"></label>
+        <input type="number" id="lossNum" min="5" max="30" step="5" value="20">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="relatedH"></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (Weinbergのロスモデル・簡略版) ================= */
+const N_MIN = 1, N_MAX = 5;
+const PROJECT_COLORS = ["#0E7C66", "#B07A14", "#3B6EA5", "#7C5CBF", "#B34A70"];
+const LOSS_FILL = "url(#lossPattern)";
+
+function lossPct(n, coef) { return Math.min(95, (n - 1) * coef); }
+function effectivePct(n, coef) { return 100 - lossPct(n, coef); }
+function perProjectPct(n, coef) { return effectivePct(n, coef) / n; }
+function naivePct(n) { return 100 / n; }
+
+function scoreOf(n, coef) {
+  return Math.max(0, Math.min(100, Math.round(effectivePct(n, coef))));
+}
+function assess(n, coef) {
+  const score = scoreOf(n, coef);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { score, band, loss: lossPct(n, coef), effective: effectivePct(n, coef), perProject: perProjectPct(n, coef), naive: naivePct(n) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "3案件並行なら、1/3ずつ進む? | コンテキストスイッチ・シミュレーター",
+  heroTitle: "3案件を並行すれば、<br>1/3ずつ進む?",
+  heroLead: "案件を同時に抱えれば、その数で単純に分け合えるはず — そう思いたくなります。しかし案件を切り替えるたびに、頭の中の再読み込みに時間がかかります。並行案件数と切り替えロスを動かして、実際どれだけの時間が「切り替え」自体に消えるかを確認してください。",
+  consoleLabel: "SWITCHING CONSOLE",
+  sumLabel: "切り替えロス",
+  scoreLabel: "集中度スコア",
+  projName: "並行案件数", projSub: "1〜5件",
+  lossName: "1件増えるごとの切り替えロス", lossSub: "案件が1つ増えるたびに失われる時間の割合",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 5案件を掛け持ちしてみる",
+  chartNote: "簡易モデルによる目安です。実際の損失は業務内容により異なります。",
+  legendWork: "各案件の作業時間",
+  legendLoss: "切り替えロス(無駄になった時間)",
+  hint: (n, r) => `${n}件を並行すると、1件あたりの実質作業時間は ${r.perProject.toFixed(1)}%(単純計算なら ${r.naive.toFixed(1)}%)。差の ${r.loss.toFixed(0)}% が切り替えロスです。`,
+  hintScenario: "5件を同時に抱えてみました。1件あたりに残る時間がどれだけ減るか確認してください。",
+  comments: [
+    "専任に近い状態です。集中して取り組めています。",
+    "概ね良好ですが、切り替えのロスが出始めています。",
+    "切り替えのロスが無視できない水準です。",
+    "スイッチのたびに、思った以上の時間が失われています。",
+    "手を広げるほど、どの案件も前に進まなくなっています。",
+  ],
+  barNLabel: n => `${n}件`,
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "案件を切り替えるたびに、頭の中の文脈(コンテキスト)を組み立て直すコストがかかります。同時に抱える案件が増えるほど、この「組み立て直し」の回数が増え、実質的な作業時間はかけ算どころか大きく目減りします。",
+  adviceItems: [
+    "専任化できる範囲を見極め、掛け持ちの数そのものを減らす",
+    "関連する会議・確認をまとめて処理し、切り替えの回数自体を減らす",
+    "集中時間帯(ノー会議タイムなど)を確保し、割り込みを構造的に防ぐ",
+    "並行案件数の上限をチームであらかじめ合意しておく",
+  ],
+  relatedH: "関連する問題",
+  related: [
+    { title: "開発あるある図鑑(全シミュレーター一覧)", desc: "他のソフトウェア開発の「あるある」もあわせてどうぞ。", href: "../" },
+    { title: "人が増えれば早く終わる? | ブルックスの法則シミュレーター", desc: "増員によるコミュニケーションコストの増加を可視化する姉妹シミュレーター。", href: "../brooks-law/" },
+    { title: "全員が常に忙しい = 効率的? | 稼働率100%の罠シミュレーター", desc: "稼働率が上がるほど待ち時間が急増する様子を可視化する姉妹シミュレーター。", href: "../utilization-trap/" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "3案件並行なら、1/3ずつ進む? | コンテキストスイッチ・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Three projects at once — does each move at 1/3 speed? | Context Switch Simulator",
+  heroTitle: "Run 3 projects at once —<br>does each get 1/3 of your time?",
+  heroLead: "It's tempting to think that juggling projects just splits your time evenly between them. But every switch costs time reloading context in your head. Move the sliders and see how much time actually disappears into switching itself.",
+  consoleLabel: "SWITCHING CONSOLE",
+  sumLabel: "Switching loss",
+  scoreLabel: "Focus score",
+  projName: "Parallel projects", projSub: "1 to 5",
+  lossName: "Loss per extra project", lossSub: "Share of time lost for each additional project",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: juggle 5 projects at once",
+  chartNote: "A simplified estimate — actual losses vary by the type of work.",
+  legendWork: "Time spent on each project",
+  legendLoss: "Switching loss (wasted time)",
+  hint: (n, r) => `With ${n} projects running in parallel, each gets ${r.perProject.toFixed(1)}% of effective time (vs. ${r.naive.toFixed(1)}% under naive division). The ${r.loss.toFixed(0)}% gap is lost to switching.`,
+  hintScenario: "We just piled on 5 projects at once. See how little time is left for each.",
+  comments: [
+    "Close to fully dedicated. You can stay focused.",
+    "Broadly fine, but switching losses are starting to show.",
+    "Switching losses are no longer negligible.",
+    "Every switch is costing more time than it looks like.",
+    "The more you spread yourself, the less any project actually moves.",
+  ],
+  barNLabel: n => `${n}`,
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Every time you switch projects, you pay a cost to rebuild context in your head. The more projects you carry at once, the more often you pay that cost — so effective work time shrinks far more than simple division would suggest.",
+  adviceItems: [
+    "Identify where dedicated focus is possible and reduce the number of concurrent projects",
+    "Batch related meetings and check-ins to cut down on the number of switches itself",
+    "Block dedicated focus time (e.g. no-meeting blocks) to structurally prevent interruptions",
+    "Agree on a team-wide cap for how many projects can run in parallel",
+  ],
+  relatedH: "Related problems",
+  related: [
+    { title: "Dev Sim Lab (all simulators)", desc: "Explore the other software development misconceptions in this series.", href: "../" },
+    { title: "Will adding people make it faster? | Brooks's Law Simulator", desc: "A companion simulator on how communication overhead grows with team size.", href: "../brooks-law/" },
+    { title: "Is everyone being 100% busy actually efficient? | Utilization Trap Simulator", desc: "A companion simulator on how wait times explode as utilization rises.", href: "../utilization-trap/" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Three projects at once — does each move at 1/3 speed? — Context Switch Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (n, r) => `${n}件同時進行中。実質 ${r.perProject.toFixed(1)}%/件。残りの ${r.loss.toFixed(0)}%は、Slackのタブを切り替えている時間に消えました。`,
+  hintScenario: "5件抱えました。もうどれが本業か、本人にもわかりません。",
+  comments: [
+    "奇跡の専念状態。誰にも邪魔されるな。",
+    "まだ大丈夫。ただし「あれ、さっき何してたっけ」が増え始めている。",
+    "脳内タブが増えすぎて、どれも読み込み中。",
+    "会議のたびに前回の記憶がロールバックされる。",
+    "全部同時にやっている風だが、実際は全部同時に止まっている。",
+  ],
+},
+en: {
+  hint: (n, r) => `${n} projects at once. ${r.perProject.toFixed(1)}% effective each. The remaining ${r.loss.toFixed(0)}% vanished into tab-switching.`,
+  hintScenario: "Five projects, loaded. Not even you remember which one is the priority anymore.",
+  comments: [
+    "Miraculous focus. Nobody dares interrupt.",
+    "Still fine. But 'wait, what was I just doing' is creeping in.",
+    "Too many mental tabs open. All of them stuck loading.",
+    "Every meeting rolls back your memory to before the last one.",
+    "Looks like you're doing it all at once. You're actually stalled on all of it at once.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let projects = 3;
+let lossCoef = 20;
+
+/* ================= 積み上げ棒グラフ ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const BW = 640, BH = 280, PAD_L = 40, PAD_R = 16, PAD_T = 16, PAD_B = 40;
+const BAR_W = 76, BAR_GAP = 40;
+const barAreaH = BH - PAD_T - PAD_B;
+
+function barX(n) { return PAD_L + (n - N_MIN) * (BAR_W + BAR_GAP); }
+function yOf(pct) { return PAD_T + barAreaH - (pct / 100) * barAreaH; }
+
+function drawGrid() {
+  const layer = document.getElementById("barGridLayer");
+  layer.innerHTML = "";
+  [0, 25, 50, 75, 100].forEach(pct => {
+    const y = yOf(pct);
+    layer.appendChild(el("line", { class: "bar-grid", x1: PAD_L - 8, y1: y, x2: BW - PAD_R, y2: y }));
+    const label = el("text", { class: "bar-axis-label", x: PAD_L - 12, y: y + 3, "text-anchor": "end" });
+    label.textContent = pct + "%";
+    layer.appendChild(label);
+  });
+}
+
+function buildBars() {
+  const layer = document.getElementById("barsLayer");
+  layer.innerHTML = "";
+  for (let n = N_MIN; n <= N_MAX; n++) {
+    const g = el("g", { class: "bar-group", "data-n": n });
+    g.addEventListener("click", () => { projects = n; render(); });
+    layer.appendChild(g);
+    const nLabel = el("text", { class: "bar-n-label", x: barX(n) + BAR_W / 2, y: BH - PAD_B + 20 });
+    g.appendChild(nLabel);
+  }
+}
+
+function drawBars(coef) {
+  const t = T();
+  for (let n = N_MIN; n <= N_MAX; n++) {
+    const g = document.querySelector(`.bar-group[data-n="${n}"]`);
+    g.querySelectorAll(".bar-seg, .bar-outline").forEach(e => e.remove());
+    g.classList.toggle("is-selected", n === projects);
+
+    const r = assess(n, coef);
+    const x = barX(n);
+    // stack from bottom: n equal project segments, then loss segment on top
+    let cursorPct = 0;
+    for (let i = 0; i < n; i++) {
+      const segPct = r.effective / n;
+      const yTop = yOf(cursorPct + segPct);
+      const yBottom = yOf(cursorPct);
+      g.appendChild(el("rect", {
+        class: "bar-seg", x, y: yTop, width: BAR_W, height: Math.max(0, yBottom - yTop),
+        fill: PROJECT_COLORS[i % PROJECT_COLORS.length],
+      }));
+      cursorPct += segPct;
+    }
+    if (r.loss > 0) {
+      const yTop = yOf(cursorPct + r.loss);
+      const yBottom = yOf(cursorPct);
+      g.appendChild(el("rect", {
+        class: "bar-seg", x, y: yTop, width: BAR_W, height: Math.max(0, yBottom - yTop),
+        fill: LOSS_FILL, stroke: "var(--alert)", "stroke-width": 1,
+      }));
+      if (n === projects) {
+        const midY = (yTop + yBottom) / 2;
+        const labelY = (yBottom - yTop) > 16 ? midY : yTop - 6;
+        g.appendChild(el("text", {
+          class: "bar-loss-label", x: x + BAR_W / 2, y: labelY + 4,
+        })).textContent = Math.round(r.loss) + "%";
+      }
+    }
+    g.appendChild(el("rect", { class: "bar-outline", x, y: yOf(100), width: BAR_W, height: barAreaH, rx: 3 }));
+    const nLabel = g.querySelector(".bar-n-label");
+    if (nLabel) nLabel.textContent = t.barNLabel(n);
+  }
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const r = assess(projects, lossCoef);
+
+  drawBars(lossCoef);
+
+  document.getElementById("sumVal").textContent = r.loss.toFixed(0) + "%";
+  document.getElementById("hint").textContent = t.hint(projects, r);
+
+  document.getElementById("projReadout").textContent = projects;
+  document.getElementById("lossReadout").textContent = lossCoef + "%";
+  if (document.activeElement !== document.getElementById("projSlider")) document.getElementById("projSlider").value = projects;
+  if (document.activeElement !== document.getElementById("projNum")) document.getElementById("projNum").value = projects;
+  if (document.activeElement !== document.getElementById("lossSlider")) document.getElementById("lossSlider").value = lossCoef;
+  if (document.activeElement !== document.getElementById("lossNum")) document.getElementById("lossNum").value = lossCoef;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = r.score;
+  scoreEl.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/context-switch/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("projName").textContent = t.projName;
+  document.getElementById("projSub").textContent = t.projSub;
+  document.getElementById("lossName").textContent = t.lossName;
+  document.getElementById("lossSub").textContent = t.lossSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendWork").textContent = t.legendWork;
+  document.getElementById("legendLoss").textContent = t.legendLoss;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("relatedH").textContent = t.relatedH;
+  const relGrid = document.getElementById("relatedGrid");
+  relGrid.innerHTML = "";
+  t.related.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "sim-card";
+    a.href = item.href;
+    a.innerHTML = `<h2>${item.title}</h2><p>${item.desc}</p>`;
+    relGrid.appendChild(a);
+  });
+}
+
+/* ================= イベント ================= */
+document.getElementById("projSlider").addEventListener("input", e => { projects = +e.target.value; render(); });
+document.getElementById("projNum").addEventListener("change", e => {
+  projects = Math.min(N_MAX, Math.max(N_MIN, +e.target.value));
+  render();
+});
+document.getElementById("lossSlider").addEventListener("input", e => { lossCoef = +e.target.value; render(); });
+document.getElementById("lossNum").addEventListener("change", e => {
+  lossCoef = Math.min(30, Math.max(5, +e.target.value));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  projects = 3; lossCoef = 20;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  projects = 5;
+  render();
+  document.getElementById("hint").textContent = T().hintScenario;
+});
+
+drawGrid();
+buildBars();
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
