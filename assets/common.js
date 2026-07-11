@@ -113,6 +113,12 @@ window.DevSimLab = (function () {
       ja: { name: "技術的負債シミュレーター", title: "技術的負債は、あとでまとめて返せばいい?", desc: "放置している間も借金の利息のように対応コストが複利で膨らんでいく様子を可視化するシミュレーター。" },
       en: { name: "Technical Debt Simulator", title: "Can you just pay off tech debt later?", desc: "A simulator visualizing how the cost of unaddressed technical debt compounds like interest over time." },
     },
+    {
+      id: "code-review", href: "code-review/", status: "live",
+      tags: { ja: ["コードレビュー", "品質"], en: ["Code review", "Quality"] },
+      ja: { name: "コードレビュー係数シミュレーター", title: "レビューは、早く終わらせた方がいい?", desc: "レビュー速度が上がるほど欠陥の検出率が下がっていく様子を可視化するシミュレーター。" },
+      en: { name: "Code Review Coefficient Simulator", title: "Is it better to finish reviews quickly?", desc: "A simulator visualizing how defect detection rate drops as code review speed increases." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */

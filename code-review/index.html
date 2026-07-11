@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レビューは早く終わらせた方がいい? | コードレビュー係数シミュレーター</title>
+<meta name="description" content="コードレビューの速度が上がるほど、欠陥の検出率が下がっていく様子を体験できるシミュレーター。シスコシステムズの大規模レビュー調査をもとにした簡易モデルを可視化。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/code-review/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/code-review/">
+<meta property="og:title" content="レビューは早く終わらせた方がいい? | コードレビュー係数シミュレーター">
+<meta property="og:description" content="コードレビューの速度が上がるほど、欠陥の検出率が下がっていく様子を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/code-review.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "コードレビュー係数シミュレーター",
+  "alternateName": "Code Review Coefficient Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/code-review/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "コードレビューの速度が上がるほど欠陥の検出率が下がっていく様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- detection-rate curve ---- */
+.review-wrap{margin-top:14px}
+.review-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.review-grid{stroke:var(--line);stroke-width:1}
+.review-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.review-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.review-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.review-area{fill:var(--d);opacity:.12}
+.review-line{fill:none;stroke:var(--ink);stroke-width:2.2}
+.review-threshold{stroke:var(--q);stroke-width:1.4;stroke-dasharray:4 3}
+.review-threshold-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--q);font-weight:700}
+.review-marker{stroke:var(--d);stroke-width:3;stroke-linecap:round;cursor:grab}
+.review-marker.dragging{cursor:grabbing}
+.review-marker-hit{fill:transparent;cursor:grab}
+.review-marker-hit.dragging{cursor:grabbing}
+.review-point{fill:var(--surface);stroke:var(--d);stroke-width:2}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- defect dot grid ---- */
+.defect-row{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.defect-wrap{flex:1;display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-height:32px;padding:10px;border:1px dashed var(--line);border-radius:8px;background:#FDFDFC}
+.defect-dot{width:14px;height:14px;border-radius:50%;flex:none;animation:dotIn .2s ease-out}
+.defect-dot.found{background:var(--q)}
+.defect-dot.missed{background:var(--alert)}
+@keyframes dotIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.defect-dot{animation:none}}
+.defect-legend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.defect-legend .swatch{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.defect-legend .swatch.found{background:var(--q)}
+.defect-legend .swatch.missed{background:var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">90%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="review-wrap">
+    <svg class="review-svg" id="reviewChart" viewBox="0 0 640 240" role="img" aria-label="Defect detection rate vs review speed">
+      <g id="reviewGridLayer"></g>
+      <path id="reviewArea" class="review-area"></path>
+      <path id="reviewLine" class="review-line"></path>
+      <line id="reviewThreshold" class="review-threshold" x1="0" y1="0" x2="0" y2="0"></line>
+      <text id="reviewThresholdLabel" class="review-threshold-label"></text>
+      <line id="reviewMarker" class="review-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="reviewPoint" class="review-point" r="5"></circle>
+      <rect id="reviewMarkerHit" class="review-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="defect-row">
+    <div class="defect-wrap" id="defectWrap" role="img" aria-label="Defects found vs missed"></div>
+  </div>
+  <div class="defect-legend">
+    <span><span class="swatch found"></span><span id="legendFound"></span></span>
+    <span><span class="swatch missed"></span><span id="legendMissed"></span></span>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">90</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="speedName"></span><small id="speedSub"></small></div>
+      <div class="readout mono" id="speedReadout">300</div>
+      <input type="range" id="speedSlider" min="50" max="1000" step="50" value="300">
+      <div class="num-row">
+        <label for="speedNum" id="numLabel1"></label>
+        <input type="number" id="speedNum" min="50" max="1000" step="50" value="300">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="locName"></span><small id="locSub"></small></div>
+      <div class="readout mono" id="locReadout">200</div>
+      <input type="range" id="locSlider" min="50" max="2000" step="50" value="200">
+      <div class="num-row">
+        <label for="locNum" id="numLabel2"></label>
+        <input type="number" id="locNum" min="50" max="2000" step="50" value="200">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (Cisco/SmartBearの調査を参考にした簡易モデル) ================= */
+const SPEED_MIN = 50, SPEED_MAX = 1000;
+const LOC_MIN = 50, LOC_MAX = 2000;
+const RECOMMENDED_SPEED = 300;
+const DEFECT_DENSITY = 0.015; // 1000行あたり15件、という簡易仮定
+
+function detectionRateOf(speed) {
+  if (speed <= 300) return 90;
+  if (speed <= 500) return 90 - (speed - 300) / 200 * 25;
+  return Math.max(20, 65 - (speed - 500) / 500 * 45);
+}
+function totalDefectsOf(loc) { return Math.max(1, Math.round(loc * DEFECT_DENSITY)); }
+function reviewTimeMinOf(loc, speed) { return Math.round((loc / speed) * 60); }
+function scoreOf(speed) { return Math.round(detectionRateOf(speed)); }
+function assess(speed, loc) {
+  const score = scoreOf(speed);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  const total = totalDefectsOf(loc);
+  const found = Math.round(total * score / 100);
+  return { score, band, total, found, missed: total - found, timeMin: reviewTimeMinOf(loc, speed) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "レビューは早く終わらせた方がいい? | コードレビュー係数シミュレーター",
+  heroTitle: "レビューは、<br>早く終わらせた方がいい?",
+  heroLead: "コードレビューは早く終わらせるほど、開発のスピードが上がる — そう考えたくなります。しかし実際の調査では、レビュー速度が上がるほど見逃す不具合の割合も増えることが報告されています。レビュー速度と変更量を動かして、実際にどれだけの不具合を見逃すことになるかを確認してください。",
+  consoleLabel: "REVIEW CONSOLE",
+  sumLabel: "欠陥検出率",
+  scoreLabel: "レビュー品質スコア",
+  speedName: "レビュー速度", speedSub: "1時間あたりに読むコード量(行/時)",
+  locName: "変更量", locSub: "このレビュー対象のコード量(行)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 1000行を1時間で「まとめてレビュー」する",
+  chartCaption: "点線は調査で報告された「推奨ペース(300行/時)」の目安です。速く読むほど、検出率は下がっていきます。",
+  chartNote: "簡易モデルによる目安です。実際の検出率はコードの複雑さやレビュアーの経験により異なります。",
+  reviewYTitle: "欠陥検出率(%)", reviewXTitle: "レビュー速度(行/時)",
+  thresholdLabel: "推奨ペース",
+  legendFound: "検出できた不具合", legendMissed: "見逃した不具合",
+  hint: (speed, loc, r) => `レビュー速度${speed}行/時・変更量${loc}行(所要時間の目安 約${r.timeMin}分)。検出率は${r.score}%で、${r.total}件中${r.found}件を検出、${r.missed}件を見逃す計算になります。`,
+  hintScenario: (r) => `1000行のプルリクエストを、1時間で「まとめてレビュー」してしまいました。検出率は${r.score}%まで下がり、${r.total}件中${r.missed}件を見逃しています。`,
+  comments: [
+    "十分な検出率です。じっくり読めていると言えます。",
+    "概ね良好ですが、見逃しが出始めるペースです。",
+    "検出率が目に見えて下がっています。ペースを落とすことをおすすめします。",
+    "多くの不具合を見逃している可能性が高い状態です。",
+    "「レビューした」という事実だけが残り、ほとんど機能していません。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象は、シスコシステムズの大規模コードレビュー調査(ジェイソン・コーエンによる分析、2,500件以上のレビューを対象)で報告されました。1時間に300行を超えるペースでレビューすると、欠陥の検出率が目に見えて下がることが示されています。ただしこれは1社の実務データであり、普遍的な法則ではありません。あくまで目安としてご活用ください。",
+  adviceItems: [
+    "レビュー速度の目安(300行/時未満)を意識する。急ぐ理由がある場合は対象範囲を絞る",
+    "変更量(プルリクエストのサイズ)自体を小さく保つ。大きな変更は分割してレビューする",
+    "1回のレビューセッションは60〜90分を上限にする。長時間の連続レビューは避ける",
+    "「レビュー済み」を承認条件にする場合、かけた時間や行数もあわせて記録・可視化する",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "CODE REVIEW", title: "伝わるコードレビュー", desc: "鳥井雪著。開発チームの生産性を高める「上手な伝え方」を体系的に解説した一冊。", link: "Amazonで見る →", url: "https://amzn.to/3TuXia0" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "レビューは早く終わらせた方がいい? | コードレビュー係数シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Is it better to finish reviews quickly? | Code Review Coefficient Simulator",
+  heroTitle: "Is it better to<br>finish reviews quickly?",
+  heroLead: "It's tempting to think that finishing code review faster speeds up development. But research shows that as review speed increases, the share of defects you miss goes up too. Move the sliders and see how many defects actually slip through.",
+  consoleLabel: "REVIEW CONSOLE",
+  sumLabel: "Defect detection rate",
+  scoreLabel: "Review quality score",
+  speedName: "Review speed", speedSub: "Code reviewed per hour (LOC/hour)",
+  locName: "Change size", locSub: "Size of this changeset (lines of code)",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: review 1000 lines in one hour, all at once",
+  chartCaption: "The dashed line marks the \"recommended pace\" (300 LOC/hour) reported by the research. The faster you read, the lower the detection rate.",
+  chartNote: "A simplified estimate — actual detection rates vary by code complexity and reviewer experience.",
+  reviewYTitle: "Detection rate (%)", reviewXTitle: "Review speed (LOC/hour)",
+  thresholdLabel: "Recommended pace",
+  legendFound: "Defects found", legendMissed: "Defects missed",
+  hint: (speed, loc, r) => `At ${speed} LOC/hour with a ${loc}-line change (about ${r.timeMin} min), detection rate is ${r.score}%: ${r.found} of ${r.total} defects found, ${r.missed} missed.`,
+  hintScenario: (r) => `A 1000-line pull request just got "reviewed all at once" in a single hour. Detection rate dropped to ${r.score}%, missing ${r.missed} of ${r.total} defects.`,
+  comments: [
+    "A solid detection rate. This looks like a thorough read.",
+    "Broadly fine, but you're starting to miss things at this pace.",
+    "Detection rate has visibly dropped. Slowing down is recommended.",
+    "You're likely missing a significant share of defects.",
+    "\"Reviewed\" is now just a checkbox — it isn't doing much anymore.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This is based on Cisco Systems' large-scale code review study (analyzed by Jason Cohen across more than 2,500 reviews). It found that reviewing faster than about 300 LOC/hour causes a visible drop in defect detection. This is data from a single company's internal practice, not a universal law — treat it as a useful reference point, not gospel.",
+  adviceItems: [
+    "Keep review pace under roughly 300 LOC/hour; if you must go faster, narrow the scope",
+    "Keep changesets themselves small — split large changes into smaller reviewable pieces",
+    "Cap a single review session at 60–90 minutes; avoid long unbroken review marathons",
+    "If \"reviewed\" is a merge requirement, also track and surface the time and LOC spent reviewing",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "CODE REVIEW", title: "Best Kept Secrets of Peer Code Review", desc: "Jason Cohen. The book behind the Cisco study cited on this page — practical advice drawn directly from that research.", link: "View on Amazon →", url: "https://amzn.to/4vv284B" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Is it better to finish reviews quickly? — Code Review Coefficient Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (speed, loc, r) => `${speed}行/時で${loc}行を「確認」。検出率${r.score}%。LGTMボタンは指が押しただけで、目は通っていません。見逃し${r.missed}件。`,
+  hintScenario: (r) => `1000行のPR、1時間、LGTM。検出率${r.score}%。あなたが見たのは差分の色くらいです。見逃し${r.missed}件。`,
+  comments: [
+    "本当に読んでいる。奇跡的な集中力。",
+    "まだ読めている。コーヒーが効いている証拠。",
+    "スクロールの速度がレビューの速度になっている。",
+    "「LGTM」の意味が「Looks Good, Trust Me」になっている。",
+    "承認ボタンは押した。それ以外は何もしていない。",
+  ],
+},
+en: {
+  hint: (speed, loc, r) => `${speed} LOC/hour, ${loc} lines "reviewed." Detection: ${r.score}%. The LGTM button got clicked; the eyes did not follow. ${r.missed} missed.`,
+  hintScenario: (r) => `1000-line PR, one hour, LGTM. Detection rate: ${r.score}%. What you actually reviewed was the color of the diff. ${r.missed} missed.`,
+  comments: [
+    "Actually reading it. A miraculous feat of focus.",
+    "Still reading. The coffee is working.",
+    "Scroll speed has become review speed.",
+    "\"LGTM\" now stands for \"Looks Good, Trust Me.\"",
+    "The approve button got pressed. Nothing else happened.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let speed = 300;
+let loc = 200;
+
+/* ================= カーブ描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const X_TICKS = [50, 300, 500, 750, 1000];
+const xOf = s => PAD_L + ((s - SPEED_MIN) / (SPEED_MAX - SPEED_MIN)) * (PW - PAD_L - PAD_R);
+const sOfX = x => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = SPEED_MIN + frac * (SPEED_MAX - SPEED_MIN);
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(raw / 50) * 50));
+};
+const yOf = v => PAD_T + (1 - v / 100) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("reviewGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 25, 50, 75, 100].forEach(v => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "review-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "review-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  X_TICKS.forEach(s => {
+    const x = xOf(s);
+    gridLayer.appendChild(el("line", { class: "review-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "review-axis-label", x, y: PH - PAD_B + 14, "text-anchor": s === SPEED_MIN ? "start" : s === SPEED_MAX ? "end" : "middle" });
+    label.textContent = String(s);
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "review-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.reviewYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "review-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.reviewXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  for (let s = SPEED_MIN; s <= SPEED_MAX; s += 10) pts.push(`${xOf(s)},${yOf(detectionRateOf(s))}`);
+  document.getElementById("reviewLine").setAttribute("d", "M " + pts.join(" L "));
+  document.getElementById("reviewArea").setAttribute("d", "M " + xOf(SPEED_MIN) + "," + yOf(0) + " L " + pts.join(" L ") + " L " + xOf(SPEED_MAX) + "," + yOf(0) + " Z");
+
+  const thX = xOf(RECOMMENDED_SPEED);
+  const th = document.getElementById("reviewThreshold");
+  th.setAttribute("x1", thX); th.setAttribute("x2", thX);
+  th.setAttribute("y1", PAD_T); th.setAttribute("y2", PH - PAD_B);
+  const thLabel = document.getElementById("reviewThresholdLabel");
+  thLabel.setAttribute("x", thX + 6);
+  thLabel.setAttribute("y", PAD_T + 12);
+  thLabel.textContent = t.thresholdLabel;
+
+  const mx = xOf(speed), my = yOf(detectionRateOf(speed));
+  const marker = document.getElementById("reviewMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+  const point = document.getElementById("reviewPoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", my);
+
+  const hit = document.getElementById("reviewMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+function drawDefects(r) {
+  const wrap = document.getElementById("defectWrap");
+  wrap.innerHTML = "";
+  for (let i = 0; i < r.found; i++) {
+    const dot = document.createElement("div");
+    dot.className = "defect-dot found";
+    wrap.appendChild(dot);
+  }
+  for (let i = 0; i < r.missed; i++) {
+    const dot = document.createElement("div");
+    dot.className = "defect-dot missed";
+    wrap.appendChild(dot);
+  }
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const r = assess(speed, loc);
+
+  drawChart();
+  drawDefects(r);
+
+  document.getElementById("sumVal").textContent = r.score + "%";
+  document.getElementById("hint").textContent = t.hint(speed, loc, r);
+
+  document.getElementById("speedReadout").textContent = speed;
+  document.getElementById("locReadout").textContent = loc;
+  if (document.activeElement !== document.getElementById("speedSlider")) document.getElementById("speedSlider").value = speed;
+  if (document.activeElement !== document.getElementById("speedNum")) document.getElementById("speedNum").value = speed;
+  if (document.activeElement !== document.getElementById("locSlider")) document.getElementById("locSlider").value = loc;
+  if (document.activeElement !== document.getElementById("locNum")) document.getElementById("locNum").value = loc;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = r.score;
+  scoreEl.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/code-review/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("speedName").textContent = t.speedName;
+  document.getElementById("speedSub").textContent = t.speedSub;
+  document.getElementById("locName").textContent = t.locName;
+  document.getElementById("locSub").textContent = t.locSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("speedSlider").setAttribute("aria-label", t.speedName);
+  document.getElementById("locSlider").setAttribute("aria-label", t.locName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.speedName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.locName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendFound").textContent = t.legendFound;
+  document.getElementById("legendMissed").textContent = t.legendMissed;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "code-review" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("speedSlider").addEventListener("input", e => { speed = +e.target.value; render(); });
+document.getElementById("speedNum").addEventListener("change", e => {
+  speed = Math.min(SPEED_MAX, Math.max(SPEED_MIN, +e.target.value));
+  render();
+});
+document.getElementById("locSlider").addEventListener("input", e => { loc = +e.target.value; render(); });
+document.getElementById("locNum").addEventListener("change", e => {
+  loc = Math.min(LOC_MAX, Math.max(LOC_MIN, +e.target.value));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  speed = 300; loc = 200;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  speed = 1000; loc = 1000;
+  render();
+  const r = assess(speed, loc);
+  document.getElementById("hint").textContent = T().hintScenario(r);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const reviewChart = document.getElementById("reviewChart");
+function svgPoint(evt) {
+  const pt = reviewChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(reviewChart.getScreenCTM().inverse());
+}
+let draggingSpeed = false;
+function startDrag(evt) {
+  draggingSpeed = true;
+  reviewChart.setPointerCapture(evt.pointerId);
+  document.getElementById("reviewMarker").classList.add("dragging");
+  document.getElementById("reviewMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  speed = sOfX(p.x);
+  render();
+}
+document.getElementById("reviewMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("reviewPoint").addEventListener("pointerdown", startDrag);
+reviewChart.addEventListener("pointermove", evt => { if (draggingSpeed) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach(ev => reviewChart.addEventListener(ev, () => {
+  draggingSpeed = false;
+  document.getElementById("reviewMarker").classList.remove("dragging");
+  document.getElementById("reviewMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
