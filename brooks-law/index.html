@@ -94,7 +94,7 @@ svg{width:100%;max-width:320px;height:auto}
 </header>
 
 <main>
-<section class="console" aria-label="Brooks's Law Simulator">
+<section class="console" aria-labelledby="heroTitle">
   <div class="console-head">
     <span class="label" id="consoleLabel"></span>
     <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
@@ -504,6 +504,10 @@ function applyStaticText() {
   document.getElementById("costSub").textContent = t.costSub;
   document.getElementById("numLabel1").textContent = t.numLabel;
   document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("teamSlider").setAttribute("aria-label", t.teamName);
+  document.getElementById("costSlider").setAttribute("aria-label", t.costName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.teamName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.costName} ${t.numLabel}`);
   document.getElementById("resetBtn").textContent = t.resetBtn;
   document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
   document.getElementById("rampBtn").textContent = t.rampBtn;

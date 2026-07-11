@@ -111,7 +111,7 @@ svg{width:100%;max-width:440px;height:auto;touch-action:none;user-select:none}
 </header>
 
 <main>
-<section class="console" aria-label="QCD Simulator">
+<section class="console" aria-labelledby="heroTitle">
   <div class="console-head">
     <span class="label">TRADE-OFF CONSOLE</span>
     <span class="sum"><span id="sumLabel"></span> <b id="sumVal">±0</b><span id="sumNote"></span></span>
@@ -732,6 +732,8 @@ function applyLang(lang){
     if (LANG === "en") a._title.textContent = `${a.key} ${ta.name} (${ta.short})`;
     a._sub2.textContent = ta.sub;
     a._numLabel.textContent = t.numLabel;
+    a._numLabel.setAttribute("aria-label", `${ta.name} ${t.numLabel}`);
+    a._slider.setAttribute("aria-label", ta.name);
     a._lockBtn.setAttribute("aria-label", t.lockAria(ta.name));
   });
 

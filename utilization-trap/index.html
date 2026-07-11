@@ -83,7 +83,7 @@
 </header>
 
 <main>
-<section class="console" aria-label="Utilization Trap Simulator">
+<section class="console" aria-labelledby="heroTitle">
   <div class="console-head">
     <span class="label" id="consoleLabel"></span>
     <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
@@ -490,6 +490,10 @@ function applyStaticText() {
   document.getElementById("timeSub").textContent = t.timeSub;
   document.getElementById("numLabel1").textContent = t.numLabel;
   document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("utilSlider").setAttribute("aria-label", t.utilName);
+  document.getElementById("timeSlider").setAttribute("aria-label", t.timeName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.utilName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.timeName} ${t.numLabel}`);
   document.getElementById("resetBtn").textContent = t.resetBtn;
   document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
   document.getElementById("chartNote").textContent = t.chartNote;

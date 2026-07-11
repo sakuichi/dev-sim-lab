@@ -74,7 +74,7 @@
 </header>
 
 <main>
-<section class="console" aria-label="Estimation Uncertainty Simulator">
+<section class="console" aria-labelledby="heroTitle">
   <div class="console-head">
     <span class="label" id="consoleLabel"></span>
     <span class="sum"><span id="sumLabel"></span> <b id="sumVal">0</b></span>
@@ -471,6 +471,10 @@ function applyStaticText() {
   document.getElementById("baseSub").textContent = t.baseSub;
   document.getElementById("numLabel1").textContent = t.numLabel;
   document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("phaseSlider").setAttribute("aria-label", t.phaseName);
+  document.getElementById("baseSlider").setAttribute("aria-label", t.baseName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.phaseName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.baseName} ${t.numLabel}`);
   document.getElementById("resetBtn").textContent = t.resetBtn;
   document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
   document.getElementById("chartNote").textContent = t.chartNote;
