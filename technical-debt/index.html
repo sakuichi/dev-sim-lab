@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>技術的負債は、あとでまとめて返せばいい? | 技術的負債シミュレーター</title>
+<meta name="description" content="技術的負債を放置している間も、借金の利息のように対応コストが複利で膨らんでいく様子を、単利での直感的な予想と比較しながら体験できるシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/technical-debt/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/technical-debt/">
+<meta property="og:title" content="技術的負債は、あとでまとめて返せばいい? | 技術的負債シミュレーター">
+<meta property="og:description" content="技術的負債を放置している間も、複利のように対応コストが膨らんでいく様子を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/technical-debt.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "技術的負債シミュレーター",
+  "alternateName": "Technical Debt Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/technical-debt/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "技術的負債を放置している間も対応コストが複利で膨らんでいく様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- compound-vs-simple curve ---- */
+.debt-wrap{margin-top:14px}
+.debt-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.debt-grid{stroke:var(--line);stroke-width:1}
+.debt-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.debt-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.debt-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.debt-area{fill:var(--alert);opacity:.12}
+.debt-simple{fill:none;stroke:var(--ink-soft);stroke-width:1.6;stroke-dasharray:4 3}
+.debt-compound{fill:none;stroke:var(--ink);stroke-width:2.2}
+.debt-marker{stroke:var(--alert);stroke-width:2.5;cursor:grab}
+.debt-marker.dragging{cursor:grabbing}
+.debt-marker-hit{fill:transparent;cursor:grab}
+.debt-marker-hit.dragging{cursor:grabbing}
+.debt-point{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.debt-point-simple{fill:var(--surface);stroke:var(--ink-soft);stroke-width:2}
+.debt-val-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;text-anchor:middle}
+.debt-val-label.compound{fill:var(--alert)}
+.debt-val-label.simple{fill:var(--ink-soft)}
+
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+.related-grid{margin-top:10px}
+.controls{grid-template-columns:repeat(3,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">×1.00</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="debt-wrap">
+    <svg class="debt-svg" id="debtChart" viewBox="0 0 640 240" role="img" aria-label="Repayment cost vs months deferred">
+      <g id="debtGridLayer"></g>
+      <path id="debtArea" class="debt-area"></path>
+      <path id="debtSimple" class="debt-simple"></path>
+      <path id="debtCompound" class="debt-compound"></path>
+      <line id="debtMarker" class="debt-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="debtPointSimple" class="debt-point-simple" r="5"></circle>
+      <circle id="debtPointCompound" class="debt-point" r="5"></circle>
+      <text id="debtValCompound" class="debt-val-label compound"></text>
+      <text id="debtValSimple" class="debt-val-label simple"></text>
+      <rect id="debtMarkerHit" class="debt-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="baseCostName"></span><small id="baseCostSub"></small></div>
+      <div class="readout mono" id="baseCostReadout">5</div>
+      <input type="range" id="baseCostSlider" min="1" max="60" step="1" value="5">
+      <div class="num-row">
+        <label for="baseCostNum" id="numLabel1"></label>
+        <input type="number" id="baseCostNum" min="1" max="60" step="1" value="5">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="monthsName"></span><small id="monthsSub"></small></div>
+      <div class="readout mono" id="monthsReadout">6</div>
+      <input type="range" id="monthsSlider" min="0" max="24" step="1" value="6">
+      <div class="num-row">
+        <label for="monthsNum" id="numLabel2"></label>
+        <input type="number" id="monthsNum" min="0" max="24" step="1" value="6">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--c)">
+      <div class="axis-name"><span id="rateName"></span><small id="rateSub"></small></div>
+      <div class="readout mono" id="rateReadout">10%</div>
+      <input type="range" id="rateSlider" min="1" max="20" step="1" value="10">
+      <div class="num-row">
+        <label for="rateNum" id="numLabel3"></label>
+        <input type="number" id="rateNum" min="1" max="20" step="1" value="10">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (複利のたとえ・簡略版) ================= */
+const MONTHS_MIN = 0, MONTHS_MAX = 24;
+const RATE_MIN = 1, RATE_MAX = 20;
+const BASE_MIN = 1, BASE_MAX = 60;
+
+function compoundMultiplier(months, ratePct) { return Math.pow(1 + ratePct / 100, months); }
+function simpleMultiplier(months, ratePct) { return 1 + (ratePct / 100) * months; }
+function scoreOf(months, ratePct) {
+  return Math.max(0, Math.min(100, Math.round(100 / compoundMultiplier(months, ratePct))));
+}
+function assess(months, ratePct) {
+  const score = scoreOf(months, ratePct);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { score, band, compound: compoundMultiplier(months, ratePct), simple: simpleMultiplier(months, ratePct) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "技術的負債は、あとでまとめて返せばいい? | 技術的負債シミュレーター",
+  heroTitle: "技術的負債は、<br>あとでまとめて返せばいい?",
+  heroLead: "今は機能を優先し、技術的負債の返済は後回しにする — そう考えたくなります。しかし技術的負債は、放置している間も借金の利息のように増え続けます。放置期間と「利率」を動かして、返済コストがどれだけ膨らむかを確認してください。",
+  consoleLabel: "DEBT CONSOLE",
+  sumLabel: "放置後の返済コスト",
+  scoreLabel: "健全度スコア",
+  baseCostName: "現在の修正コスト", baseCostSub: "今すぐ返済(修正)する場合にかかる工数(人日)",
+  monthsName: "放置期間", monthsSub: "リファクタリング(返済)までの期間(ヶ月)",
+  rateName: "月あたりの利率", rateSub: "放置している間、対応コストが毎月増えていく割合",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 「あとでまとめて直す」を2年間続ける",
+  chartCaption: "点線は「単利」で考えた場合の直感的な予想、実線が実際の複利での増え方です。",
+  chartNote: "簡易モデルによる目安です。実際の負債の増え方はプロジェクトの性質により異なります。",
+  unitDays: d => `${d}人日`,
+  sumVal: (baseCost, mult) => `${(baseCost * mult).toFixed(1)}人日 (×${mult.toFixed(1)})`,
+  hint: (months, rate, baseCost, compound, simple) => `現在修正すると${baseCost}人日で済みますが、${months}ヶ月放置すると${(baseCost * compound).toFixed(1)}人日(当初の${compound.toFixed(1)}倍)に膨らみます。単利で考えた場合は${(baseCost * simple).toFixed(1)}人日です。`,
+  hintScenario: (baseCost, compound, simple) => `「あとでまとめて直す」と言いながら、2年間そのまま放置してしまいました。${baseCost}人日で済んだはずの修正が、今では${(baseCost * compound).toFixed(1)}人日に膨らんでいます。`,
+  comments: [
+    "負債はまだ小さく、対応しやすい状態です。",
+    "少しずつ利息がつき始めています。早めの返済がおすすめです。",
+    "負債が目に見えて膨らんできました。放置するほど高くつきます。",
+    "複利の効果で、返済コストが当初の想定を大きく超えています。",
+    "雪だるま式に膨らみ、もはや「あとでまとめて」では済まない規模です。",
+  ],
+  debtXTitle: "放置期間(ヶ月)", debtYTitle: "返済コスト倍率(×)",
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "「技術的負債」という言葉は、1992年にウォード・カニンガムが提唱した比喩です。返済(リファクタリング)を先延ばしにするほど、借金の利息のように対応コストが膨らんでいきます。この複利のたとえは簡略化したモデルですが、「先延ばしにするほど高くつく」という実務の感覚とも一致します。",
+  adviceItems: [
+    "技術的負債を「見える化」する(バックログへの登録、コード内のマーキングなど)",
+    "新機能を追加するたびに、関連する負債を少しずつ返済する(ボーイスカウトルール)",
+    "負債が増えるペース(利率)自体を下げる。テストやドキュメントの整備で対応コストの膨張を抑える",
+    "「あとでまとめて返す」と判断する前に、複利で膨らむコストを見積もりに織り込む",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "REFACTORING", title: "リファクタリング(第2版) 既存のコードを安全に改善する", desc: "マーチン・ファウラー著。技術的負債を小さく返済し続けるための実践技法を体系化した定番書。", link: "Amazonで見る →", url: "https://amzn.to/4gy2PX0" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "技術的負債は、あとでまとめて返せばいい? | 技術的負債シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Can you just pay off tech debt later? | Technical Debt Simulator",
+  heroTitle: "Can you just pay off<br>tech debt later, all at once?",
+  heroLead: "It's tempting to prioritize features now and deal with technical debt later. But technical debt keeps accruing interest while it sits unaddressed, just like a loan. Move the sliders and see how much the repayment cost grows.",
+  consoleLabel: "DEBT CONSOLE",
+  sumLabel: "Repayment cost after deferral",
+  scoreLabel: "Health score",
+  baseCostName: "Current fix cost", baseCostSub: "Effort it would take to pay it down today (person-days)",
+  monthsName: "Months deferred", monthsSub: "Time until you refactor (pay it down)",
+  rateName: "Monthly interest rate", rateSub: "How much the cost of working around it grows each month",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: keep deferring for 2 years",
+  chartCaption: "The dashed line is the intuitive \"simple interest\" guess; the solid line is what compounding actually does.",
+  chartNote: "A simplified estimate — actual debt growth varies by project.",
+  unitDays: d => `${d} PD`,
+  sumVal: (baseCost, mult) => `${(baseCost * mult).toFixed(1)} PD (×${mult.toFixed(1)})`,
+  hint: (months, rate, baseCost, compound, simple) => `Fixing it now would cost ${baseCost} person-days. Defer it ${months} months, and it grows to ${(baseCost * compound).toFixed(1)} person-days (${compound.toFixed(1)}× the original). Simple interest would have suggested only ${(baseCost * simple).toFixed(1)}.`,
+  hintScenario: (baseCost, compound, simple) => `You kept saying "we'll fix it all later" for two years straight. A fix that would have cost ${baseCost} person-days has now grown to ${(baseCost * compound).toFixed(1)}.`,
+  comments: [
+    "The debt is still small and manageable.",
+    "Interest is starting to accrue. Paying it down soon is a good idea.",
+    "The debt has visibly grown. The longer you wait, the more it costs.",
+    "Compounding has pushed the repayment cost well past the naive estimate.",
+    "It's snowballed — this is no longer something you fix \"all at once, later.\"",
+  ],
+  debtXTitle: "Months deferred", debtYTitle: "Repayment cost multiplier (×)",
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The term \"technical debt\" was coined by Ward Cunningham in 1992. The longer you defer repayment (refactoring), the more the cost of working around it grows — like interest on a loan. This compounding analogy is a simplified model, but it matches the real-world sense that deferring always costs more later.",
+  adviceItems: [
+    "Make technical debt visible — track it in the backlog, mark it in code",
+    "Pay down related debt a little at a time whenever you touch nearby code (the Boy Scout Rule)",
+    "Lower the rate at which debt compounds — tests and documentation slow the growth of workaround cost",
+    "Before deciding to \"fix it all later,\" factor the compounding cost into your estimate",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "REFACTORING", title: "Refactoring: Improving the Design of Existing Code (2nd Edition)", desc: "Martin Fowler. The definitive guide to paying down technical debt in small, continuous steps.", link: "View on Amazon →", url: "https://amzn.to/4vhXwyx" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Can you just pay off tech debt later? — Technical Debt Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (months, rate, baseCost, compound, simple) => `${months}ヶ月放置、月利${rate}%。${baseCost}人日だった修正が${(baseCost * compound).toFixed(1)}人日に(単利脳だと${(baseCost * simple).toFixed(1)}人日で済むと思ってた)。`,
+  hintScenario: (baseCost, compound, simple) => `「あとでまとめて」と言い続けて2年。その「あとで」はまだ来ていません。${baseCost}人日は今${(baseCost * compound).toFixed(1)}人日です。`,
+  comments: [
+    "負債ゼロ。この状態を写真に撮っておけ。二度と見られないかもしれない。",
+    "利息がつき始めた。まだ「ちょっとやばい」で済むレベル。",
+    "雪だるまが転がり始めた。誰か止めて。",
+    "複利のカラクリに気づいた頃には、もう遅い。",
+    "もはや技術的負債ではなく、技術的爆弾。ボーイスカウトルールも白旗を上げた。",
+  ],
+},
+en: {
+  hint: (months, rate, baseCost, compound, simple) => `${months} months deferred, ${rate}% monthly. A ${baseCost}-person-day fix is now ${(baseCost * compound).toFixed(1)} (simple-interest brain thought it'd be ${(baseCost * simple).toFixed(1)}).`,
+  hintScenario: (baseCost, compound, simple) => `Two years of saying "we'll fix it all later." "Later" has not yet arrived. ${baseCost} person-days is now ${(baseCost * compound).toFixed(1)}.`,
+  comments: [
+    "Zero debt. Take a screenshot. You may never see this again.",
+    "Interest is starting to bite. Still in \"mildly concerning\" territory.",
+    "The snowball is rolling. Somebody stop it.",
+    "By the time you notice the compounding, it's already too late.",
+    "This isn't technical debt anymore, it's a technical bomb. Even the Boy Scout Rule has surrendered.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let baseCost = 5;
+let months = 6;
+let rate = 10;
+
+/* ================= カーブ描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 46, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const X_TICKS = [0, 6, 12, 18, 24];
+const Y_TICK_FRACS = [0, 0.25, 0.5, 0.75, 1];
+const xOf = m => PAD_L + ((m - MONTHS_MIN) / (MONTHS_MAX - MONTHS_MIN)) * (PW - PAD_L - PAD_R);
+const mOfX = x => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  return Math.min(MONTHS_MAX, Math.max(MONTHS_MIN, Math.round(MONTHS_MIN + frac * (MONTHS_MAX - MONTHS_MIN))));
+};
+
+function drawChart() {
+  const t = T();
+  const yMax = Math.max(compoundMultiplier(MONTHS_MAX, rate), 2);
+  const yOf = v => PAD_T + (1 - (v - 1) / (yMax - 1)) * (PH - PAD_T - PAD_B);
+
+  const gridLayer = document.getElementById("debtGridLayer");
+  gridLayer.innerHTML = "";
+  Y_TICK_FRACS.forEach(f => {
+    const v = 1 + f * (yMax - 1);
+    const y = PAD_T + (1 - f) * (PH - PAD_T - PAD_B);
+    gridLayer.appendChild(el("line", { class: "debt-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "debt-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    const abs = baseCost * v;
+    label.textContent = t.unitDays(abs < 10 ? abs.toFixed(1) : Math.round(abs));
+    gridLayer.appendChild(label);
+  });
+  X_TICKS.forEach(m => {
+    const x = xOf(m);
+    gridLayer.appendChild(el("line", { class: "debt-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "debt-axis-label", x, y: PH - PAD_B + 14, "text-anchor": m === 0 ? "start" : m === MONTHS_MAX ? "end" : "middle" });
+    label.textContent = String(m);
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "debt-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.debtYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "debt-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.debtXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const compoundPts = [], simplePts = [];
+  for (let m = MONTHS_MIN; m <= MONTHS_MAX; m++) {
+    compoundPts.push(`${xOf(m)},${yOf(compoundMultiplier(m, rate))}`);
+    simplePts.push(`${xOf(m)},${yOf(simpleMultiplier(m, rate))}`);
+  }
+  document.getElementById("debtCompound").setAttribute("d", "M " + compoundPts.join(" L "));
+  document.getElementById("debtSimple").setAttribute("d", "M " + simplePts.join(" L "));
+  document.getElementById("debtArea").setAttribute(
+    "d",
+    "M " + compoundPts.join(" L ") + " L " + simplePts.slice().reverse().join(" L ") + " Z"
+  );
+
+  const compound = compoundMultiplier(months, rate);
+  const simple = simpleMultiplier(months, rate);
+  const mx = xOf(months);
+  const cy = yOf(compound), sy = yOf(simple);
+
+  const marker = document.getElementById("debtMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", Math.min(cy, sy)); marker.setAttribute("y2", Math.max(cy, sy) + 0.001);
+
+  const ptC = document.getElementById("debtPointCompound");
+  ptC.setAttribute("cx", mx); ptC.setAttribute("cy", cy);
+  const ptS = document.getElementById("debtPointSimple");
+  ptS.setAttribute("cx", mx); ptS.setAttribute("cy", sy);
+
+  const valC = document.getElementById("debtValCompound");
+  valC.setAttribute("x", mx);
+  valC.setAttribute("y", cy - 10);
+  valC.textContent = t.unitDays((baseCost * compound).toFixed(1));
+  const valS = document.getElementById("debtValSimple");
+  valS.setAttribute("x", mx);
+  valS.setAttribute("y", sy + 16);
+  valS.textContent = t.unitDays((baseCost * simple).toFixed(1));
+
+  const hit = document.getElementById("debtMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const r = assess(months, rate);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = t.sumVal(baseCost, r.compound);
+  document.getElementById("hint").textContent = t.hint(months, rate, baseCost, r.compound, r.simple);
+
+  document.getElementById("baseCostReadout").textContent = baseCost;
+  document.getElementById("monthsReadout").textContent = months;
+  document.getElementById("rateReadout").textContent = rate + "%";
+  if (document.activeElement !== document.getElementById("baseCostSlider")) document.getElementById("baseCostSlider").value = baseCost;
+  if (document.activeElement !== document.getElementById("baseCostNum")) document.getElementById("baseCostNum").value = baseCost;
+  if (document.activeElement !== document.getElementById("monthsSlider")) document.getElementById("monthsSlider").value = months;
+  if (document.activeElement !== document.getElementById("monthsNum")) document.getElementById("monthsNum").value = months;
+  if (document.activeElement !== document.getElementById("rateSlider")) document.getElementById("rateSlider").value = rate;
+  if (document.activeElement !== document.getElementById("rateNum")) document.getElementById("rateNum").value = rate;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = r.score;
+  scoreEl.className = "score-val mono" + (r.score < 50 ? " danger" : r.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[r.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/technical-debt/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("baseCostName").textContent = t.baseCostName;
+  document.getElementById("baseCostSub").textContent = t.baseCostSub;
+  document.getElementById("monthsName").textContent = t.monthsName;
+  document.getElementById("monthsSub").textContent = t.monthsSub;
+  document.getElementById("rateName").textContent = t.rateName;
+  document.getElementById("rateSub").textContent = t.rateSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("numLabel3").textContent = t.numLabel;
+  document.getElementById("baseCostSlider").setAttribute("aria-label", t.baseCostName);
+  document.getElementById("monthsSlider").setAttribute("aria-label", t.monthsName);
+  document.getElementById("rateSlider").setAttribute("aria-label", t.rateName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.baseCostName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.monthsName} ${t.numLabel}`);
+  document.getElementById("numLabel3").setAttribute("aria-label", `${t.rateName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map(i => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "technical-debt" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("baseCostSlider").addEventListener("input", e => { baseCost = +e.target.value; render(); });
+document.getElementById("baseCostNum").addEventListener("change", e => {
+  baseCost = Math.min(BASE_MAX, Math.max(BASE_MIN, +e.target.value));
+  render();
+});
+document.getElementById("monthsSlider").addEventListener("input", e => { months = +e.target.value; render(); });
+document.getElementById("monthsNum").addEventListener("change", e => {
+  months = Math.min(MONTHS_MAX, Math.max(MONTHS_MIN, +e.target.value));
+  render();
+});
+document.getElementById("rateSlider").addEventListener("input", e => { rate = +e.target.value; render(); });
+document.getElementById("rateNum").addEventListener("change", e => {
+  rate = Math.min(RATE_MAX, Math.max(RATE_MIN, +e.target.value));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  baseCost = 5; months = 6; rate = 10;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  months = 24;
+  render();
+  const r = assess(months, rate);
+  document.getElementById("hint").textContent = T().hintScenario(baseCost, r.compound, r.simple);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const debtChart = document.getElementById("debtChart");
+function svgPoint(evt) {
+  const pt = debtChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(debtChart.getScreenCTM().inverse());
+}
+let draggingMonths = false;
+function startDrag(evt) {
+  draggingMonths = true;
+  debtChart.setPointerCapture(evt.pointerId);
+  document.getElementById("debtMarker").classList.add("dragging");
+  document.getElementById("debtMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  months = mOfX(p.x);
+  render();
+}
+document.getElementById("debtMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("debtPointCompound").addEventListener("pointerdown", startDrag);
+debtChart.addEventListener("pointermove", evt => { if (draggingMonths) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach(ev => debtChart.addEventListener(ev, () => {
+  draggingMonths = false;
+  document.getElementById("debtMarker").classList.remove("dragging");
+  document.getElementById("debtMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

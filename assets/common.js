@@ -107,6 +107,12 @@ window.DevSimLab = (function () {
       ja: { name: "見積もりの不確実性シミュレーター", title: "最初の見積もりは、そのまま信じていい?", desc: "プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく「不確実性のコーン」を可視化するシミュレーター。" },
       en: { name: "Estimation Uncertainty Simulator", title: "Can you trust the first estimate?", desc: "A simulator visualizing the Cone of Uncertainty — how estimate accuracy narrows as a project progresses." },
     },
+    {
+      id: "technical-debt", href: "technical-debt/", status: "live",
+      tags: { ja: ["技術的負債", "リファクタリング"], en: ["Technical debt", "Refactoring"] },
+      ja: { name: "技術的負債シミュレーター", title: "技術的負債は、あとでまとめて返せばいい?", desc: "放置している間も借金の利息のように対応コストが複利で膨らんでいく様子を可視化するシミュレーター。" },
+      en: { name: "Technical Debt Simulator", title: "Can you just pay off tech debt later?", desc: "A simulator visualizing how the cost of unaddressed technical debt compounds like interest over time." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
