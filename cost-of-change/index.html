@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バグは、後工程で見つかるほど直すコストが跳ね上がる? | 修正コスト・シミュレーター</title>
+<meta name="description" content="「バグは後工程になるほど修正コストが跳ね上がる」という通説(Boehmの古典的モデル)と、171件のプロジェクトを分析した実証研究の結果を比較できるシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/cost-of-change/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/cost-of-change/">
+<meta property="og:title" content="バグは、後工程で見つかるほど直すコストが跳ね上がる? | 修正コスト・シミュレーター">
+<meta property="og:description" content="「バグは後工程になるほど修正コストが跳ね上がる」という通説と、実証研究の結果を比較できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/cost-of-change.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "修正コスト・シミュレーター",
+  "alternateName": "Cost of Change Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/cost-of-change/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "バグの発見工程と修正コストの関係について、通説と実証研究を比較できる無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-curve comparison chart ---- */
+.coc-wrap{margin-top:14px}
+.coc-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.coc-grid{stroke:var(--line);stroke-width:1}
+.coc-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.coc-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.coc-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.coc-band{fill:var(--q);opacity:.15}
+.coc-line-classic{fill:none;stroke:var(--alert);stroke-width:2.2}
+.coc-line-modern{fill:none;stroke:var(--q);stroke-width:2.2}
+.coc-dot{r:3.5}
+.coc-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.coc-marker.dragging{cursor:grabbing}
+.coc-marker-hit{fill:transparent;cursor:grab}
+.coc-marker-hit.dragging{cursor:grabbing}
+.coc-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.coc-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.coc-legend .sw.classic{background:var(--alert)}
+.coc-legend .sw.modern{background:var(--q)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.classic{border-left:4px solid var(--alert)}
+.tier-card.modern{border-left:4px solid var(--q)}
+
+.controls{grid-template-columns:1fr}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">50</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="coc-wrap">
+    <svg class="coc-svg" id="cocChart" viewBox="0 0 640 240" role="img" aria-label="Relative cost to fix a defect by discovery stage: classic claim vs modern research">
+      <g id="cocBandLayer"></g>
+      <g id="cocGridLayer"></g>
+      <path id="cocLineModern" class="coc-line-modern"></path>
+      <path id="cocLineClassic" class="coc-line-classic"></path>
+      <g id="cocDotsLayer"></g>
+      <line id="cocMarker" class="coc-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="cocMarkerHit" class="coc-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="coc-legend">
+    <span><span class="sw classic"></span><span id="legendClassic"></span></span>
+    <span><span class="sw modern"></span><span id="legendModern"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card classic">
+      <div class="k" id="classicLabel"></div>
+      <div class="v" id="classicVal">10倍</div>
+    </div>
+    <div class="tier-card modern">
+      <div class="k" id="modernLabel"></div>
+      <div class="v" id="modernVal">約1倍</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">50</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="stageName"></span><small id="stageSub"></small></div>
+      <div class="readout mono" id="stageReadout" style="font-size:20px">実装</div>
+      <input type="range" id="stageSlider" min="1" max="5" step="1" value="3">
+      <div class="num-row">
+        <label for="stageNum" id="numLabel1"></label>
+        <input type="number" id="stageNum" min="1" max="5" step="1" value="3">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「classic」は Boehm, Software Engineering Economics (1981) で示され、多くの教科書・研修で
+   引用されてきた古典的な相対コスト曲線(1970年代の大規模ウォーターフォール開発が対象)。
+   「modern」は Menzies, Nichols, Shull, Layman, "Are Delayed Issues Harder to Resolve?
+   Revisiting Cost-to-Fix of Defects throughout the Lifecycle" (Empirical Software Engineering, 2017)。
+   2006〜2014年の171件のプロジェクトを分析し、「後工程になるほど修正コストが増える」という
+   効果(delayed issue effect)を裏づける一貫した証拠は見られなかったと報告している。
+   ここではその2つの主張を、同じ5工程の軸の上で比較できるようにしている。
+*/
+const STAGE_MIN = 1, STAGE_MAX = 5;
+const CLASSIC_MULT = [1, 5, 10, 20, 100];
+const MODERN_MULT = [1, 1, 1, 1, 1];
+const MODERN_BAND = 0.6; // 「有意な効果は見られなかった」を示す簡易的な誤差帯(±)
+const EARLY_SCORE = [100, 75, 50, 25, 0];
+
+function classicOf(stage) { return CLASSIC_MULT[stage - 1]; }
+function modernOf(stage) { return MODERN_MULT[stage - 1]; }
+function scoreOf(stage) { return EARLY_SCORE[stage - 1]; }
+function assess(stage) {
+  const score = scoreOf(stage);
+  const band = stage - 1;
+  return { score, band, classic: classicOf(stage), modern: modernOf(stage) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "バグは、後工程で見つかるほど直すコストが跳ね上がる? | 修正コスト・シミュレーター",
+  heroTitle: "バグは、後工程で見つかるほど<br>直すコストが跳ね上がる?",
+  heroLead: "「バグは要件定義の段階で見つければ1、本番リリース後に見つかれば100」——研修や書籍でよく見かけるこの図(Boehmの古典的モデル)は、実は1970年代の大規模ウォーターフォール開発を対象にした古いデータが元になっており、近年の大規模な実証研究では裏づけが得られていません。ただし、これは「後回しにしても同じ」という意味ではありません。実際にどれだけコストが変わるかはチームの開発体制次第です。工程を動かして、「よく引用される通説」と「実証研究の結果」を見比べてください。",
+  consoleLabel: "COST CONSOLE",
+  sumLabel: "通説での相対コスト",
+  scoreLabel: "早期発見度スコア",
+  stageName: "発見した工程", stageSub: "バグが見つかったタイミング",
+  numLabel: "工程番号(1〜5)",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 本番リリース後に発見された場合",
+  chartCaption: "赤線は教科書等で引用される「通説」、緑の帯は実証研究(171プロジェクトの分析)で観測された範囲の目安です。",
+  chartNote: "簡易モデルによる比較です。「通説」の数値自体、出典によってばらつきがあり、根拠が弱いとの指摘があります。",
+  cocYTitle: "相対的な修正コスト(倍)", cocXTitle: "発見した工程",
+  legendClassic: "通説(Boehm, 1981)",
+  legendModern: "実証研究(Menzies他, 2017)",
+  classicLabel: "通説での相対コスト",
+  modernLabel: "実証研究での相対コスト",
+  stageNames: ["要件定義", "設計", "実装", "テスト", "リリース後"],
+  hint: (stageName, a) => `「${stageName}」で発見した場合、よく引用される通説ではおよそ${a.classic}倍のコストとされます。一方、171件のプロジェクトを分析した実証研究では、工程による有意なコスト増加は確認されませんでした(目安 約${a.modern}倍±)。`,
+  hintScenario: (a) => `本番リリース後に発見されました。通説ではおよそ${a.classic}倍のコストとされる場面ですが、実証研究ではこの「後工程ほど高コスト」という効果自体、一貫した裏づけが得られていません。`,
+  comments: [
+    "最も早い工程です。どちらの立場でも、早期発見はコストを抑えると考えられています。",
+    "早い段階です。通説では比較的コストは低いとされる工程です。",
+    "実装段階です。通説ではここから相対コストが上がり始めるとされています。",
+    "テスト段階です。通説ではかなりコストが高いとされますが、実証研究はこれを支持していません。",
+    "本番リリース後です。通説では最もコストが高いとされますが、この効果自体に異論があります。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "「バグは後工程になるほど直すコストが跳ね上がる」という図は、Barry Boehmの著書『Software Engineering Economics』(1981年)で示されたデータが元になっています。ただしこれは1970年代、TRWやIBMなど大規模なウォーターフォール型開発を行う組織から集めたデータであり、汎用的な法則として扱うには根拠が弱いとの指摘が近年強まっています。2017年に発表されたMenzies, Nichols, Shull, Laymanらの研究では、2006〜2014年の171件のプロジェクトを分析した結果、「発見が遅れるほど修正コストが一貫して増える」という効果は確認されませんでした。とはいえ、これは「いつ見つけても同じ」という意味でもありません。実際にどれだけコストが変わるかは、自動テストの整備状況、変更の影響範囲、デプロイの容易さなど、チームごとの事情に大きく左右されます。",
+  adviceItems: [
+    "「後工程ほどX倍」という具体的な数字を、根拠を確認せずに意思決定の前提にしない",
+    "要件やUXなど不確実性が高い部分は、プロトタイピングやスパイク的な検証で早めに仮説を確かめる。実装してから間違いに気づくより安く済む",
+    "重要なのは工程の「名前」ではなく、自動テスト・CI/CDによってどれだけ早くフィードバックを得られるかという「仕組み」",
+    "変更を小さく保ち、疎結合な設計にしておくことで、いつ見つかった問題でも対応コストを抑えやすくなる",
+    "「早く見つけた方が良い」という大方針は保ちつつ、具体的な倍率を使った過度な危機感の煽り方は避ける",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "SOFTWARE ENGINEERING", title: "単体テストの考え方/使い方", desc: "Vladimir Khorikov著、須田智之訳。自動テストへの投資がプロジェクトの持続可能な成長=変更コストの抑制につながる理由を体系的に解説した一冊。", link: "Amazonで見る →", url: "https://amzn.to/4yoib75" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "バグは、後工程で見つかるほど直すコストが跳ね上がる? | 修正コスト・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Does a bug cost dramatically more to fix the later it's found? | Cost-of-Change Simulator",
+  heroTitle: "Does a bug cost dramatically<br>more to fix, the later it's found?",
+  heroLead: "\"A bug costs 1x if caught during requirements, 100x if caught after release\" — this famous chart (Boehm's classic curve) shows up in countless training decks and books. But it's built on old data from 1970s waterfall projects, and more recent large-scale research hasn't been able to confirm it. That doesn't mean it's fine to just fix things later, though — how much cost actually shifts depends heavily on a team's own practices. Move the stage slider and compare the widely-cited claim against what the research actually found.",
+  consoleLabel: "COST CONSOLE",
+  sumLabel: "Relative cost (classic claim)",
+  scoreLabel: "Early-detection score",
+  stageName: "Discovery stage", stageSub: "When the bug was found",
+  numLabel: "Stage (1–5)",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: found after release, in production",
+  chartCaption: "The red line is the \"classic claim\" often cited in textbooks. The green band is the range observed in a large empirical study (171 projects).",
+  chartNote: "A simplified comparison. The \"classic\" numbers themselves vary by source and have been criticized as weakly supported.",
+  cocYTitle: "Relative cost to fix (×)", cocXTitle: "Discovery stage",
+  legendClassic: "Classic claim (Boehm, 1981)",
+  legendModern: "Empirical study (Menzies et al., 2017)",
+  classicLabel: "Relative cost (classic claim)",
+  modernLabel: "Relative cost (empirical study)",
+  stageNames: ["Requirements", "Design", "Coding", "Testing", "Post-release"],
+  hint: (stageName, a) => `Found at "${stageName}": the widely-cited classic claim puts this at roughly ${a.classic}×. A study analyzing 171 real projects, however, found no significant cost increase by stage (roughly ${a.modern}×± in that data).`,
+  hintScenario: (a) => `Found after release, in production. The classic claim puts this at roughly ${a.classic}×, but the empirical research found no consistent support for the idea that later-stage fixes cost dramatically more at all.`,
+  comments: [
+    "The earliest stage. Both camps agree that finding issues early tends to keep costs down.",
+    "Still early. The classic claim treats this stage as relatively cheap to fix.",
+    "The coding stage. This is where the classic curve starts climbing.",
+    "The testing stage. The classic claim puts costs quite high here, but the empirical study doesn't back that up.",
+    "Found after release. The classic claim says this is the most expensive stage, but the effect itself is disputed.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The chart showing costs skyrocketing in later stages traces back to Barry Boehm's book \"Software Engineering Economics\" (1981). But that data came from 1970s waterfall-style organizations like TRW and IBM, and there's growing criticism that it's too weakly supported to treat as a universal law. A 2017 study by Menzies, Nichols, Shull, and Layman analyzed 171 real-world projects from 2006–2014 and found no consistent evidence that fixing an issue later in the lifecycle costs substantially more. That doesn't mean timing never matters, though — how much cost actually shifts depends heavily on a team's own automated test coverage, blast radius of the change, and how easy deployment is.",
+  adviceItems: [
+    "Don't treat a specific \"Nx more expensive later\" number as a decision-making fact without checking its source",
+    "For requirements and UX decisions with high uncertainty, validate assumptions early through prototyping or spike solutions — it's cheaper than discovering you were wrong after building the real thing",
+    "What matters isn't the stage's name, but the mechanism: how fast automated testing and CI/CD get you feedback",
+    "Keeping changes small and loosely coupled makes issues cheaper to fix no matter when they're found",
+    "Keep the general direction (earlier tends to be cheaper) without over-dramatizing it with a specific multiplier",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "SOFTWARE ENGINEERING", title: "The Leprechauns of Software Engineering", desc: "Laurent Bossavit. Examines the actual evidentiary basis of widely-cited software engineering \"facts\" — including the cost-of-change curve.", link: "View on Amazon →", url: "https://amzn.to/4wIQCnj" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Does a bug cost dramatically more to fix the later it's found? — Cost-of-Change Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (stageName, a) => `「${stageName}」。通説なら${a.classic}倍。でも実証研究はそれを支持していない。それでもお客様の前では「はい、後工程になるほど高くつきます」と真顔で言い続ける仕事、それがコンサル。`,
+  hintScenario: (a) => `本番で見つかった。通説なら${a.classic}倍。深夜のインシデント対応で疲弊しながら「ほら、やっぱり後工程は高コストだ」と結論づけがちだが、それはただの生存者バイアスかもしれない。`,
+  comments: [
+    "まだ紙とホワイトボードの段階。誰も傷ついていない。",
+    "設計レビューで指摘。ドキュメントを直すだけで済む、平和な時代。",
+    "実装中に気づいた。git resetで済むうちが花。",
+    "テストで見つかった。QAチームに感謝しつつ、こっそり直す。",
+    "本番で見つかった。Slackが騒がしい。通説の倍率より、深夜対応の疲労の方が実感として重い。",
+  ],
+},
+en: {
+  hint: (stageName, a) => `"${stageName}." The classic claim says ${a.classic}×. The empirical research doesn't back that up. And yet consultants keep saying "yes, it gets more expensive later" with a straight face — that's the job.`,
+  hintScenario: (a) => `Found in production. The classic claim says ${a.classic}×. Exhausted from a 2am incident call, it's tempting to conclude "see, late-stage bugs really are more expensive" — but that might just be survivorship bias talking.`,
+  comments: [
+    "Still on a whiteboard. Nobody's been hurt yet.",
+    "Caught in design review. Just edit a doc — peaceful times.",
+    "Caught while coding. As long as `git reset` still works, you're fine.",
+    "Caught in testing. Thank the QA team, then quietly fix it.",
+    "Found in production. Slack is on fire. The multiplier in the textbook matters less than how tired you are at 2am.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let stage = 3;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 110;
+const xOf = (s) => PAD_L + ((s - STAGE_MIN) / (STAGE_MAX - STAGE_MIN)) * (PW - PAD_L - PAD_R);
+const sOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = STAGE_MIN + frac * (STAGE_MAX - STAGE_MIN);
+  return Math.min(STAGE_MAX, Math.max(STAGE_MIN, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - v / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const bandLayer = document.getElementById("cocBandLayer");
+  bandLayer.innerHTML = "";
+  const bandPtsTop = [], bandPtsBottom = [];
+  for (let s = STAGE_MIN; s <= STAGE_MAX; s++) {
+    bandPtsTop.push(`${xOf(s)},${yOf(modernOf(s) + MODERN_BAND)}`);
+    bandPtsBottom.unshift(`${xOf(s)},${yOf(Math.max(0, modernOf(s) - MODERN_BAND))}`);
+  }
+  bandLayer.appendChild(el("path", { class: "coc-band", d: "M " + bandPtsTop.join(" L ") + " L " + bandPtsBottom.join(" L ") + " Z" }));
+
+  const gridLayer = document.getElementById("cocGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "coc-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "coc-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + (t.htmlLang === "ja" ? "倍" : "×");
+    gridLayer.appendChild(label);
+  });
+  for (let s = STAGE_MIN; s <= STAGE_MAX; s++) {
+    const x = xOf(s);
+    gridLayer.appendChild(el("line", { class: "coc-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "coc-axis-label", x, y: PH - PAD_B + 14, "text-anchor": s === STAGE_MIN ? "start" : s === STAGE_MAX ? "end" : "middle" });
+    label.textContent = t.stageNames[s - 1];
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "coc-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.cocYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "coc-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.cocXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const classicPts = [], modernPts = [];
+  for (let s = STAGE_MIN; s <= STAGE_MAX; s++) {
+    classicPts.push(`${xOf(s)},${yOf(classicOf(s))}`);
+    modernPts.push(`${xOf(s)},${yOf(modernOf(s))}`);
+  }
+  document.getElementById("cocLineClassic").setAttribute("d", "M " + classicPts.join(" L "));
+  document.getElementById("cocLineModern").setAttribute("d", "M " + modernPts.join(" L "));
+
+  const dotsLayer = document.getElementById("cocDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let s = STAGE_MIN; s <= STAGE_MAX; s++) {
+    dotsLayer.appendChild(el("circle", { class: "coc-dot", cx: xOf(s), cy: yOf(classicOf(s)), fill: "var(--alert)" }));
+    dotsLayer.appendChild(el("circle", { class: "coc-dot", cx: xOf(s), cy: yOf(modernOf(s)), fill: "var(--q)" }));
+  }
+
+  const mx = xOf(stage);
+  const marker = document.getElementById("cocMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("cocMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(stage);
+  const stageName = t.stageNames[stage - 1];
+
+  drawChart();
+
+  const unit = t.htmlLang === "ja" ? "倍" : "×";
+  document.getElementById("sumVal").textContent = a.classic + unit;
+  document.getElementById("classicVal").textContent = a.classic + unit;
+  document.getElementById("modernVal").textContent = t.htmlLang === "ja" ? `約${a.modern}倍` : `~${a.modern}×`;
+  document.getElementById("hint").textContent = t.hint(stageName, a);
+
+  document.getElementById("stageReadout").textContent = stageName;
+  if (document.activeElement !== document.getElementById("stageSlider")) document.getElementById("stageSlider").value = stage;
+  if (document.activeElement !== document.getElementById("stageNum")) document.getElementById("stageNum").value = stage;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 50 ? " danger" : a.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/cost-of-change/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("stageName").textContent = t.stageName;
+  document.getElementById("stageSub").textContent = t.stageSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("stageSlider").setAttribute("aria-label", t.stageName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.stageName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendClassic").textContent = t.legendClassic;
+  document.getElementById("legendModern").textContent = t.legendModern;
+  document.getElementById("classicLabel").textContent = t.classicLabel;
+  document.getElementById("modernLabel").textContent = t.modernLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "cost-of-change" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("stageSlider").addEventListener("input", (e) => { stage = +e.target.value; render(); });
+document.getElementById("stageNum").addEventListener("change", (e) => {
+  stage = Math.min(STAGE_MAX, Math.max(STAGE_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  stage = 3;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  stage = 5;
+  render();
+  const a = assess(stage);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart (5 discrete stages) ---- */
+const cocChart = document.getElementById("cocChart");
+function svgPoint(evt) {
+  const pt = cocChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(cocChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  cocChart.setPointerCapture(evt.pointerId);
+  document.getElementById("cocMarker").classList.add("dragging");
+  document.getElementById("cocMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  stage = sOfX(p.x);
+  render();
+}
+document.getElementById("cocMarkerHit").addEventListener("pointerdown", startDrag);
+cocChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => cocChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("cocMarker").classList.remove("dragging");
+  document.getElementById("cocMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

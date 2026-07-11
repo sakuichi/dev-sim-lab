@@ -125,6 +125,12 @@ window.DevSimLab = (function () {
       ja: { name: "リリース頻度シミュレーター", title: "リリースは、まとめて少ない回数でやった方が安全?", desc: "リリース頻度が下がるほど変更失敗率・復旧時間が悪化していく様子をDORAの調査データで可視化するシミュレーター。" },
       en: { name: "Release Frequency Simulator", title: "Is it safer to release less often, in bigger batches?", desc: "A simulator visualizing how change failure rate and recovery time worsen as release frequency drops, based on DORA's research." },
     },
+    {
+      id: "cost-of-change", href: "cost-of-change/", status: "live",
+      tags: { ja: ["修正コスト", "品質"], en: ["Cost of change", "Quality"] },
+      ja: { name: "修正コスト・シミュレーター", title: "バグは、後工程で見つかるほど直すコストが跳ね上がる?", desc: "「後工程ほど修正コストが跳ね上がる」という通説と、実証研究の結果を比較できるシミュレーター。" },
+      en: { name: "Cost of Change Simulator", title: "Does a bug cost dramatically more to fix the later it's found?", desc: "A simulator comparing the widely-cited claim that late-found bugs cost dramatically more against what empirical research actually found." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
