@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リリースは、まとめて少ない回数でやった方が安全? | リリース頻度シミュレーター</title>
+<meta name="description" content="リリース頻度と変更失敗率・復旧時間の関係を、DORAの調査データをもとに可視化するシミュレーター。リリースを溜め込むほどリスクが下がる、という直感が正しいかを確認できます。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/release-frequency/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/release-frequency/">
+<meta property="og:title" content="リリースは、まとめて少ない回数でやった方が安全? | リリース頻度シミュレーター">
+<meta property="og:description" content="リリース頻度と変更失敗率・復旧時間の関係を、DORAの調査データをもとに可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/release-frequency.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "リリース頻度シミュレーター",
+  "alternateName": "Release Frequency Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/release-frequency/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "リリース頻度と変更失敗率・復旧時間の関係を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- CFR band chart ---- */
+.rel-wrap{margin-top:14px}
+.rel-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.rel-band{opacity:.16}
+.rel-band-line{stroke-width:2.2;fill:none}
+.rel-grid{stroke:var(--line);stroke-width:1}
+.rel-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.rel-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.rel-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.rel-band-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;font-weight:700}
+.rel-marker{stroke:var(--ink);stroke-width:3;stroke-linecap:round;cursor:grab}
+.rel-marker.dragging{cursor:grabbing}
+.rel-marker-hit{fill:transparent;cursor:grab}
+.rel-marker-hit.dragging{cursor:grabbing}
+.rel-point{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- tier + recovery-time readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.tier-elite{border-left:4px solid var(--q)}
+.tier-card.tier-medium{border-left:4px solid var(--c)}
+.tier-card.tier-low{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:1fr}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">23%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="rel-wrap">
+    <svg class="rel-svg" id="relChart" viewBox="0 0 640 240" role="img" aria-label="Change failure rate vs release interval">
+      <g id="relBandLayer"></g>
+      <g id="relGridLayer"></g>
+      <path id="relLine" class="rel-band-line" stroke="var(--ink)"></path>
+      <line id="relMarker" class="rel-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="relPoint" class="rel-point" r="5"></circle>
+      <rect id="relMarkerHit" class="rel-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card" id="cfrCard">
+      <div class="k" id="cfrLabel"></div>
+      <div class="v" id="cfrVal">16–30%</div>
+    </div>
+    <div class="tier-card" id="mttrCard">
+      <div class="k" id="mttrLabel"></div>
+      <div class="v" id="mttrVal">数時間〜1日</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">77</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="intervalName"></span><small id="intervalSub"></small></div>
+      <div class="readout mono" id="intervalReadout">14</div>
+      <input type="range" id="intervalSlider" min="0" max="1000" step="1" value="500">
+      <div class="num-row">
+        <label for="intervalNum" id="numLabel1"></label>
+        <input type="number" id="intervalNum" min="0.5" max="180" step="0.5" value="14">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (DORA State of DevOps Report / Accelerateの調査を参考にした簡易モデル) =================
+   3つの帯(高頻度・中頻度・低頻度)は、DORAが長年報告してきた変更失敗率(Change Failure Rate)の
+   代表的なレンジ(0-15% / 16-30% / 46-60%)にもとづく。復旧時間(MTTR)は高頻度帯と低頻度帯のみ
+   公表値があり、中頻度帯は両者の中間として簡易的に補間した目安。
+*/
+const INTERVAL_MIN = 0.5, INTERVAL_MAX = 180;
+const TIERS = [
+  { key: "elite", max: 7, cfrLow: 0, cfrHigh: 15, cfrMid: 8,
+    mttr: { ja: "1時間以内", en: "under 1 hour" }, mttrVerified: true },
+  { key: "medium", max: 30, cfrLow: 16, cfrHigh: 30, cfrMid: 23,
+    mttr: { ja: "数時間〜1日(目安)", en: "a few hours to a day (estimate)" }, mttrVerified: false },
+  { key: "low", max: Infinity, cfrLow: 46, cfrHigh: 60, cfrMid: 53,
+    mttr: { ja: "1週間〜1ヶ月", en: "a week to a month" }, mttrVerified: true },
+];
+function tierOf(days) { return TIERS.find((t) => days <= t.max); }
+function scoreOf(days) { return Math.round(100 - tierOf(days).cfrMid); }
+function releasesPerMonthOf(days) { return 30 / days; }
+function assess(days) {
+  const tier = tierOf(days);
+  const score = scoreOf(days);
+  const band = tier.key === "elite" ? 0 : tier.key === "medium" ? (days <= 14 ? 1 : 2) : (days <= 90 ? 3 : 4);
+  return { tier, score, band, perMonth: releasesPerMonthOf(days) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "リリースは、まとめて少ない回数でやった方が安全? | リリース頻度シミュレーター",
+  heroTitle: "リリースは、まとめて<br>少ない回数でやった方が安全?",
+  heroLead: "リリースを溜め込んで、たまに大きくまとめて出す方が「事故が少なく安全」に思えるかもしれません。しかしDORA(DevOps Research and Assessment)の調査では、逆にリリース頻度が低いチームほど、1回あたりの変更失敗率が高い傾向が報告されています。リリース間隔を動かして、変更失敗率と復旧時間がどう変わるかを確認してください。",
+  consoleLabel: "RELEASE CONSOLE",
+  sumLabel: "変更失敗率(目安)",
+  scoreLabel: "リリース安全度スコア",
+  intervalName: "リリース間隔", intervalSub: "何日に1回リリースするか(日)",
+  numLabel: "日数",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 四半期に1回の「大型アップデート」にまとめる",
+  chartCaption: "帯の色は変更失敗率の目安を示します。リリース間隔が空くほど、1回あたりの変更失敗率が上がる傾向にあります。",
+  chartNote: "DORAの調査で報告された代表的な3つの帯を簡易化したモデルです。個々のチームの実績を保証するものではありません。",
+  relYTitle: "変更失敗率(%)", relXTitle: "リリース間隔(日・対数目盛)",
+  cfrLabel: "変更失敗率の目安",
+  mttrLabel: "障害復旧時間の目安",
+  hint: (days, a) => `${days}日に1回のペース(月換算 約${a.perMonth.toFixed(1)}回)。この頻度帯の変更失敗率はおおよそ${a.tier.cfrLow}〜${a.tier.cfrHigh}%、障害が起きた場合の復旧時間の目安は${T().mttrTextFor(a.tier)}です。`,
+  mttrTextFor: (tier) => tier.mttr.ja,
+  hintScenario: (a) => `四半期に1回(約90日に1回)の「大型アップデート」にまとめました。変更失敗率はおよそ${a.tier.cfrLow}〜${a.tier.cfrHigh}%まで上がり、障害復旧にも${a.tier.mttr.ja}ほどかかる計算になります。`,
+  comments: [
+    "高頻度帯です。1回あたりの変更が小さく保たれ、失敗率・復旧時間ともに低い傾向にあります。",
+    "中頻度帯の中でも高頻度寄りです。悪くはありませんが、まだ改善余地があります。",
+    "中頻度帯です。変更失敗率が目に見えて上がり始める帯です。",
+    "低頻度帯に入りました。変更失敗率・復旧時間ともに大きく悪化する帯です。",
+    "半年に1回に近いペースです。1回のリリースに多くの変更が積み上がり、最もリスクが高い帯です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この3つの帯は、DevOps Research and Assessment(DORA)チームが2014年から続けている年次調査『State of DevOps Report』と、書籍『Accelerate』(Forsgren, Humble, Kim)で報告されてきた変更失敗率の代表的なレンジを簡易化したものです。ただしこれは相関関係であり、「リリース頻度を上げれば自動的に失敗率が下がる」という単純な因果関係ではありません。高頻度にリリースできるチームは、同時に変更を小さく保つ・自動テストを整備する、といった実践を伴っていることが背景にあると報告されています。",
+  adviceItems: [
+    "頻度そのものより、「1回あたりの変更量(バッチサイズ)」を小さく保つことを優先する。頻度は結果として上がる",
+    "自動テスト・CI/CDを整備し、小さな変更を安全に検証できる状態をつくる",
+    "障害の発生を前提に、検知とロールバックを高速化して復旧時間を短縮する",
+    "「リリースは特別な一大イベント」という運用文化から、「リリースは日常的な作業」という文化へ転換する",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "DEVOPS", title: "LeanとDevOpsの科学[Accelerate]", desc: "Nicole Forsgren他著。本シミュレーターの元になった調査(DORA State of DevOps)を体系化した一冊。", link: "Amazonで見る →", url: "https://amzn.to/4gE1MFb" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "リリースは、まとめて少ない回数でやった方が安全? | リリース頻度シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Is it safer to release less often, in bigger batches? | Release Frequency Simulator",
+  heroTitle: "Is it safer to release<br>less often, in bigger batches?",
+  heroLead: "Batching up changes and releasing them rarely can feel safer — fewer events, fewer chances for something to go wrong. But research from DORA (DevOps Research and Assessment) reports the opposite: teams that release less often tend to have a higher failure rate per release. Move the release interval and see how the change failure rate and recovery time shift.",
+  consoleLabel: "RELEASE CONSOLE",
+  sumLabel: "Change failure rate (est.)",
+  scoreLabel: "Release safety score",
+  intervalName: "Release interval", intervalSub: "How often you release (days between releases)",
+  numLabel: "Days",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: batch into one \"big update\" per quarter",
+  chartCaption: "Band colors show the estimated change failure rate. The longer the interval between releases, the higher the failure rate tends to be per release.",
+  chartNote: "A simplified model based on three representative bands reported by DORA's research — not a guarantee for any specific team.",
+  relYTitle: "Change failure rate (%)", relXTitle: "Release interval (days, log scale)",
+  cfrLabel: "Change failure rate (est.)",
+  mttrLabel: "Typical recovery time",
+  hint: (days, a) => `Releasing every ${days} day(s) (about ${a.perMonth.toFixed(1)}/month). This band's change failure rate runs roughly ${a.tier.cfrLow}–${a.tier.cfrHigh}%, with typical recovery time around ${T().mttrTextFor(a.tier)}.`,
+  mttrTextFor: (tier) => tier.mttr.en,
+  hintScenario: (a) => `Batched into one "big update" per quarter (about every 90 days). Change failure rate rises to roughly ${a.tier.cfrLow}–${a.tier.cfrHigh}%, with recovery taking around ${a.tier.mttr.en}.`,
+  comments: [
+    "A high-frequency band. Changes stay small, and both failure rate and recovery time tend to be low.",
+    "Still on the higher-frequency side of the medium band. Not bad, but room to improve.",
+    "The medium band. Change failure rate starts climbing noticeably here.",
+    "You've entered the low-frequency band. Both failure rate and recovery time worsen sharply here.",
+    "Close to once every six months. A lot of change piles into a single release — the highest-risk band.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "These three bands simplify the change-failure-rate ranges reported by the DevOps Research and Assessment (DORA) team's annual \"State of DevOps Report\" (running since 2014) and the book \"Accelerate\" (Forsgren, Humble, Kim). This is a correlation, not a simple cause-and-effect — releasing more often doesn't automatically lower your failure rate on its own. Teams that manage to release frequently tend to also keep changes small and invest in automated testing, and that combination is what the research points to as the real driver.",
+  adviceItems: [
+    "Prioritize keeping the batch size (amount of change per release) small — frequency tends to follow as a result",
+    "Invest in automated testing and CI/CD so small changes can be verified safely",
+    "Assume failures will happen; invest in faster detection and rollback to shorten recovery time",
+    "Shift the culture from \"release is a big special event\" to \"release is routine, everyday work\"",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "DEVOPS", title: "Accelerate", desc: "Nicole Forsgren, Jez Humble, Gene Kim. The book behind the DORA research this simulator is based on.", link: "View on Amazon →", url: "https://amzn.to/4w5Jxxi" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Is it safer to release less often, in bigger batches? — Release Frequency Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (days, a) => `${days}日に1回。月${a.perMonth.toFixed(1)}回。この帯の失敗率は${a.tier.cfrLow}〜${a.tier.cfrHigh}%。障害が起きたら${T().mttrTextFor(a.tier)}、Slackで「調査中です🙏」と言い続けることになります。`,
+  mttrTextFor: (tier) => tier.mttr.ja,
+  hintScenario: (a) => `四半期に1回の「大型アップデート」。失敗率${a.tier.cfrLow}〜${a.tier.cfrHigh}%。リリース当日は関係者全員が終業後もPCの前に張り付く、あの日です。`,
+  comments: [
+    "リリースしても誰も気づかない。それが理想の状態。",
+    "まあ許容範囲。まだ祈らなくていい。",
+    "そろそろリリース前にお守りが欲しくなる帯。",
+    "リリース作業がプロジェクトになっている。",
+    "「今期最大のリリース」という言葉自体がリスクの証拠。",
+  ],
+},
+en: {
+  hint: (days, a) => `Once every ${days} day(s), about ${a.perMonth.toFixed(1)}/month. Failure rate in this band: ${a.tier.cfrLow}–${a.tier.cfrHigh}%. When it breaks, expect ${T().mttrTextFor(a.tier)} of posting "still investigating 🙏" in Slack.`,
+  mttrTextFor: (tier) => tier.mttr.en,
+  hintScenario: (a) => `One "big update" per quarter. Failure rate ${a.tier.cfrLow}–${a.tier.cfrHigh}%. Release day is the day everyone stays glued to their laptop long after hours.`,
+  comments: [
+    "Nobody even notices a release happened. That's the dream.",
+    "Fine, mostly. You don't need to start praying yet.",
+    "This is the band where people start wanting a lucky charm before release day.",
+    "The release itself has become a project of its own.",
+    "The phrase \"biggest release of the quarter\" is itself a risk signal.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let intervalDays = 14;
+
+/* ================= チャート描画(対数軸) ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const LOG_MIN = Math.log10(INTERVAL_MIN), LOG_MAX = Math.log10(INTERVAL_MAX);
+const X_TICKS = [0.5, 1, 7, 30, 90, 180];
+const xOf = (d) => PAD_L + ((Math.log10(d) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * (PW - PAD_L - PAD_R);
+const dOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const log = LOG_MIN + Math.min(1, Math.max(0, frac)) * (LOG_MAX - LOG_MIN);
+  return Math.pow(10, log);
+};
+const yOf = (cfr) => PAD_T + (1 - cfr / 70) * (PH - PAD_T - PAD_B);
+const COLOR_VAR = { elite: "var(--q)", medium: "var(--c)", low: "var(--alert)" };
+
+function fmtDays(d) {
+  return d < 1 ? d.toFixed(2) : d < 10 ? (Math.round(d * 10) / 10).toString() : Math.round(d).toString();
+}
+
+function drawChart() {
+  const t = T();
+  const bandLayer = document.getElementById("relBandLayer");
+  bandLayer.innerHTML = "";
+  let prevX = xOf(INTERVAL_MIN);
+  TIERS.forEach((tier) => {
+    const endD = tier.max === Infinity ? INTERVAL_MAX : tier.max;
+    const x2 = xOf(endD);
+    bandLayer.appendChild(el("rect", {
+      class: "rel-band", x: prevX, y: yOf(tier.cfrHigh), width: Math.max(0, x2 - prevX),
+      height: yOf(tier.cfrLow) - yOf(tier.cfrHigh), fill: COLOR_VAR[tier.key],
+    }));
+    prevX = x2;
+  });
+
+  const gridLayer = document.getElementById("relGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 15, 30, 46, 60, 70].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "rel-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "rel-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  X_TICKS.forEach((d) => {
+    const x = xOf(d);
+    gridLayer.appendChild(el("line", { class: "rel-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "rel-axis-label", x, y: PH - PAD_B + 14, "text-anchor": d === INTERVAL_MIN ? "start" : d === INTERVAL_MAX ? "end" : "middle" });
+    label.textContent = fmtDays(d);
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "rel-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.relYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "rel-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.relXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  const samples = [];
+  for (let ld = LOG_MIN; ld <= LOG_MAX; ld += (LOG_MAX - LOG_MIN) / 200) samples.push(Math.pow(10, ld));
+  samples.forEach((d) => pts.push(`${xOf(d)},${yOf(tierOf(d).cfrMid)}`));
+  document.getElementById("relLine").setAttribute("d", "M " + pts.join(" L "));
+
+  const mx = xOf(intervalDays), my = yOf(tierOf(intervalDays).cfrMid);
+  const marker = document.getElementById("relMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+  const point = document.getElementById("relPoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", my);
+  point.setAttribute("stroke", COLOR_VAR[tierOf(intervalDays).key]);
+
+  const hit = document.getElementById("relMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(intervalDays);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${a.tier.cfrLow}–${a.tier.cfrHigh}%`;
+  document.getElementById("cfrVal").textContent = `${a.tier.cfrLow}–${a.tier.cfrHigh}%`;
+  document.getElementById("mttrVal").textContent = t.mttrTextFor(a.tier);
+  document.getElementById("hint").textContent = t.hint(fmtDays(intervalDays), a);
+
+  const cardEl = document.getElementById("cfrCard");
+  cardEl.className = "tier-card tier-" + a.tier.key;
+  document.getElementById("mttrCard").className = "tier-card tier-" + a.tier.key;
+
+  const sliderPos = Math.round(((Math.log10(intervalDays) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * 1000);
+  document.getElementById("intervalReadout").textContent = fmtDays(intervalDays);
+  if (document.activeElement !== document.getElementById("intervalSlider")) document.getElementById("intervalSlider").value = sliderPos;
+  if (document.activeElement !== document.getElementById("intervalNum")) document.getElementById("intervalNum").value = fmtDays(intervalDays);
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 50 ? " danger" : a.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/release-frequency/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("intervalName").textContent = t.intervalName;
+  document.getElementById("intervalSub").textContent = t.intervalSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("intervalSlider").setAttribute("aria-label", t.intervalName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.intervalName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("cfrLabel").textContent = t.cfrLabel;
+  document.getElementById("mttrLabel").textContent = t.mttrLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "release-frequency" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("intervalSlider").addEventListener("input", (e) => {
+  const frac = +e.target.value / 1000;
+  intervalDays = Math.pow(10, LOG_MIN + frac * (LOG_MAX - LOG_MIN));
+  render();
+});
+document.getElementById("intervalNum").addEventListener("change", (e) => {
+  intervalDays = Math.min(INTERVAL_MAX, Math.max(INTERVAL_MIN, +e.target.value));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  intervalDays = 14;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  intervalDays = 90;
+  render();
+  const a = assess(intervalDays);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart (log-scale x) ---- */
+const relChart = document.getElementById("relChart");
+function svgPoint(evt) {
+  const pt = relChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(relChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  relChart.setPointerCapture(evt.pointerId);
+  document.getElementById("relMarker").classList.add("dragging");
+  document.getElementById("relMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  intervalDays = dOfX(p.x);
+  render();
+}
+document.getElementById("relMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("relPoint").addEventListener("pointerdown", startDrag);
+relChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => relChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("relMarker").classList.remove("dragging");
+  document.getElementById("relMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

@@ -119,6 +119,12 @@ window.DevSimLab = (function () {
       ja: { name: "コードレビュー係数シミュレーター", title: "レビューは、早く終わらせた方がいい?", desc: "レビュー速度が上がるほど欠陥の検出率が下がっていく様子を可視化するシミュレーター。" },
       en: { name: "Code Review Coefficient Simulator", title: "Is it better to finish reviews quickly?", desc: "A simulator visualizing how defect detection rate drops as code review speed increases." },
     },
+    {
+      id: "release-frequency", href: "release-frequency/", status: "live",
+      tags: { ja: ["リリース頻度", "DevOps"], en: ["Release frequency", "DevOps"] },
+      ja: { name: "リリース頻度シミュレーター", title: "リリースは、まとめて少ない回数でやった方が安全?", desc: "リリース頻度が下がるほど変更失敗率・復旧時間が悪化していく様子をDORAの調査データで可視化するシミュレーター。" },
+      en: { name: "Release Frequency Simulator", title: "Is it safer to release less often, in bigger batches?", desc: "A simulator visualizing how change failure rate and recovery time worsen as release frequency drops, based on DORA's research." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
