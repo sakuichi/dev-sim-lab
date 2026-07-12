@@ -143,6 +143,12 @@ window.DevSimLab = (function () {
       ja: { name: "中断コスト・シミュレーター", title: "作業を止めても、コストは増え続ける?", desc: "長期間中断した作業を再開するときの思い出し工数と作業漏れリスクを可視化するシミュレーター。" },
       en: { name: "Pause Cost Simulator", title: "If you pause the work, does the cost keep climbing?", desc: "A simulator visualizing the reacquisition cost and omission risk of resuming work after a long pause." },
     },
+    {
+      id: "zero-bugs", href: "zero-bugs/", status: "live",
+      tags: { ja: ["信頼性", "SRE"], en: ["Reliability", "SRE"] },
+      ja: { name: "バグゼロ・コストシミュレーター", title: "バグゼロのシステムは、目指せば作れる?", desc: "信頼性を100%に近づけようとするほどコストが指数的に増えていく様子をSREの考え方で可視化するシミュレーター。" },
+      en: { name: "Zero Bugs Cost Simulator", title: "Can you actually build a zero-bug system if you aim for it?", desc: "A simulator visualizing how cost grows exponentially as target reliability approaches 100%, based on SRE practice." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */

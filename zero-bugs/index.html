@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バグゼロのシステムは、目指せば作れる? | バグゼロ・コストシミュレーター</title>
+<meta name="description" content="信頼性を100%(バグゼロ)に近づけようとするほど、必要なコストが指数的に増える様子を、SREの「ナインの法則」にもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/zero-bugs/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/zero-bugs/">
+<meta property="og:title" content="バグゼロのシステムは、目指せば作れる? | バグゼロ・コストシミュレーター">
+<meta property="og:description" content="信頼性を100%に近づけようとするほど、必要なコストが指数的に増える様子を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/zero-bugs.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "バグゼロ・コストシミュレーター",
+  "alternateName": "Zero Bugs Cost Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/zero-bugs/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "信頼性を100%に近づけようとするほどコストが指数的に増える様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- cost-of-nines log-scale chart ---- */
+.zb-wrap{margin-top:14px}
+.zb-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.zb-grid{stroke:var(--line);stroke-width:1}
+.zb-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.zb-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.zb-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.zb-area{fill:var(--alert);opacity:.10}
+.zb-line{fill:none;stroke:var(--ink);stroke-width:2.2}
+.zb-dot{r:3.5;fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.zb-marker{stroke:var(--alert);stroke-width:3;stroke-linecap:round;cursor:grab}
+.zb-marker.dragging{cursor:grabbing}
+.zb-marker-hit{fill:transparent;cursor:grab}
+.zb-marker-hit.dragging{cursor:grabbing}
+.zb-inf-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--alert);font-weight:700}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.cost-card{border-left:4px solid var(--alert)}
+.tier-card.rate-card{border-left:4px solid var(--d)}
+
+.controls{grid-template-columns:1fr}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">99.9%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="zb-wrap">
+    <svg class="zb-svg" id="zbChart" viewBox="0 0 640 240" role="img" aria-label="Relative cost vs target reliability (nines)">
+      <g id="zbGridLayer"></g>
+      <path id="zbArea" class="zb-area"></path>
+      <path id="zbLine" class="zb-line"></path>
+      <g id="zbDotsLayer"></g>
+      <text id="zbInfLabel" class="zb-inf-label"></text>
+      <line id="zbMarker" class="zb-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="zbMarkerHit" class="zb-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card cost-card">
+      <div class="k" id="costCardLabel"></div>
+      <div class="v" id="costCardVal">100倍</div>
+    </div>
+    <div class="tier-card rate-card">
+      <div class="k" id="rateCardLabel"></div>
+      <div class="v" id="rateCardVal">1,000件に1件</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">84</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="nineName"></span><small id="nineSub"></small></div>
+      <div class="readout mono" id="nineReadout" style="font-size:20px">99.9%</div>
+      <input type="range" id="nineSlider" min="1" max="6" step="1" value="3">
+      <div class="num-row">
+        <label for="nineNum" id="numLabel1"></label>
+        <input type="number" id="nineNum" min="1" max="6" step="1" value="3">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   SRE(Site Reliability Engineering)の実務でよく言われる経験則
+   「信頼性を1ナイン(桁)上げるごとに、必要なコストはおおよそ1桁増える」を
+   簡易的に数式化したモデル。Googleの『SRE サイトリライアビリティエンジニアリング』では
+   100%は正しい目標ではなく、100%に近づくほど限界コストは増大し、
+   限界価値(利用者にとっての体感的なメリット)はゼロに近づいていくと説明されている。
+   ここでの費用倍率(10^(n-1))は説明のための簡易化であり、実際の費用構造を
+   再現した精緻なモデルではない。
+*/
+const NINE_MIN = 1, NINE_MAX = 6;
+const NINES = [
+  { n: 1, reliability: 0.90, label: "90%", failOneIn: 10 },
+  { n: 2, reliability: 0.99, label: "99%", failOneIn: 100 },
+  { n: 3, reliability: 0.999, label: "99.9%", failOneIn: 1000 },
+  { n: 4, reliability: 0.9999, label: "99.99%", failOneIn: 10000 },
+  { n: 5, reliability: 0.99999, label: "99.999%", failOneIn: 100000 },
+  { n: 6, reliability: 0.999999, label: "99.9999%", failOneIn: 1000000 },
+];
+function nineOf(n) { return NINES[n - 1]; }
+function costMultiplierOf(n) { return Math.pow(10, n - 1); }
+function scoreOf(n) { return Math.max(0, Math.min(100, Math.round(100 - Math.abs(n - 3.5) * 32))); }
+function assess(n) {
+  const nine = nineOf(n);
+  const cost = costMultiplierOf(n);
+  const score = scoreOf(n);
+  const band = n <= 1 ? 0 : n === 2 ? 1 : (n === 3 || n === 4) ? 2 : n === 5 ? 3 : 4;
+  return { nine, cost, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "バグゼロのシステムは、目指せば作れる? | バグゼロ・コストシミュレーター",
+  heroTitle: "バグゼロのシステムは、<br>目指せば作れる?",
+  heroLead: "「バグ0でよろしく」と言われることがあります。気持ちは理解できますが、エンジニアの立場では、これは技術的に不可能な要求です。大規模システムの信頼性を専門に扱う実務の現場では、信頼性を1桁(1ナイン)上げるごとに、必要なコストはおおよそ1桁増えると言われています。目標とする信頼性を動かして、コストがどう変わるかを確認してください。100%(バグゼロ)は、この曲線の先にある、決して到達できない極限です。",
+  consoleLabel: "RELIABILITY CONSOLE",
+  sumLabel: "目標信頼性",
+  scoreLabel: "投資対効果スコア",
+  nineName: "目標信頼性", nineSub: "どこまでの信頼性を目指すか",
+  numLabel: "段階(1〜6)",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 顧客に「バグ0」を求められた",
+  chartCaption: "横軸は目標信頼性、縦軸はそのために必要な相対コスト(対数目盛)です。1ナイン上げるごとに、コストはおよそ1桁増えます。",
+  chartNote: "SREの実務でよく言われる経験則を簡易化したモデルです。実際の費用構造を精緻に再現したものではありません。",
+  zbYTitle: "相対コスト(倍・対数目盛)", zbXTitle: "目標信頼性",
+  infLabel: "100%(バグゼロ)= コスト無限大",
+  costCardLabel: "必要な相対コスト",
+  rateCardLabel: "許容する不具合の目安",
+  hint: (a) => `目標信頼性${a.nine.label}のとき、必要な相対コストはおよそ${a.cost.toLocaleString()}倍。${a.nine.failOneIn.toLocaleString()}件に1件は不具合が起こりうる計算です。`,
+  hintScenario: (a) => `顧客から「バグ0」を求められました。しかし100%は数学的な極限であり、到達しようとするほどコストは限りなく増大します。まずは現実的な目標信頼性(${a.nine.label}前後)をすり合わせるところから始める必要があります。`,
+  comments: [
+    "信頼性が低すぎます。基本的な品質保証すら不十分な水準です。",
+    "実用上のリスクは残りますが、コストは抑えられています。",
+    "多くのWebサービスにとって現実的な、投資対効果のバランスが取れた水準です。",
+    "十分に高い信頼性ですが、コストもかなり嵩んでいます。用途を選ぶ水準です。",
+    "生命に関わるシステムなど、特別な理由がない限り過剰投資になりやすい水準です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "「バグゼロ」が技術的に不可能である理由は、経験則だけでなく理論的にも裏付けられています。エドガー・ダイクストラは「テストはバグの存在を示せるが、不在を証明することはできない」と述べました。現実のシステムは入力や状態の組み合わせが膨大(組み合わせ爆発)であり、すべてを網羅的に検証することは現実的に不可能です。GoogleのSREチームは著書『Site Reliability Engineering』の中で、100%は正しい信頼性目標ではないと述べています。信頼性を100%に近づけようとするほど限界コストは増大する一方、利用者にとっての体感的な価値(限界価値)はゼロに近づいていくためです。だからこそSREでは「エラーバジェット」という考え方で、許容できる不具合の量をあらかじめ合意します。",
+  adviceItems: [
+    "「バグ0」ではなく、具体的な目標信頼性(SLA/SLO)を顧客とすり合わせる",
+    "すべての不具合を同列に扱わず、影響の大きいものから優先して対応する(エラーバジェットの考え方)",
+    "「なぜバグ0を約束できないか」を、精神論ではなく組み合わせ爆発などの技術的根拠で説明する",
+    "信頼性への投資は、目標を上回った時点で他の改善(機能開発など)に振り向ける",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "SRE", title: "SRE サイトリライアビリティエンジニアリング", desc: "Google編。「100%は正しい信頼性目標ではない」という考え方の一次情報。本シミュレーターの元になった一冊。", link: "Amazonで見る →", url: "https://amzn.to/4h5TeH5" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "バグゼロのシステムは、目指せば作れる? | バグゼロ・コストシミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Can you actually build a zero-bug system if you aim for it? | Zero Bugs Cost Simulator",
+  heroTitle: "Can you actually build<br>a zero-bug system if you aim for it?",
+  heroLead: "\"Just get it to zero bugs\" is a request every engineer has heard. The sentiment is understandable, but from an engineering standpoint it's a technically impossible ask. In Site Reliability Engineering (SRE) practice, each additional \"nine\" of reliability tends to cost roughly an order of magnitude more than the one before it. Move the target reliability and see how cost responds. 100% (zero bugs) sits at the far end of this curve — a limit you can approach but never actually reach.",
+  consoleLabel: "RELIABILITY CONSOLE",
+  sumLabel: "Target reliability",
+  scoreLabel: "Return-on-investment score",
+  nineName: "Target reliability", nineSub: "How much reliability you're aiming for",
+  numLabel: "Tier (1–6)",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: the client asked for \"zero bugs\"",
+  chartCaption: "X-axis: target reliability. Y-axis: relative cost required to get there (log scale). Each additional nine costs roughly an order of magnitude more.",
+  chartNote: "A simplified model based on a common SRE rule of thumb — not a precise reproduction of any real cost structure.",
+  zbYTitle: "Relative cost (×, log scale)", zbXTitle: "Target reliability",
+  infLabel: "100% (zero bugs) = infinite cost",
+  costCardLabel: "Relative cost required",
+  rateCardLabel: "Estimated failure rate",
+  hint: (a) => `At a target reliability of ${a.nine.label}, relative cost runs about ${a.cost.toLocaleString()}×. Expect roughly 1 failure in every ${a.nine.failOneIn.toLocaleString()} cases.`,
+  hintScenario: (a) => `The client asked for "zero bugs." But 100% is a mathematical limit — the closer you try to get, the more cost grows without bound. The real starting point is agreeing on a realistic target reliability (something like ${a.nine.label}).`,
+  comments: [
+    "Reliability is too low here — even basic quality assurance falls short.",
+    "Some practical risk remains, but cost stays low.",
+    "A realistic, well-balanced level for most web services.",
+    "High reliability, but cost is climbing fast too. Suited to specific use cases.",
+    "Outside special cases like life-critical systems, this level tends to be over-investment.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Zero bugs being technically impossible isn't just a rule of thumb — it's backed by theory too. Edsger Dijkstra famously noted that \"program testing can be used to show the presence of bugs, but never to show their absence.\" Real systems have an enormous number of possible input and state combinations (combinatorial explosion), making exhaustive verification practically infeasible. Google's SRE team writes in their book \"Site Reliability Engineering\" that 100% is the wrong reliability target: as you approach 100%, marginal cost keeps rising while the marginal value users actually notice approaches zero. This is exactly why SRE uses \"error budgets\" — agreeing in advance on how much failure is acceptable.",
+  adviceItems: [
+    "Replace \"zero bugs\" with a concrete target reliability (SLA/SLO) agreed with the client",
+    "Don't treat every defect equally — prioritize by impact (the error-budget mindset)",
+    "Explain why zero bugs can't be promised using technical grounds like combinatorial explosion, not just reassurance",
+    "Once reliability investment clears the target, redirect further effort toward other improvements like new features",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "SRE", title: "Site Reliability Engineering", desc: "Edited by Google. The primary source for \"100% is the wrong reliability target\" — the idea behind this simulator.", link: "View on Amazon →", url: "https://amzn.to/44lfcyr" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Can you actually build a zero-bug system if you aim for it? — Zero Bugs Cost Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (a) => `${a.nine.label}を目指す。コストは${a.cost.toLocaleString()}倍。営業が「バグ0いけますよね?」と聞いてくる会議室の空気を思い出してほしい。`,
+  hintScenario: (a) => `「バグ0でお願いします」に、営業が「はい、大丈夫です!」と即答した。エンジニアは無限大のコスト見積もりを片手に、その場で白目をむいている。`,
+  comments: [
+    "誰も使ってないシステムと同じくらいバグが出ない。まあ動いてはいる。",
+    "「まあこんなもんでしょ」で押し切れる水準。",
+    "「うちは品質にこだわってます」と名刺に書ける水準。",
+    "監査対応のためだけに存在する謎の冗長構成が生まれ始める。",
+    "予算会議で誰かが「本当にここまで要る?」と聞き始める、あの空気。",
+  ],
+},
+en: {
+  hint: (a) => `Targeting ${a.nine.label}. Cost runs ${a.cost.toLocaleString()}×. Remember that meeting where sales asked "so we can do zero bugs, right?"`,
+  hintScenario: (a) => `"Zero bugs, please." Sales says "Sure, no problem!" immediately. The engineer is quietly rolling their eyes while holding an infinite cost estimate.`,
+  comments: [
+    "About as bug-free as a system nobody uses. Technically it runs.",
+    "\"Eh, good enough\" territory, and you can get away with saying that.",
+    "The level where you can put \"we care about quality\" on a business card.",
+    "Mysteriously redundant architecture starts appearing, purely for audit purposes.",
+    "The budget meeting where someone finally asks \"do we really need this much?\"",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let nineIdx = 3;
+
+/* ================= チャート描画(対数軸) ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 46, PAD_R = 16, PAD_T = 34, PAD_B = 42;
+const LOG_MIN = 0, LOG_MAX = 5; // cost 10^0 .. 10^5
+const xOf = (n) => PAD_L + ((n - NINE_MIN) / (NINE_MAX - NINE_MIN)) * (PW - PAD_L - PAD_R);
+const nOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = NINE_MIN + frac * (NINE_MAX - NINE_MIN);
+  return Math.min(NINE_MAX, Math.max(NINE_MIN, Math.round(raw)));
+};
+const yOf = (cost) => PAD_T + (1 - (Math.log10(cost) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("zbGridLayer");
+  gridLayer.innerHTML = "";
+  [1, 10, 100, 1000, 10000, 100000].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "zb-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "zb-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v.toLocaleString() + "×";
+    gridLayer.appendChild(label);
+  });
+  NINES.forEach((nine) => {
+    const x = xOf(nine.n);
+    gridLayer.appendChild(el("line", { class: "zb-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "zb-axis-label", x, y: PH - PAD_B + 14, "text-anchor": nine.n === NINE_MIN ? "start" : nine.n === NINE_MAX ? "end" : "middle" });
+    label.textContent = nine.label;
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "zb-axis-title", x: 2, y: 14 });
+  yTitle.textContent = t.zbYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "zb-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.zbXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = NINES.map((nine) => `${xOf(nine.n)},${yOf(costMultiplierOf(nine.n))}`);
+  document.getElementById("zbLine").setAttribute("d", "M " + pts.join(" L "));
+  document.getElementById("zbArea").setAttribute("d", "M " + xOf(NINE_MIN) + "," + yOf(1) + " L " + pts.join(" L ") + " L " + xOf(NINE_MAX) + "," + yOf(1) + " Z");
+
+  const dotsLayer = document.getElementById("zbDotsLayer");
+  dotsLayer.innerHTML = "";
+  NINES.forEach((nine) => {
+    dotsLayer.appendChild(el("circle", { class: "zb-dot", cx: xOf(nine.n), cy: yOf(costMultiplierOf(nine.n)) }));
+  });
+
+  const infLabel = document.getElementById("zbInfLabel");
+  infLabel.setAttribute("x", PW - PAD_R);
+  infLabel.setAttribute("y", PAD_T - 10);
+  infLabel.setAttribute("text-anchor", "end");
+  infLabel.textContent = t.infLabel;
+
+  const mx = xOf(nineIdx), my = yOf(costMultiplierOf(nineIdx));
+  const marker = document.getElementById("zbMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("zbMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(nineIdx);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = a.nine.label;
+  document.getElementById("costCardVal").textContent = t.htmlLang === "ja" ? `${a.cost.toLocaleString()}倍` : `${a.cost.toLocaleString()}×`;
+  document.getElementById("rateCardVal").textContent = t.htmlLang === "ja" ? `${a.nine.failOneIn.toLocaleString()}件に1件` : `1 in ${a.nine.failOneIn.toLocaleString()}`;
+  document.getElementById("hint").textContent = t.hint(a);
+
+  document.getElementById("nineReadout").textContent = a.nine.label;
+  if (document.activeElement !== document.getElementById("nineSlider")) document.getElementById("nineSlider").value = nineIdx;
+  if (document.activeElement !== document.getElementById("nineNum")) document.getElementById("nineNum").value = nineIdx;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/zero-bugs/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("nineName").textContent = t.nineName;
+  document.getElementById("nineSub").textContent = t.nineSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("nineSlider").setAttribute("aria-label", t.nineName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.nineName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("costCardLabel").textContent = t.costCardLabel;
+  document.getElementById("rateCardLabel").textContent = t.rateCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "zero-bugs" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("nineSlider").addEventListener("input", (e) => { nineIdx = +e.target.value; render(); });
+document.getElementById("nineNum").addEventListener("change", (e) => {
+  nineIdx = Math.min(NINE_MAX, Math.max(NINE_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  nineIdx = 3;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  nineIdx = 6;
+  render();
+  const a = assess(nineIdx);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart (6 discrete nines) ---- */
+const zbChart = document.getElementById("zbChart");
+function svgPoint(evt) {
+  const pt = zbChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(zbChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  zbChart.setPointerCapture(evt.pointerId);
+  document.getElementById("zbMarker").classList.add("dragging");
+  document.getElementById("zbMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  nineIdx = nOfX(p.x);
+  render();
+}
+document.getElementById("zbMarkerHit").addEventListener("pointerdown", startDrag);
+zbChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => zbChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("zbMarker").classList.remove("dragging");
+  document.getElementById("zbMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
