@@ -173,6 +173,12 @@ window.DevSimLab = (function () {
       ja: { name: "発言コスト・シミュレーター", title: "その意見、言ったら自分の仕事になる?", desc: "「発言するとタスクを負わされる」という構造が発言意欲とリスクの見逃しにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Speak-Up Cost Simulator", title: "If you say that, does it become your job?", desc: "A simulator visualizing how a \"speaking up means you own the task\" structure affects willingness to speak up and the risk of issues being missed." },
     },
+    {
+      id: "psychological-safety", href: "psychological-safety/", status: "live",
+      tags: { ja: ["心理的安全性", "組織"], en: ["Psychological safety", "Organization"] },
+      ja: { name: "心理的安全性シミュレーター", title: "ミスの報告が少ないチームは、優れたチーム?", desc: "心理的安全性の水準が、報告される問題と隠れた問題の割合にどう影響するかをEdmondsonの研究にもとづいて可視化するシミュレーター。" },
+      en: { name: "Psychological Safety Simulator", title: "Is a team with fewer reported mistakes the better team?", desc: "A simulator visualizing how psychological safety level affects the split between reported and hidden problems, based on Edmondson's research." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
