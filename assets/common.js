@@ -215,6 +215,12 @@ window.DevSimLab = (function () {
       ja: { name: "確証バイアス・シミュレーター", title: "賛成してくれる相手にだけ聞いていると、何が起きる?", desc: "反証を探す努力と相談相手の追従度(追従的な生成AIを含む)が、誤った仮説に気づける確率にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Confirmation Bias Simulator", title: "What happens when you only consult people who agree with you?", desc: "A simulator visualizing how disconfirmation effort and a consultation partner's sycophancy (AI included) drive the chance of catching a wrong hypothesis." },
     },
+    {
+      id: "hofstadters-law", href: "hofstadters-law/", status: "live",
+      tags: { ja: ["見積もり", "計画錯誤"], en: ["Estimation", "Planning fallacy"] },
+      ja: { name: "ホフスタッターの法則シミュレーター", title: "多めに見積もったのに、なぜまた遅れる?", desc: "バッファをどれだけ積んでも実際の所要時間がその先を行く、自己言及的な見積もりの法則と計画錯誤の研究を体験できるシミュレーター。" },
+      en: { name: "Hofstadter's Law Simulator", title: "You padded the estimate — so why is it late again?", desc: "A simulator of the self-referential estimation law and the planning fallacy: however much buffer you stack, the actual duration stays ahead." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -319,7 +325,7 @@ window.DevSimLab = (function () {
     "brooks-law": ["onboarding-ramp", "utilization-trap", "wip-lead-time"],
     "utilization-trap": ["wip-lead-time", "context-switch", "brooks-law"],
     "context-switch": ["pause-cost", "wip-lead-time", "utilization-trap"],
-    "estimation-uncertainty": ["skill-variance", "qcd-tradeoff", "cost-of-change"],
+    "estimation-uncertainty": ["hofstadters-law", "skill-variance", "qcd-tradeoff"],
     "technical-debt": ["cost-of-change", "zero-bugs", "code-review"],
     "code-review": ["bikeshedding", "technical-debt", "speak-up-cost"],
     "release-frequency": ["wip-lead-time", "qcd-tradeoff", "technical-debt"],
@@ -338,6 +344,7 @@ window.DevSimLab = (function () {
     "rubber-duck": ["xy-problem", "curse-of-knowledge", "pause-cost"],
     "xy-problem": ["curse-of-knowledge", "rubber-duck", "speak-up-cost"],
     "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
+    "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
   };
 
   function renderRelated(container, opts) {

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多めに見積もったのに、なぜまた遅れる? | ホフスタッターの法則シミュレーター</title>
+<meta name="description" content="「いつでも予想以上に時間がかかる。ホフスタッターの法則を考慮に入れても」——自己言及的な見積もりの法則と計画錯誤の研究を体験できるシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/hofstadters-law/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/hofstadters-law/">
+<meta property="og:title" content="多めに見積もったのに、なぜまた遅れる? | ホフスタッターの法則シミュレーター">
+<meta property="og:description" content="「いつでも予想以上に時間がかかる。ホフスタッターの法則を考慮に入れても」——自己言及的な見積もりの法則と計画錯誤の研究を体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/hofstadters-law.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ホフスタッターの法則シミュレーター",
+  "alternateName": "Hofstadter's Law Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/hofstadters-law/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "見積もりとバッファ倍率を動かしても、実際の所要時間が常にその先を行く自己言及的な構造を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- diverging dual-line chart (planned vs actual, by buffer multiplier) ---- */
+.hl-wrap{margin-top:14px}
+.hl-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.hl-grid{stroke:var(--line);stroke-width:1}
+.hl-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.hl-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.hl-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.hl-line-planned{fill:none;stroke:var(--q);stroke-width:2.2}
+.hl-line-actual{fill:none;stroke:var(--alert);stroke-width:2.2}
+.hl-dot{r:3.5}
+.hl-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.hl-marker.dragging{cursor:grabbing}
+.hl-marker-hit{fill:transparent;cursor:grab}
+.hl-marker-hit.dragging{cursor:grabbing}
+.hl-point-planned{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.hl-point-actual{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.hl-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.hl-value-label-planned{fill:var(--q)}
+.hl-value-label-actual{fill:var(--alert)}
+.hl-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.hl-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.hl-legend .sw.planned{background:var(--q)}
+.hl-legend .sw.actual{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.planned-card{border-left:4px solid var(--q)}
+.tier-card.actual-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">+14.4日</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="hl-wrap">
+    <svg class="hl-svg" id="hlChart" viewBox="0 0 640 240" role="img" aria-label="Planned duration with buffer vs actual duration, by buffer multiplier">
+      <g id="hlGridLayer"></g>
+      <path id="hlLinePlanned" class="hl-line-planned"></path>
+      <path id="hlLineActual" class="hl-line-actual"></path>
+      <g id="hlDotsLayer"></g>
+      <line id="hlMarker" class="hl-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="hlPointPlanned" class="hl-point-planned" r="5"></circle>
+      <circle id="hlPointActual" class="hl-point-actual" r="5"></circle>
+      <text id="hlLabelPlanned" class="hl-value-label hl-value-label-planned"></text>
+      <text id="hlLabelActual" class="hl-value-label hl-value-label-actual"></text>
+      <rect id="hlMarkerHit" class="hl-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="hl-legend">
+    <span><span class="sw planned"></span><span id="legendPlanned"></span></span>
+    <span><span class="sw actual"></span><span id="legendActual"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card planned-card">
+      <div class="k" id="plannedCardLabel"></div>
+      <div class="v" id="plannedCardVal">24.0日</div>
+    </div>
+    <div class="tier-card actual-card">
+      <div class="k" id="actualCardLabel"></div>
+      <div class="v" id="actualCardVal">38.4日</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">63</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="estName"></span><small id="estSub"></small></div>
+      <div class="readout mono" id="estReadout">20日</div>
+      <input type="range" id="estSlider" min="5" max="60" step="5" value="20">
+      <div class="num-row">
+        <label for="estNum" id="numLabel1"></label>
+        <input type="number" id="estNum" min="5" max="60" step="5" value="20">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="bufName"></span><small id="bufSub"></small></div>
+      <div class="readout mono" id="bufReadout">×1.2</div>
+      <input type="range" id="bufSlider" min="1" max="3" step="0.1" value="1.2">
+      <div class="num-row">
+        <label for="bufNum" id="numLabel2"></label>
+        <input type="number" id="bufNum" min="1" max="3" step="0.1" value="1.2">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「ホフスタッターの法則」——"いつでも予想以上に時間がかかる。
+   ホフスタッターの法則を考慮に入れても。"
+   ダグラス・ホフスタッターが『ゲーデル、エッシャー、バッハ』(1979年、
+   ピュリッツァー賞受賞)で、チェスコンピュータの実現予測が「あと10年」と
+   言われ続けた文脈で提示した、自己言及的な経験則。
+   真面目な裏付けは「計画錯誤(planning fallacy)」(Kahneman & Tversky, 1979)。
+   Buehlerら(1994)の卒業論文研究では、学生の予測平均33.9日に対し実際は
+   平均55.5日(約1.6倍)かかり、「99%確実」とした期日さえ大半が守れなかった。
+   本モデルの超過係数 OVERRUN=1.6 はこの研究の比率を目安にした演出であり、
+   実際の超過率はタスクや組織によって大きく異なる。
+   自己言及の再現: バッファをどれだけ積んでも、実際の所要時間は
+   「バッファ込みの予定」のさらに1.6倍になる——つまり法則を考慮した予定に対しても
+   法則が適用される。その結果、予定/実際の比率(スコア)は何をしても変わらない。
+*/
+const EST_MIN = 5, EST_MAX = 60;
+const BUF_MIN = 1.0, BUF_MAX = 3.0;
+const OVERRUN = 1.6;
+
+function plannedOf(est, buf) { return est * buf; }
+function actualOf(est, buf) { return plannedOf(est, buf) * OVERRUN; }
+function overrunDaysOf(est, buf) { return actualOf(est, buf) - plannedOf(est, buf); }
+function scoreOf() { return Math.round((1 / OVERRUN) * 100); }
+function tierOf(buf) {
+  if (buf < 1.2) return 0;
+  if (buf < 1.5) return 1;
+  if (buf < 2.0) return 2;
+  if (buf < 2.5) return 3;
+  return 4;
+}
+function assess(est, buf) {
+  const planned = plannedOf(est, buf);
+  const actual = actualOf(est, buf);
+  const overrun = overrunDaysOf(est, buf);
+  const score = scoreOf();
+  const band = tierOf(buf);
+  return { planned, actual, overrun, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "多めに見積もったのに、なぜまた遅れる? | ホフスタッターの法則シミュレーター",
+  heroTitle: "多めに見積もったのに、<br>なぜまた遅れる?",
+  heroLead: "「いつでも予想以上に時間がかかる。ホフスタッターの法則を考慮に入れても。」——ダグラス・ホフスタッターが『ゲーデル、エッシャー、バッハ』(1979年)に記した、自分自身に言及する奇妙な法則です(当時「あと10年で人間に勝つ」と言われ続けたチェスコンピュータの文脈で登場しました。実際に勝ったのは18年後の1997年です)。冗談のような法則ですが、真面目な裏付けがあります。カーネマンとトベルスキーが1979年に名づけた「計画錯誤」——人は自分のタスクの所要時間を系統的に過小評価する——です。Buehlerらの研究(1994年)では、学生が卒業論文の完成まで平均33.9日と予測したのに対し、実際は平均55.5日(約1.6倍)。「99%確実」と答えた期日ですら、大半の学生が守れませんでした。このシミュレーターでは「最初の見積もり」と「バッファ倍率」を動かせます。バッファをどれだけ積んでも何が起きるか——スコアに注目してください。",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "予定を超過する日数",
+  scoreLabel: "予定の達成度スコア",
+  estName: "最初の見積もり", estSub: "バッファを積む前の、素朴な見積もり(日)",
+  bufName: "バッファ倍率", bufSub: "ホフスタッターの法則を考慮して、見積もりに掛ける倍率",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 法則を考慮して、さらに1.6倍しておく",
+  chartCaption: "緑線はバッファ込みの予定、赤線は実際の所要時間です。バッファ倍率を上げると予定は延びますが、実際はその1.6倍の位置に居続けます——2本の線の比率は、どこまで行っても変わりません。",
+  chartNote: "超過係数1.6倍は、Buehlerらの卒業論文研究(予測33.9日/実際55.5日)の比率を目安にした演出です。実際の超過率はタスクの種類や組織によって大きく異なり、常に1.6倍になるわけではありません。",
+  hlYTitle: "所要時間(日)", hlXTitle: "バッファ倍率",
+  legendPlanned: "バッファ込みの予定",
+  legendActual: "実際の所要時間",
+  plannedCardLabel: "バッファ込みの予定",
+  actualCardLabel: "実際の所要時間",
+  hint: (est, buf, a) => `見積もり${est}日×バッファ${buf.toFixed(1)}倍で、予定は${a.planned.toFixed(1)}日。しかし実際は約${a.actual.toFixed(1)}日かかり、${a.overrun.toFixed(1)}日超過します。スコアが動かないことに気づきましたか? それがこの法則です。`,
+  hintScenario: (est, buf, a) => `賢明な判断です。法則を考慮してバッファを1.6倍に増やしました。予定は${a.planned.toFixed(1)}日——しかし実際は約${a.actual.toFixed(1)}日。「考慮に入れても」超過する、というのが法則の後半部分です。`,
+  comments: [
+    "バッファなしの素朴な予定です。それでもスコアは63——バッファを積んでも、この数字は変わりません。",
+    "常識的なバッファです。スコアは変わらず63。おや?",
+    "かなり手厚いバッファです。それでもスコアは63のまま。これは偶然ではありません。",
+    "予定の半分がバッファになりました。スコアは今日も63です。",
+    "バッファが本体を超えました。それでもスコアは63——「考慮に入れても、予想以上に時間がかかる」。これがホフスタッターの法則です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "スコアが動かないのは、このモデルが「バッファ込みの予定に対しても法則が適用される」という自己言及をそのまま実装しているからです。もちろん現実は定数倍ではありません。しかし「バッファを積んだ, はずなのに超過した」という体験が繰り返されるのは、計画錯誤の研究が示すとおり、人が見積もるとき「順調に進んだ場合のシナリオ」を思い浮かべ、割り込み・手戻り・想定外を体系的に除外してしまうからです。対策として研究上も効果が示されているのは、内側からの想像(このタスクはこう進むはず)ではなく、外側の実績(似たタスクは過去に実際何日かかったか)を使うこと——「外部視点(reference class forecasting)」です。当サイトの見積もり不確実性・思い出し工数・割り込みコストのページも、この「想定外はどこから来るか」の内訳になっています。",
+  adviceItems: [
+    "見積もりは「どう進むはずか」ではなく「似た作業が過去に実際何日かかったか」から出発する(外部視点)",
+    "バッファを一律の倍率で積むのではなく、過去の実績の分布(中央値と悪い方の裾)で幅として持つ",
+    "「99%確実な期日」も守れなかったというBuehlerらの結果を思い出し、コミットする期日と内部目標を分ける",
+    "超過したら理由を記録し、次の見積もりの実績データにする——法則に勝てなくても、超過幅は学習で狭められる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "TIME MANAGEMENT", title: "限りある時間の使い方", desc: "オリバー・バークマン著。人生は4000週間——計画はなぜいつも楽観的になるのかを含め、限られた時間との向き合い方を説く40万部超のベストセラー。", link: "Amazonで見る →", url: "https://amzn.to/4w4VuTU" },
+    { tag: "DECISION MAKING", title: "ファスト&スロー(上)", desc: "ダニエル・カーネマン著。計画錯誤の名づけ親による古典的名著。人が見積もりを誤る仕組みを体系的に解説する。", link: "Amazonで見る →", url: "https://amzn.to/4eVp9J0" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "多めに見積もったのに、なぜまた遅れる? | ホフスタッターの法則シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "You padded the estimate — so why is it late again? | Hofstadter's Law Simulator",
+  heroTitle: "You padded the estimate —<br>so why is it late again?",
+  heroLead: "\"It always takes longer than you expect, even when you take into account Hofstadter's Law.\" Douglas Hofstadter wrote this strange, self-referential law in Gödel, Escher, Bach (1979), in the context of chess computers that had been \"ten years away\" from beating humans for decades (they finally won 18 years later, in 1997). It sounds like a joke, but it has a serious backbone: the \"planning fallacy,\" named by Kahneman and Tversky in 1979 — people systematically underestimate how long their own tasks will take. In Buehler et al.'s 1994 study, students predicted their theses would take 33.9 days on average; the actual average was 55.5 days (about 1.6×). Even deadlines they rated \"99% certain\" were mostly missed. This simulator lets you move the initial estimate and the buffer multiplier. Whatever buffer you stack — watch the score.",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "Days over plan",
+  scoreLabel: "Plan attainment score",
+  estName: "Initial estimate", estSub: "The naive estimate, before any buffer (days)",
+  bufName: "Buffer multiplier", bufSub: "The multiplier you apply, taking Hofstadter's Law into account",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: account for the law — multiply by another 1.6",
+  chartCaption: "The green line is your buffered plan; the red line is the actual duration. Raising the buffer stretches the plan — but the actual stays at 1.6× above it. The ratio between the two lines never changes, no matter how far you go.",
+  chartNote: "The 1.6× overrun factor is a dramatization loosely anchored to Buehler et al.'s thesis study (33.9 days predicted vs 55.5 actual). Real overrun ratios vary widely by task and organization — it is not literally a constant 1.6.",
+  hlYTitle: "Duration (days)", hlXTitle: "Buffer multiplier",
+  legendPlanned: "Buffered plan",
+  legendActual: "Actual duration",
+  plannedCardLabel: "Buffered plan",
+  actualCardLabel: "Actual duration",
+  hint: (est, buf, a) => `At a ${est}-day estimate with a ${buf.toFixed(1)}× buffer, the plan is ${a.planned.toFixed(1)} days. The actual comes to about ${a.actual.toFixed(1)} days — ${a.overrun.toFixed(1)} days over. Noticed the score isn't moving? That's the law.`,
+  hintScenario: (est, buf, a) => `A wise move. You accounted for the law and multiplied the buffer by 1.6. The plan is now ${a.planned.toFixed(1)} days — and the actual is about ${a.actual.toFixed(1)}. Overrunning \"even when you take it into account\" is the second half of the law.`,
+  comments: [
+    "A naive, buffer-free plan. The score is 63 — and stacking buffer won't change that number.",
+    "A sensible buffer. The score is still 63. Hm.",
+    "A generous buffer. The score remains 63. This is not a coincidence.",
+    "Half your plan is now buffer. The score is 63 today as well.",
+    "The buffer now exceeds the task itself. Still 63 — \"even when you take into account Hofstadter's Law.\" That's the law.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The score never moves because this model implements the law's self-reference literally: the law applies to the buffered plan too. Reality isn't a constant multiplier, of course. But the recurring experience of \"we padded it and still ran over\" happens for the reason the planning-fallacy research identifies: when estimating, people imagine the scenario where things go smoothly, and systematically leave out interruptions, rework, and surprises. What demonstrably helps is switching from the inside view (how this task should unfold) to the outside view — reference class forecasting: how long did similar tasks actually take in the past? Several other pages on this site (estimation uncertainty, pause cost, context switching) are essentially the itemized breakdown of where those \"surprises\" come from.",
+  adviceItems: [
+    "Start estimates from records of similar past work, not from imagining how this one should go (the outside view)",
+    "Hold buffer as a range from your historical distribution (median and bad-tail), not a flat multiplier",
+    "Remember Buehler's students missed even their \"99% certain\" dates — separate committed deadlines from internal targets",
+    "Log the reason every time you overrun and feed it into the next estimate — you can't beat the law, but you can narrow it",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ORIGIN", title: "Gödel, Escher, Bach: An Eternal Golden Braid", desc: "Douglas Hofstadter. The Pulitzer-winning labyrinth of self-reference where the law first appeared.", link: "View on Amazon →", url: "https://amzn.to/4eWTfMb" },
+    { tag: "DECISION MAKING", title: "Thinking, Fast and Slow", desc: "Daniel Kahneman. The classic by the researcher who named the planning fallacy, on exactly how our estimates go wrong.", link: "View on Amazon →", url: "https://amzn.to/4vV3CWL" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "You padded the estimate — so why is it late again? — Hofstadter's Law Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (est, buf, a) => `バッファ${buf.toFixed(1)}倍。予定${a.planned.toFixed(1)}日、実際${a.actual.toFixed(1)}日。「進捗どうですか」「順調です」(残り90%が残っている)。スコアは今日も63。`,
+  hintScenario: (est, buf, a) => `前回の反省を活かしてバッファを1.6倍に。それでも${a.overrun.toFixed(1)}日超過。反省会の結論は今回も「次はバッファを積もう」。`,
+  comments: [
+    "「たぶん3日でできます」。この言葉が発された瞬間、6日コースが確定した。",
+    "「余裕を見て1.2倍にしました」。その余裕は初日の環境構築で消えた。",
+    "1.5倍のバッファ。祝日と障害対応とレビュー待ちが、静かに笑っている。",
+    "2倍のバッファを申請したら「多すぎない?」と言われた。多くなかった。",
+    "バッファ3倍。もはや見積もりではなく祈り。それでも足りないのがこの法則。",
+  ],
+},
+en: {
+  hint: (est, buf, a) => `Buffer ${buf.toFixed(1)}×. Plan ${a.planned.toFixed(1)} days, actual ${a.actual.toFixed(1)}. "How's progress?" "On track" (the remaining 90% remains). Score: 63, as always.`,
+  hintScenario: (est, buf, a) => `Lessons learned from last time: buffer ×1.6. Still ${a.overrun.toFixed(1)} days over. The retro's conclusion, once again: "next time, let's add buffer."`,
+  comments: [
+    "\"Should take about three days.\" The moment those words were spoken, a six-day course was locked in.",
+    "\"I added 20% to be safe.\" That safety evaporated during day-one environment setup.",
+    "A 1.5× buffer. The holidays, the incident, and the review queue are quietly smiling.",
+    "Requested a 2× buffer and got asked \"isn't that too much?\" It was not too much.",
+    "A 3× buffer. At this point it's not an estimate, it's a prayer. And per the law, still not enough.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let est = 20;
+let buf = 1.2;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 44, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+/* Y軸は「見積もり×5」で動的にスケールする(グリッド線1本=見積もり1個ぶん)。
+   実際の最大値は est×3×1.6=4.8est なので常に収まる。 */
+const yMax = () => est * 5;
+const xOf = (b) => PAD_L + ((b - BUF_MIN) / (BUF_MAX - BUF_MIN)) * (PW - PAD_L - PAD_R);
+const bOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = BUF_MIN + frac * (BUF_MAX - BUF_MIN);
+  return Math.min(BUF_MAX, Math.max(BUF_MIN, Math.round(raw * 10) / 10));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, yMax()) / yMax()) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("hlGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 1, 2, 3, 4, 5].map((i) => i * est).forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "hl-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "hl-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  });
+  for (let b = 10; b <= 30; b += 5) {
+    const bv = b / 10;
+    const x = xOf(bv);
+    gridLayer.appendChild(el("line", { class: "hl-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "hl-axis-label", x, y: PH - PAD_B + 14, "text-anchor": bv === BUF_MIN ? "start" : bv === BUF_MAX ? "end" : "middle" });
+    label.textContent = "×" + bv.toFixed(1);
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "hl-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.hlYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "hl-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.hlXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const plannedPts = [], actualPts = [];
+  for (let b = 10; b <= 30; b += 1) {
+    const bv = b / 10;
+    plannedPts.push(`${xOf(bv)},${yOf(plannedOf(est, bv))}`);
+    actualPts.push(`${xOf(bv)},${yOf(actualOf(est, bv))}`);
+  }
+  document.getElementById("hlLinePlanned").setAttribute("d", "M " + plannedPts.join(" L "));
+  document.getElementById("hlLineActual").setAttribute("d", "M " + actualPts.join(" L "));
+
+  const dotsLayer = document.getElementById("hlDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let b = 10; b <= 30; b += 5) {
+    const bv = b / 10;
+    dotsLayer.appendChild(el("circle", { class: "hl-dot", cx: xOf(bv), cy: yOf(plannedOf(est, bv)), fill: "var(--q)" }));
+    dotsLayer.appendChild(el("circle", { class: "hl-dot", cx: xOf(bv), cy: yOf(actualOf(est, bv)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(buf);
+  const marker = document.getElementById("hlMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const plannedY = yOf(plannedOf(est, buf));
+  const actualY = yOf(actualOf(est, buf));
+  document.getElementById("hlPointPlanned").setAttribute("cx", mx);
+  document.getElementById("hlPointPlanned").setAttribute("cy", plannedY);
+  document.getElementById("hlPointActual").setAttribute("cx", mx);
+  document.getElementById("hlPointActual").setAttribute("cy", actualY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const dayLabel = (v) => (T().htmlLang === "ja" ? `${v.toFixed(1)}日` : `${v.toFixed(1)}d`);
+
+  const labelPlanned = document.getElementById("hlLabelPlanned");
+  labelPlanned.setAttribute("x", mx + labelDx);
+  labelPlanned.setAttribute("y", clampY(plannedY + 20));
+  labelPlanned.setAttribute("text-anchor", labelAnchor);
+  labelPlanned.textContent = dayLabel(plannedOf(est, buf));
+
+  const labelActual = document.getElementById("hlLabelActual");
+  labelActual.setAttribute("x", mx + labelDx);
+  labelActual.setAttribute("y", clampY(actualY - 10));
+  labelActual.setAttribute("text-anchor", labelAnchor);
+  labelActual.textContent = dayLabel(actualOf(est, buf));
+
+  const hit = document.getElementById("hlMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(est, buf);
+
+  drawChart();
+
+  const dayFmt = (v) => (t.htmlLang === "ja" ? `${v.toFixed(1)}日` : `${v.toFixed(1)} days`);
+  document.getElementById("sumVal").textContent = "+" + dayFmt(a.overrun);
+  document.getElementById("plannedCardVal").textContent = dayFmt(a.planned);
+  document.getElementById("actualCardVal").textContent = dayFmt(a.actual);
+  document.getElementById("hint").textContent = t.hint(est, buf, a);
+
+  document.getElementById("estReadout").textContent = t.htmlLang === "ja" ? `${est}日` : `${est} days`;
+  document.getElementById("bufReadout").textContent = `×${buf.toFixed(1)}`;
+  if (document.activeElement !== document.getElementById("estSlider")) document.getElementById("estSlider").value = est;
+  if (document.activeElement !== document.getElementById("estNum")) document.getElementById("estNum").value = est;
+  if (document.activeElement !== document.getElementById("bufSlider")) document.getElementById("bufSlider").value = buf;
+  if (document.activeElement !== document.getElementById("bufNum")) document.getElementById("bufNum").value = buf;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono warn";
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/hofstadters-law/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("estName").textContent = t.estName;
+  document.getElementById("estSub").textContent = t.estSub;
+  document.getElementById("bufName").textContent = t.bufName;
+  document.getElementById("bufSub").textContent = t.bufSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("estSlider").setAttribute("aria-label", t.estName);
+  document.getElementById("bufSlider").setAttribute("aria-label", t.bufName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.estName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.bufName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendPlanned").textContent = t.legendPlanned;
+  document.getElementById("legendActual").textContent = t.legendActual;
+  document.getElementById("plannedCardLabel").textContent = t.plannedCardLabel;
+  document.getElementById("actualCardLabel").textContent = t.actualCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "hofstadters-law" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("estSlider").addEventListener("input", (e) => { est = +e.target.value; render(); });
+document.getElementById("estNum").addEventListener("change", (e) => {
+  est = Math.min(EST_MAX, Math.max(EST_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("bufSlider").addEventListener("input", (e) => { buf = +e.target.value; render(); });
+document.getElementById("bufNum").addEventListener("change", (e) => {
+  buf = Math.min(BUF_MAX, Math.max(BUF_MIN, Math.round(+e.target.value * 10) / 10));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  est = 20; buf = 1.2;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  buf = Math.min(BUF_MAX, Math.round(buf * OVERRUN * 10) / 10);
+  render();
+  const a = assess(est, buf);
+  document.getElementById("hint").textContent = T().hintScenario(est, buf, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const hlChart = document.getElementById("hlChart");
+function svgPoint(evt) {
+  const pt = hlChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(hlChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  hlChart.setPointerCapture(evt.pointerId);
+  document.getElementById("hlMarker").classList.add("dragging");
+  document.getElementById("hlMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  buf = bOfX(p.x);
+  render();
+}
+document.getElementById("hlMarkerHit").addEventListener("pointerdown", startDrag);
+hlChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => hlChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("hlMarker").classList.remove("dragging");
+  document.getElementById("hlMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
