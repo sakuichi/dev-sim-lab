@@ -48,7 +48,6 @@
 .chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
 .phase-marker{stroke:var(--d);stroke-width:3;stroke-linecap:round;cursor:grab}
 .phase-marker.dragging{cursor:grabbing}
-.phase-cap{stroke:var(--d);stroke-width:3;stroke-linecap:round}
 .phase-hit{fill:transparent;cursor:grab}
 .phase-hit.dragging{cursor:grabbing}
 .phase-point{fill:var(--surface);stroke:var(--d);stroke-width:2}
@@ -94,9 +93,8 @@
       <text id="trueLineLabel" class="true-label"></text>
       <g id="phaseAxisLayer"></g>
       <line id="phaseMarker" class="phase-marker"></line>
-      <line id="phaseCapTop" class="phase-cap"></line>
-      <line id="phaseCapBottom" class="phase-cap"></line>
-      <circle id="phasePoint" class="phase-point" r="5"></circle>
+      <circle id="phasePointTop" class="phase-point" r="5"></circle>
+      <circle id="phasePointBottom" class="phase-point" r="5"></circle>
       <text id="phasePctTop" class="phase-pct-label"></text>
       <text id="phasePctBottom" class="phase-pct-label"></text>
       <rect id="phaseHit" class="phase-hit" x="0" y="0" width="20" height="260"></rect>
@@ -398,14 +396,10 @@ function drawCone() {
   const marker = document.getElementById("phaseMarker");
   marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
   marker.setAttribute("y1", yTop); marker.setAttribute("y2", yBottom);
-  const capTop = document.getElementById("phaseCapTop");
-  capTop.setAttribute("x1", mx - 7); capTop.setAttribute("x2", mx + 7);
-  capTop.setAttribute("y1", yTop); capTop.setAttribute("y2", yTop);
-  const capBottom = document.getElementById("phaseCapBottom");
-  capBottom.setAttribute("x1", mx - 7); capBottom.setAttribute("x2", mx + 7);
-  capBottom.setAttribute("y1", yBottom); capBottom.setAttribute("y2", yBottom);
-  const point = document.getElementById("phasePoint");
-  point.setAttribute("cx", mx); point.setAttribute("cy", (yTop + yBottom) / 2);
+  const pointTop = document.getElementById("phasePointTop");
+  pointTop.setAttribute("cx", mx); pointTop.setAttribute("cy", yTop);
+  const pointBottom = document.getElementById("phasePointBottom");
+  pointBottom.setAttribute("cx", mx); pointBottom.setAttribute("cy", yBottom);
 
   const maxPct = Math.round((PHASES[phase - 1].high - 1) * 100);
   const minPct = Math.round((PHASES[phase - 1].low - 1) * 100);
@@ -545,7 +539,8 @@ function updatePhaseFromPointer(evt) {
   render();
 }
 document.getElementById("phaseHit").addEventListener("pointerdown", startPhaseDrag);
-document.getElementById("phasePoint").addEventListener("pointerdown", startPhaseDrag);
+document.getElementById("phasePointTop").addEventListener("pointerdown", startPhaseDrag);
+document.getElementById("phasePointBottom").addEventListener("pointerdown", startPhaseDrag);
 coneChart.addEventListener("pointermove", evt => { if (draggingPhase) updatePhaseFromPointer(evt); });
 ["pointerup", "pointercancel"].forEach(ev => coneChart.addEventListener(ev, () => {
   draggingPhase = false;
