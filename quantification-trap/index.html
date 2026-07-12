@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字で見えるものだけを、見ていない? | 定量化の罠シミュレーター</title>
+<meta name="description" content="定量指標への依存度を上げると「数字上の見かけの成果」と「実際の総合成果」がどう乖離するかを、マクナマラの誤謬をもとに可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/quantification-trap/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/quantification-trap/">
+<meta property="og:title" content="数字で見えるものだけを、見ていない? | 定量化の罠シミュレーター">
+<meta property="og:description" content="定量指標への依存度を上げると「数字上の見かけの成果」と「実際の総合成果」がどう乖離するかを、マクナマラの誤謬をもとに可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/quantification-trap.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "定量化の罠シミュレーター",
+  "alternateName": "Quantification Trap Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/quantification-trap/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "定量指標への依存度と測りにくい価値の割合が、見かけの成果と実際の成果の乖離にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- inverted-U vs rising-line chart (actual outcome vs metric mirage) ---- */
+.qt-wrap{margin-top:14px}
+.qt-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.qt-grid{stroke:var(--line);stroke-width:1}
+.qt-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.qt-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.qt-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.qt-line-actual{fill:none;stroke:var(--q);stroke-width:2.2}
+.qt-line-apparent{fill:none;stroke:var(--alert);stroke-width:2.2}
+.qt-dot{r:3.5}
+.qt-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.qt-marker.dragging{cursor:grabbing}
+.qt-marker-hit{fill:transparent;cursor:grab}
+.qt-marker-hit.dragging{cursor:grabbing}
+.qt-point-actual{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.qt-point-apparent{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.qt-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.qt-value-label-actual{fill:var(--q)}
+.qt-value-label-apparent{fill:var(--alert)}
+.qt-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.qt-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.qt-legend .sw.actual{background:var(--q)}
+.qt-legend .sw.apparent{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.apparent-card{border-left:4px solid var(--alert)}
+.tier-card.actual-card{border-left:4px solid var(--q)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">+6.6pt</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="qt-wrap">
+    <svg class="qt-svg" id="qtChart" viewBox="0 0 640 240" role="img" aria-label="Actual overall outcome vs apparent metric performance, by dependence on quantitative metrics">
+      <g id="qtGridLayer"></g>
+      <path id="qtLineApparent" class="qt-line-apparent"></path>
+      <path id="qtLineActual" class="qt-line-actual"></path>
+      <g id="qtDotsLayer"></g>
+      <line id="qtMarker" class="qt-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="qtPointApparent" class="qt-point-apparent" r="5"></circle>
+      <circle id="qtPointActual" class="qt-point-actual" r="5"></circle>
+      <text id="qtLabelApparent" class="qt-value-label qt-value-label-apparent"></text>
+      <text id="qtLabelActual" class="qt-value-label qt-value-label-actual"></text>
+      <rect id="qtMarkerHit" class="qt-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="qt-legend">
+    <span><span class="sw apparent"></span><span id="legendApparent"></span></span>
+    <span><span class="sw actual"></span><span id="legendActual"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card apparent-card">
+      <div class="k" id="apparentCardLabel"></div>
+      <div class="v" id="apparentCardVal">62.0</div>
+    </div>
+    <div class="tier-card actual-card">
+      <div class="k" id="actualCardLabel"></div>
+      <div class="v" id="actualCardVal">55.4</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">73</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="depName"></span><small id="depSub"></small></div>
+      <div class="readout mono" id="depReadout">40</div>
+      <input type="range" id="depSlider" min="0" max="100" step="5" value="40">
+      <div class="num-row">
+        <label for="depNum" id="numLabel1"></label>
+        <input type="number" id="depNum" min="0" max="100" step="5" value="40">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="hiddenName"></span><small id="hiddenSub"></small></div>
+      <div class="readout mono" id="hiddenReadout">40%</div>
+      <input type="range" id="hiddenSlider" min="10" max="70" step="5" value="40">
+      <div class="num-row">
+        <label for="hiddenNum" id="numLabel2"></label>
+        <input type="number" id="hiddenNum" min="10" max="70" step="5" value="40">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「マクナマラの誤謬」——測れるものだけで判断し、測れないものを軽視・無視する誤り。
+   有名な4段階の記述「第一段階は、簡単に測れるものを測ること。ここまではよい。
+   第二段階は、簡単に測れないものを無視するか恣意的な数値を与えること。
+   第三段階は、測れないものは重要でないと考えること。これは盲目である。
+   第四段階は、測れないものは存在しないと言うこと。これは自殺である」の
+   真の出典はDaniel Yankelovich(1972, Corporate Priorities。1971年の
+   Sales Management誌記事が先行)。Charles Handyが『The Empty Raincoat』(1994)で
+   マクナマラ本人の言葉として誤って引用し、その名で広まった。
+   名称はベトナム戦争でボディカウント等の数値指標に依存した
+   マクナマラ国防長官の意思決定に由来する。
+   開発文脈への適用(行数・ベロシティ・カバレッジ等への偏重)は本ページの敷衍。
+   モデル: 見かけの成果は依存度に比例して伸び続けるが、実際の総合成果は
+   「測りにくい価値」の毀損により逆U字を描く、という単純化した独自モデル。
+   apparent(dep) = 40 + 0.55*dep
+   actual(dep, hidden) = 45 + 0.5*dep - (dep^2/100)*(hidden/100)*1.5
+   実際の成果のピークは dep* = 2500/(1.5*hidden)。隠れた価値が少ないほど
+   定量化を強めてよい、という含意もこの式から出る。
+*/
+const DEP_MIN = 0, DEP_MAX = 100;
+const HIDDEN_MIN = 10, HIDDEN_MAX = 70;
+
+function apparentOf(dep) { return 40 + dep * 0.55; }
+function actualOf(dep, hidden) { return 45 + 0.5 * dep - (dep * dep / 100) * (hidden / 100) * 1.5; }
+function illusionOf(dep, hidden) { return apparentOf(dep) - actualOf(dep, hidden); }
+/* score: actualのグリッド全域 [-10, 80] を0-100に正規化 */
+const ACTUAL_MIN = 45 + 50 - 100 * (HIDDEN_MAX / 100) * 1.5; // dep=100, hidden=70 → -10
+const ACTUAL_MAX = 45 + 50 - 100 * (HIDDEN_MIN / 100) * 1.5; // dep=100, hidden=10 → 80
+function scoreOf(dep, hidden) {
+  return Math.max(0, Math.min(100, Math.round(((actualOf(dep, hidden) - ACTUAL_MIN) / (ACTUAL_MAX - ACTUAL_MIN)) * 100)));
+}
+function tierOf(dep, hidden) {
+  const s = scoreOf(dep, hidden);
+  if (s >= 85) return 4;
+  if (s >= 65) return 3;
+  if (s >= 45) return 2;
+  if (s >= 25) return 1;
+  return 0;
+}
+function boxTierOf(dep) { return Math.min(4, Math.floor(dep / 20)); }
+function assess(dep, hidden) {
+  const apparent = apparentOf(dep);
+  const actual = actualOf(dep, hidden);
+  const illusion = illusionOf(dep, hidden);
+  const score = scoreOf(dep, hidden);
+  const band = tierOf(dep, hidden);
+  const box = boxTierOf(dep);
+  return { apparent, actual, illusion, score, band, box };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "数字で見えるものだけを、見ていない? | 定量化の罠シミュレーター",
+  heroTitle: "数字で見えるものだけを、<br>見ていない?",
+  heroLead: "ベトナム戦争で米国防長官マクナマラは、敵の死者数などの数値指標で戦況を判断し続けました。数字は改善し続け、戦争は失敗しました——測れないもの(現地の民心、士気)が決定的だったからです。この失敗は「マクナマラの誤謬」と呼ばれます。よく引用される4段階があります。「第一段階は、簡単に測れるものを測る。ここまではよい。第二段階は、測れないものを無視するか恣意的な数値を与える。第三段階は、測れないものは重要でないと考える。これは盲目である。第四段階は、測れないものは存在しないと言う。これは自殺である」(実はこの言葉の出典はマクナマラ本人ではなく、社会学者ヤンケロビッチの1972年の著作です。ハンディが1994年の著書で誤ってマクナマラの言葉として引用し、広まりました)。開発の現場でも、行数・ベロシティ・カバレッジ・チケット消化数など「測れる数字」への依存を強めるほど、品質・信頼・学習といった測りにくい価値が視界から消えていきます。「定量指標への依存度」と「測りにくい価値の割合」を動かして、数字と実態の乖離を確認してください。",
+  consoleLabel: "METRICS CONSOLE",
+  sumLabel: "数字と実態の乖離",
+  scoreLabel: "実際の総合成果スコア",
+  depName: "定量指標への依存度", depSub: "0=数字は参考程度、100=数字がすべて(評価も意思決定も数値指標のみ)",
+  hiddenName: "測りにくい価値の割合", hiddenSub: "品質・信頼・学習・保守性など、短期の数字に表れない価値が成果に占める割合",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: ダッシュボードがすべて緑の職場",
+  chartCaption: "赤線は数字上の見かけの成果——依存度を上げるほど伸び続けます。緑線は実際の総合成果——適度な定量化までは上がりますが、依存しすぎると測りにくい価値の毀損が上回り、下がり始めます。2本の線の差が「数字がつくる幻想」です。",
+  chartNote: "方向性を示す独自の簡易モデルであり、実証研究の数値を再現したものではありません。実際の成果のピーク位置は「測りにくい価値の割合」で変わります——隠れた価値が小さい業務ほど、定量化を強めても実害は出にくくなります。",
+  qtYTitle: "成果(相対値)", qtXTitle: "定量指標への依存度",
+  legendApparent: "数字上の見かけの成果",
+  legendActual: "実際の総合成果",
+  scenarioBoxTitle: "いまの職場は、こんな状態",
+  scenarios: [
+    "数字は判断材料の一つで、現場の声や顧客の反応と並べて使われています。",
+    "ダッシュボードが整備され、数字の議論が増えてきました。まだ「数字に出ない話」も議題に上ります。",
+    "会議の議題が数値目標の進捗確認で埋まり始めています。「それ、数字で示せる?」が口癖の人が現れます。",
+    "測れないものは議題に上らなくなりました。ベロシティは上がり続けていますが、リファクタリングと顧客ヒアリングの時間は消えました。",
+    "ダッシュボードはすべて緑です。なのに、顧客は静かに離れ、ベテランも静かに辞めていきます。数字には最後まで出ません。",
+  ],
+  apparentCardLabel: "数字上の見かけの成果",
+  actualCardLabel: "実際の総合成果",
+  hint: (dep, hidden, a) => `依存度${dep}・測りにくい価値${hidden}%のとき、数字上の成果は${a.apparent.toFixed(1)}、実際の総合成果は${a.actual.toFixed(1)}。乖離は${a.illusion >= 0 ? "+" : ""}${a.illusion.toFixed(1)}ポイントです${a.illusion > 15 ? "——数字が実態より大きな幻想を見せています" : ""}。`,
+  hintScenario: (hidden, a) => `すべての指標が目標達成——数字上の成果は${a.apparent.toFixed(1)}。しかし実際の総合成果は${a.actual.toFixed(1)}まで下がっています。ヤンケロビッチの言う第四段階「測れないものは存在しないと言う」に近づいています。`,
+  comments: [
+    "数字は絶好調、実態は危機的です。測れない価値の毀損が数字に表れる頃には、手遅れになりがちです。",
+    "見かけの成果と実態の乖離が広がっています。数字の外で何が起きているかを確認する時期です。",
+    "定量と定性のバランスが揺らぎ始めています。数字に出ない価値を誰かが代弁できていますか?",
+    "健全なバランスです。数字を使いつつ、数字に出ないものへの感度も保てています。",
+    "定量・定性のバランスが取れた理想的な状態です。数字は判断の入力であって、目的にはなっていません。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "定量化そのものは悪ではありません——このモデルでも、適度な定量化は実際の成果を押し上げます。問題は依存です。数字は「簡単に測れるもの」に偏るという構造的な癖があり、品質・信頼・学習・保守性のような遅く効いてくる価値は、数字の外に取り残されます。しかも数字は説得力があるため、会議では常に「数字がある話」が「数字がない話」に勝ってしまう——これが依存を自己強化します。対策の要点は、定性情報に数字と同じ「定例の席」を与えることです。ヤンケロビッチの4段階は点検リストとして使えます: いま自分たちは第何段階にいるか?",
+  adviceItems: [
+    "定例レビューに「数字に出ていないこと」の報告枠を常設する(顧客の生の声、現場の違和感、辞めた人の理由)",
+    "指標には賞味期限を設定し、定期的に「この数字はまだ実態を代表しているか」を問い直す",
+    "数値目標を評価に直結させる前に、その指標が歪められたら何が起きるかを考える(グッドハートの法則的な副作用の点検)",
+    "「それ、数字で示せる?」と問う前に「それは数字に出る種類の価値か?」を問う習慣をつくる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "METRICS", title: "測りすぎ——なぜパフォーマンス評価は失敗するのか", desc: "ジェリー・Z・ミュラー著。医療・教育・軍事・ビジネスの実例で、測定への過剰依存が組織をどう歪めるかを描いた定番書。", link: "Amazonで見る →", url: "https://amzn.to/4aNHGEy" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "数字で見えるものだけを、見ていない? | 定量化の罠シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Are you only seeing what the numbers show? | Quantification Trap Simulator",
+  heroTitle: "Are you only seeing<br>what the numbers show?",
+  heroLead: "During the Vietnam War, US Defense Secretary McNamara steered by quantitative indicators like enemy body counts. The numbers kept improving; the war failed — because what couldn't be measured (popular sentiment, morale) turned out to be decisive. This is the \"McNamara fallacy.\" A famous four-step description is often quoted: \"The first step is to measure whatever can be easily measured. This is okay as far as it goes. The second step is to disregard that which can't be easily measured, or give it an arbitrary quantitative value. The third step is to presume that what can't be measured easily really isn't important. This is blindness. The fourth step is to say that what can't be easily measured really doesn't exist. This is suicide.\" (The quote's actual source is sociologist Daniel Yankelovich, 1972 — Charles Handy attributed it to McNamara himself in a 1994 book, and the misattribution stuck.) Development has its own versions: lines of code, velocity, coverage, tickets closed. The more decisions depend on what's countable, the more the hard-to-measure values — quality, trust, learning — slip out of view. Move the \"dependence on metrics\" and \"share of hard-to-measure value\" to see the gap between the numbers and reality.",
+  consoleLabel: "METRICS CONSOLE",
+  sumLabel: "Gap between numbers and reality",
+  scoreLabel: "Actual overall outcome score",
+  depName: "Dependence on quantitative metrics", depSub: "0 = numbers are one input among several, 100 = numbers are everything (all evaluation and decisions by metrics)",
+  hiddenName: "Share of hard-to-measure value", hiddenSub: "How much of real outcomes comes from quality, trust, learning, maintainability — things short-term numbers miss",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: the all-green dashboard workplace",
+  chartCaption: "The red line is apparent performance by the numbers — it keeps rising with dependence. The green line is actual overall outcome — moderate quantification helps, but past a point the damage to unmeasured value wins and it turns down. The gap between the lines is the mirage the numbers create.",
+  chartNote: "An original, simplified model showing the direction — not a reproduction of empirical numbers. Where actual outcome peaks depends on the share of hard-to-measure value: the smaller the hidden value in a domain, the harder you can safely quantify.",
+  qtYTitle: "Outcome (relative)", qtXTitle: "Dependence on quantitative metrics",
+  legendApparent: "Apparent performance (by the numbers)",
+  legendActual: "Actual overall outcome",
+  scenarioBoxTitle: "What the workplace looks like right now",
+  scenarios: [
+    "Numbers are one input, weighed alongside field reports and customer reactions.",
+    "Dashboards are in place and numeric discussion is growing. Things that don't show in numbers still make the agenda.",
+    "Meeting agendas are filling up with target-tracking. Someone has started asking \"can you show that in numbers?\" about everything.",
+    "What can't be measured no longer makes the agenda. Velocity keeps climbing; refactoring time and customer interviews have quietly vanished.",
+    "Every dashboard is green. Meanwhile customers are quietly leaving and veterans are quietly resigning. None of it will show in the numbers until it's over.",
+  ],
+  apparentCardLabel: "Apparent performance (by the numbers)",
+  actualCardLabel: "Actual overall outcome",
+  hint: (dep, hidden, a) => `At dependence ${dep} with ${hidden}% hard-to-measure value, the numbers show ${a.apparent.toFixed(1)} while actual overall outcome is ${a.actual.toFixed(1)} — a gap of ${a.illusion >= 0 ? "+" : ""}${a.illusion.toFixed(1)} points${a.illusion > 15 ? " — the numbers are showing a mirage well above reality" : ""}.`,
+  hintScenario: (hidden, a) => `Every metric is on target — apparent performance ${a.apparent.toFixed(1)}. Actual overall outcome has fallen to ${a.actual.toFixed(1)}. This is approaching Yankelovich's fourth step: saying that what can't be measured doesn't exist.`,
+  comments: [
+    "The numbers are thriving; reality is in crisis. By the time unmeasured damage reaches the dashboard, it tends to be too late.",
+    "The gap between apparent and actual is widening. Time to check what's happening outside the numbers.",
+    "The quantitative-qualitative balance is starting to wobble. Is anyone speaking for the value that doesn't show up in metrics?",
+    "A healthy balance — using numbers while staying sensitive to what they can't capture.",
+    "An ideal balance of quantitative and qualitative. Numbers are an input to judgment, not the goal.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Quantification itself isn't the villain — in this model too, moderate quantification lifts actual outcomes. The problem is dependence. Numbers are structurally biased toward what's easy to measure, so slow-acting values like quality, trust, learning, and maintainability get stranded outside them. And because numbers are persuasive, the argument with data beats the argument without it in every meeting — which makes the dependence self-reinforcing. The core countermeasure is giving qualitative information a standing seat equal to the numbers. Yankelovich's four steps work as a checklist: which step is your organization on right now?",
+  adviceItems: [
+    "Reserve a standing slot in regular reviews for what the numbers don't show — raw customer comments, field unease, why people left",
+    "Give every metric an expiry date and periodically re-ask whether it still represents reality",
+    "Before wiring a numeric target into evaluations, ask what happens when the metric gets gamed (a Goodhart's-law side-effect check)",
+    "Before asking \"can you show that in numbers?\", ask \"is this the kind of value that shows up in numbers at all?\"",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "METRICS", title: "The Tyranny of Metrics", desc: "Jerry Z. Muller. The standard account of how metric fixation distorts organizations, with cases from medicine, education, the military, and business.", link: "View on Amazon →", url: "https://amzn.to/4eZQeea" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Are you only seeing what the numbers show? — Quantification Trap Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (dep, hidden, a) => `依存度${dep}。見かけ${a.apparent.toFixed(1)}/実態${a.actual.toFixed(1)}。ベロシティを2倍にしろと言われたので、ストーリーポイントを半分にしました。数字は達成です。`,
+  hintScenario: (hidden, a) => `全指標グリーン。カバレッジ98%(assertのないテストで)。チケット消化数は過去最高(1行修正を10チケットに分割)。実態${a.actual.toFixed(1)}。何も間違っていない。数字の上では。`,
+  comments: [
+    "グラフはすべて右肩上がり。右肩上がりでないもの(品質、士気、顧客)は、グラフにしていないだけ。",
+    "「今月のベロシティは?」への回答時間が、実際の開発時間を侵食し始めている。",
+    "数字に出ない仕事をした人が評価面談で沈黙している。リファクタリングは犯罪になった。",
+    "たまに「数字はいいけど、現場の肌感どう?」と聞く人がいる。会議で一番価値のある発言。",
+    "ダッシュボードと現場ヒアリングが同じ画面に並んでいる。両方見てから判断する文化、実在する。",
+  ],
+},
+en: {
+  hint: (dep, hidden, a) => `Dependence ${dep}. Apparent ${a.apparent.toFixed(1)} / actual ${a.actual.toFixed(1)}. Told to double velocity, so we halved the story points. Target: achieved.`,
+  hintScenario: (hidden, a) => `All metrics green. Coverage 98% (tests without asserts). Record ticket throughput (one-line fixes split into ten tickets). Actual outcome ${a.actual.toFixed(1)}. Nothing is wrong. Numerically.`,
+  comments: [
+    "Every chart goes up and to the right. The things that don't (quality, morale, customers) simply don't have charts.",
+    "Time spent answering \"what's this month's velocity?\" is starting to eat the time spent developing.",
+    "The person who did the unmeasurable work sits silent in their review. Refactoring has become a crime.",
+    "Occasionally someone asks \"numbers look fine — how does it feel on the ground?\" Most valuable sentence in the meeting.",
+    "The dashboard and the field interviews share one screen, and decisions wait for both. Such cultures exist.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let dep = 40;
+let hidden = 40;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - DEP_MIN) / (DEP_MAX - DEP_MIN)) * (PW - PAD_L - PAD_R);
+const dOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = DEP_MIN + frac * (DEP_MAX - DEP_MIN);
+  return Math.min(DEP_MAX, Math.max(DEP_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.max(0, Math.min(v, Y_MAX)) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("qtGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "qt-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "qt-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  });
+  for (let v = DEP_MIN; v <= DEP_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "qt-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "qt-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === DEP_MIN ? "start" : v === DEP_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "qt-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.qtYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "qt-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.qtXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const apparentPts = [], actualPts = [];
+  for (let v = DEP_MIN; v <= DEP_MAX; v += 2) {
+    apparentPts.push(`${xOf(v)},${yOf(apparentOf(v))}`);
+    actualPts.push(`${xOf(v)},${yOf(actualOf(v, hidden))}`);
+  }
+  document.getElementById("qtLineApparent").setAttribute("d", "M " + apparentPts.join(" L "));
+  document.getElementById("qtLineActual").setAttribute("d", "M " + actualPts.join(" L "));
+
+  const dotsLayer = document.getElementById("qtDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = DEP_MIN; v <= DEP_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "qt-dot", cx: xOf(v), cy: yOf(apparentOf(v)), fill: "var(--alert)" }));
+    dotsLayer.appendChild(el("circle", { class: "qt-dot", cx: xOf(v), cy: yOf(actualOf(v, hidden)), fill: "var(--q)" }));
+  }
+
+  const mx = xOf(dep);
+  const marker = document.getElementById("qtMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const apparentY = yOf(apparentOf(dep));
+  const actualY = yOf(actualOf(dep, hidden));
+  document.getElementById("qtPointApparent").setAttribute("cx", mx);
+  document.getElementById("qtPointApparent").setAttribute("cy", apparentY);
+  document.getElementById("qtPointActual").setAttribute("cx", mx);
+  document.getElementById("qtPointActual").setAttribute("cy", actualY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const apparentIsHigher = apparentY <= actualY;
+
+  const labelApparent = document.getElementById("qtLabelApparent");
+  labelApparent.setAttribute("x", mx + labelDx);
+  labelApparent.setAttribute("y", clampY(apparentIsHigher ? apparentY - 10 : apparentY + 20));
+  labelApparent.setAttribute("text-anchor", labelAnchor);
+  labelApparent.textContent = apparentOf(dep).toFixed(0);
+
+  const labelActual = document.getElementById("qtLabelActual");
+  labelActual.setAttribute("x", mx + labelDx);
+  labelActual.setAttribute("y", clampY(apparentIsHigher ? actualY + 20 : actualY - 10));
+  labelActual.setAttribute("text-anchor", labelAnchor);
+  labelActual.textContent = actualOf(dep, hidden).toFixed(0);
+
+  const hit = document.getElementById("qtMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(dep, hidden);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${a.illusion >= 0 ? "+" : ""}${a.illusion.toFixed(1)}pt`;
+  document.getElementById("apparentCardVal").textContent = a.apparent.toFixed(1);
+  document.getElementById("actualCardVal").textContent = a.actual.toFixed(1);
+  document.getElementById("hint").textContent = t.hint(dep, hidden, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.box];
+
+  document.getElementById("depReadout").textContent = dep;
+  document.getElementById("hiddenReadout").textContent = hidden + "%";
+  if (document.activeElement !== document.getElementById("depSlider")) document.getElementById("depSlider").value = dep;
+  if (document.activeElement !== document.getElementById("depNum")) document.getElementById("depNum").value = dep;
+  if (document.activeElement !== document.getElementById("hiddenSlider")) document.getElementById("hiddenSlider").value = hidden;
+  if (document.activeElement !== document.getElementById("hiddenNum")) document.getElementById("hiddenNum").value = hidden;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/quantification-trap/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("depName").textContent = t.depName;
+  document.getElementById("depSub").textContent = t.depSub;
+  document.getElementById("hiddenName").textContent = t.hiddenName;
+  document.getElementById("hiddenSub").textContent = t.hiddenSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("depSlider").setAttribute("aria-label", t.depName);
+  document.getElementById("hiddenSlider").setAttribute("aria-label", t.hiddenName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.depName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.hiddenName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendApparent").textContent = t.legendApparent;
+  document.getElementById("legendActual").textContent = t.legendActual;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("apparentCardLabel").textContent = t.apparentCardLabel;
+  document.getElementById("actualCardLabel").textContent = t.actualCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "quantification-trap" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("depSlider").addEventListener("input", (e) => { dep = +e.target.value; render(); });
+document.getElementById("depNum").addEventListener("change", (e) => {
+  dep = Math.min(DEP_MAX, Math.max(DEP_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("hiddenSlider").addEventListener("input", (e) => { hidden = +e.target.value; render(); });
+document.getElementById("hiddenNum").addEventListener("change", (e) => {
+  hidden = Math.min(HIDDEN_MAX, Math.max(HIDDEN_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  dep = 40; hidden = 40;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  dep = 90;
+  render();
+  const a = assess(dep, hidden);
+  document.getElementById("hint").textContent = T().hintScenario(hidden, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const qtChart = document.getElementById("qtChart");
+function svgPoint(evt) {
+  const pt = qtChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(qtChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  qtChart.setPointerCapture(evt.pointerId);
+  document.getElementById("qtMarker").classList.add("dragging");
+  document.getElementById("qtMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  dep = dOfX(p.x);
+  render();
+}
+document.getElementById("qtMarkerHit").addEventListener("pointerdown", startDrag);
+qtChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => qtChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("qtMarker").classList.remove("dragging");
+  document.getElementById("qtMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

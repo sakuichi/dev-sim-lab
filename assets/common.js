@@ -256,6 +256,12 @@ window.DevSimLab = (function () {
       ja: { name: "発言力ループ・シミュレーター", title: "同じ意見なのに、なぜあの人が言うと通る?", desc: "「地位→発言機会→さらに地位」の強化ループが、中身と無関係な初期差をどう増幅するかを地位特性理論をもとに可視化するシミュレーター。" },
       en: { name: "Influence Loop Simulator", title: "Same idea — so why does it pass only when that person says it?", desc: "A simulator visualizing how the status-to-floor-time loop amplifies content-irrelevant initial gaps, grounded in status characteristics theory." },
     },
+    {
+      id: "quantification-trap", href: "quantification-trap/", status: "live", cat: "team",
+      tags: { ja: ["定量化の罠", "指標"], en: ["Quantification trap", "Metrics"] },
+      ja: { name: "定量化の罠シミュレーター", title: "数字で見えるものだけを、見ていない?", desc: "定量指標への依存度を上げると、数字上の見かけの成果と実際の総合成果がどう乖離するかを、マクナマラの誤謬をもとに可視化するシミュレーター。" },
+      en: { name: "Quantification Trap Simulator", title: "Are you only seeing what the numbers show?", desc: "A simulator visualizing how growing dependence on metrics splits apparent performance from actual outcomes, based on the McNamara fallacy." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -373,7 +379,7 @@ window.DevSimLab = (function () {
     "skill-variance": ["onboarding-ramp", "estimation-uncertainty", "survivorship-bias"],
     "speak-up-cost": ["psychological-safety", "who-says-it", "xy-problem"],
     "psychological-safety": ["speak-up-cost", "survivorship-bias", "confirmation-bias"],
-    "survivorship-bias": ["confirmation-bias", "psychological-safety", "skill-variance"],
+    "survivorship-bias": ["confirmation-bias", "psychological-safety", "quantification-trap"],
     "bikeshedding": ["code-review", "yak-shaving", "speak-up-cost"],
     "yak-shaving": ["pause-cost", "context-switch", "bikeshedding"],
     "rubber-duck": ["xy-problem", "curse-of-knowledge", "pause-cost"],
@@ -382,6 +388,7 @@ window.DevSimLab = (function () {
     "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
     "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
     "who-says-it": ["speak-up-cost", "psychological-safety", "confirmation-bias"],
+    "quantification-trap": ["survivorship-bias", "confirmation-bias", "utilization-trap"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */
