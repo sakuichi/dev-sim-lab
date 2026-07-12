@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新しく加わった人は、初日から「1人月」分働ける? | オンボーディング立ち上がりシミュレーター</title>
+<meta name="description" content="新しく加わったメンバーの生産性が、時間をかけてどう立ち上がっていくかを、業界調査データにもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/onboarding-ramp/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/onboarding-ramp/">
+<meta property="og:title" content="新しく加わった人は、初日から「1人月」分働ける? | オンボーディング立ち上がりシミュレーター">
+<meta property="og:description" content="新しく加わったメンバーの生産性が、時間をかけてどう立ち上がっていくかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/onboarding-ramp.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "オンボーディング立ち上がりシミュレーター",
+  "alternateName": "Onboarding Ramp-Up Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/onboarding-ramp/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "新しく加わったメンバーの生産性が時間をかけて立ち上がっていく様子を可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- ramp-up curve chart ---- */
+.ob-wrap{margin-top:14px}
+.ob-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.ob-grid{stroke:var(--line);stroke-width:1}
+.ob-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.ob-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.ob-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.ob-area{fill:var(--q);opacity:.12}
+.ob-line{fill:none;stroke:var(--ink);stroke-width:2.2}
+.ob-marker{stroke:var(--q);stroke-width:3;stroke-linecap:round;cursor:grab}
+.ob-marker.dragging{cursor:grabbing}
+.ob-marker-hit{fill:transparent;cursor:grab}
+.ob-marker-hit.dragging{cursor:grabbing}
+.ob-point{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.prod-card{border-left:4px solid var(--q)}
+.tier-card.gap-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">45%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="ob-wrap">
+    <svg class="ob-svg" id="obChart" viewBox="0 0 640 240" role="img" aria-label="Effective productivity vs months since joining">
+      <g id="obGridLayer"></g>
+      <path id="obArea" class="ob-area"></path>
+      <path id="obLine" class="ob-line"></path>
+      <line id="obMarker" class="ob-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="obPoint" class="ob-point" r="5"></circle>
+      <rect id="obMarkerHit" class="ob-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card prod-card">
+      <div class="k" id="prodCardLabel"></div>
+      <div class="v" id="prodCardVal">45%</div>
+    </div>
+    <div class="tier-card gap-card">
+      <div class="k" id="gapCardLabel"></div>
+      <div class="v" id="gapCardVal">1.2人月</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">45</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="monthName"></span><small id="monthSub"></small></div>
+      <div class="readout mono" id="monthReadout">2</div>
+      <input type="range" id="monthSlider" min="0" max="9" step="1" value="2">
+      <div class="num-row">
+        <label for="monthNum" id="numLabel1"></label>
+        <input type="number" id="monthNum" min="0" max="9" step="1" value="2">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="qualityName"></span><small id="qualitySub"></small></div>
+      <div class="readout mono" id="qualityReadout">30%</div>
+      <input type="range" id="qualitySlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="qualityNum" id="numLabel2"></label>
+        <input type="number" id="qualityNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   新しく加わったメンバーの実効生産性が、時間をかけて立ち上がっていく様子を表す簡易モデル。
+   Swimm/HackerNoonによる80社調査では、フル立ち上がりまで平均3〜9ヶ月、
+   APQCの調査では基本的な生産性に達するまで中央値35日、Brandon Hall Groupの調査では
+   体系的なオンボーディングにより新人の生産性が最大70%向上すると報告されている。
+   これらの調査結果の方向性(飽和的に立ち上がる・体制で加速する)を反映した簡易モデルであり、
+   個々の組織の正確な数値を予測するものではない。
+   累計ギャップ(人月)は、「入社直後から100%稼働」という前提の見積もりに対して、
+   実際にはどれだけの生産性が積算されずに失われているかを表す。
+*/
+const MONTH_MIN = 0, MONTH_MAX = 9;
+const QUALITY_MIN = 0, QUALITY_MAX = 100;
+const P0 = 20; // 初日の実効生産性(%)
+const K_BASE = 3.5; // 立ち上がりの時定数(ヶ月)
+
+function productivityOf(month, quality) {
+  const kEff = K_BASE * (1 - (quality / 100) * 0.5);
+  return 100 - (100 - P0) * Math.exp(-month / kEff);
+}
+function cumulativeGapPersonMonths(month, quality) {
+  const steps = Math.max(1, Math.round(month * 20));
+  const dt = month / steps;
+  let sum = 0;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) * dt;
+    sum += (1 - productivityOf(t, quality) / 100) * dt;
+  }
+  return sum;
+}
+function scoreOf(month, quality) { return Math.round(productivityOf(month, quality)); }
+function assess(month, quality) {
+  const productivity = productivityOf(month, quality);
+  const gap = cumulativeGapPersonMonths(month, quality);
+  const score = scoreOf(month, quality);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { productivity, gap, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "新しく加わった人は、初日から「1人月」分働ける? | オンボーディング立ち上がりシミュレーター",
+  heroTitle: "新しく加わった人は、初日から<br>「1人月」分働ける?",
+  heroLead: "見積もりでは「1人月」を均一なコストとして積算しがちですが、新しく加わったメンバーは、そのチームやコードベースに慣れるまで、初日からいきなり平均的な生産性を出せるわけではありません。これは複数人が一つのプロジェクトに集中投入された際に生じるコミュニケーションコストの話(→関連ページ「ブルックスの法則」)とは別の、個人の習熟曲線そのものによるコストです。経過期間とオンボーディング体制の充実度を動かして、生産性がどう立ち上がっていくかを確認してください。",
+  consoleLabel: "RAMP-UP CONSOLE",
+  sumLabel: "実効生産性",
+  scoreLabel: "立ち上がり度スコア",
+  monthName: "参画からの経過期間", monthSub: "参画してから何ヶ月経ったか",
+  qualityName: "オンボーディング体制の充実度", qualitySub: "受け入れ体制にどれだけ投資しているか",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 体制を作らず、初日から100%稼働として見積もった",
+  chartCaption: "体制の充実度を固定した場合の、経過期間と実効生産性の関係です。線は頭打ちになりながら100%に近づく飽和カーブです。",
+  chartNote: "複数の業界調査(立ち上がりまで平均3〜9ヶ月など)の方向性を反映した簡易モデルです。個々の組織の正確な数値を予測するものではありません。",
+  obYTitle: "実効生産性(%)", obXTitle: "参画からの経過期間(ヶ月)",
+  prodCardLabel: "現在の実効生産性",
+  gapCardLabel: "累計の見えない生産性ギャップ",
+  hint: (month, quality, a) => `参画から${month}ヶ月・オンボーディング体制の充実度${quality}%のとき、実効生産性はおよそ${Math.round(a.productivity)}%。「初日から100%稼働」という前提の見積もりに対し、これまでに約${a.gap.toFixed(1)}人月分の生産性が、見積もりに積算されないまま失われている計算です。`,
+  hintScenario: (a) => `オンボーディング体制を作らず、初日から100%稼働として見積もりました。実際の実効生産性はおよそ${Math.round(a.productivity)}%にとどまり、約${a.gap.toFixed(1)}人月分の見えないギャップが発生しています。`,
+  comments: [
+    "ほぼフル稼働です。立ち上がりはおおむね完了しています。",
+    "順調に立ち上がっています。もう少しで戦力として計算できる水準です。",
+    "まだ立ち上がり途中です。この期間の生産性を見積もりに織り込む必要があります。",
+    "立ち上がりの初期段階です。「即戦力」として扱うにはまだ早い段階です。",
+    "参画直後です。手厚いサポートが必要な段階で、生産性は限定的です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "Swimm社がHackerNoonで紹介した80社への調査では、エンジニアがフルに立ち上がるまで平均3〜9ヶ月かかり、1年かかる企業も少なくないと報告されています。APQCの調査では、基本的な生産性に達するまでの期間は中央値35日、上位企業では約25日、下位企業では50日以上とばらつきがあります。Brandon Hall Groupの調査では、体系立ったオンボーディングにより新人の生産性が最大70%向上するとされています。見積もりの基礎となる「1人月」が、参画初日から一律に得られるものではないという事実は、実務上しばしば見落とされます。",
+  adviceItems: [
+    "見積もりに、新規参画者の立ち上がり期間を明示的に織り込む",
+    "オンボーディング体制(ドキュメント・メンター制度など)への投資は、立ち上がり速度を左右する重要な変数として扱う",
+    "「即戦力」という言葉を、初日からの100%稼働という意味で使わない",
+    "経験者(シニア)であっても、そのチーム・コードベース固有の立ち上がり期間は別途必要になることを踏まえる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "TEAM BUILDING", title: "ジョイ・インク", desc: "リチャード・シェリダン著。新人の受け入れに「ペアリング」を徹底する等、立ち上がりを組織的に支える仕組みを紹介する一冊。", link: "Amazonで見る →", url: "https://amzn.to/4poBfxW" },
+    { tag: "TEAM BUILDING", title: "なぜ「若手を育てる」のは今、こんなに難しいのか", desc: "古屋星斗著、HRアワード2024書籍部門最優秀賞受賞。「ゆるい職場」時代の若手育成を科学的に分析した一冊。", link: "Amazonで見る →", url: "https://amzn.to/4yoq0cX" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "新しく加わった人は、初日から「1人月」分働ける? | オンボーディング立ち上がりシミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Can a new team member contribute a full \"person-month\" from day one? | Onboarding Ramp-Up Simulator",
+  heroTitle: "Can a new team member contribute<br>a full \"person-month\" from day one?",
+  heroLead: "Estimates tend to treat a \"person-month\" as a uniform unit of cost, but someone newly joining a team doesn't produce at the team's average productivity from day one — they need time to learn the team and the codebase. This is a different cost from the communication overhead that shows up when several people are thrown at a project at once (see the related Brooks's Law simulator) — it's driven by an individual's own learning curve. Move the elapsed time and onboarding investment sliders to see how productivity ramps up.",
+  consoleLabel: "RAMP-UP CONSOLE",
+  sumLabel: "Effective productivity",
+  scoreLabel: "Ramp-up score",
+  monthName: "Months since joining", monthSub: "How long since this person joined",
+  qualityName: "Onboarding program quality", qualitySub: "How much is invested in structured onboarding",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: no onboarding program, estimated as 100% productive from day one",
+  chartCaption: "The relationship between elapsed time and effective productivity, at a fixed onboarding quality. The line saturates toward 100%, leveling off as it approaches full ramp-up.",
+  chartNote: "A simplified model reflecting the direction of several industry surveys (average 3–9 months to full ramp-up, etc.) — not a precise predictor for any specific organization.",
+  obYTitle: "Effective productivity (%)", obXTitle: "Months since joining",
+  prodCardLabel: "Current effective productivity",
+  gapCardLabel: "Cumulative unseen productivity gap",
+  hint: (month, quality, a) => `At ${month} months since joining with ${quality}% onboarding quality, effective productivity is about ${Math.round(a.productivity)}%. Compared to an estimate that assumed 100% productivity from day one, roughly ${a.gap.toFixed(1)} person-months of productivity have been lost so far without ever showing up in the plan.`,
+  hintScenario: (a) => `No onboarding program was built, and the estimate assumed 100% productivity from day one. Actual effective productivity has only reached about ${Math.round(a.productivity)}%, producing an unseen gap of roughly ${a.gap.toFixed(1)} person-months.`,
+  comments: [
+    "Nearly fully ramped. The onboarding period is essentially complete.",
+    "Ramping up well — close to being countable as full capacity.",
+    "Still mid-ramp. This period's productivity needs to be built into the estimate.",
+    "Early in the ramp-up. Too soon to treat this person as \"fully productive.\"",
+    "Just joined. This stage needs heavy support, and productivity is still limited.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "A survey of 80 engineering organizations, covered by Swimm via HackerNoon, found that engineers take an average of 3–9 months to fully ramp up, with a meaningful share of companies taking a full year. APQC research puts the median time to reach basic productivity at 35 days, with top-quartile organizations at about 25 days and laggards at 50+ days. Brandon Hall Group research found that structured onboarding can improve new-hire productivity by up to 70%. The fact that a \"person-month\" — the basic unit estimates are built on — isn't uniformly available from day one is a detail that's easy to overlook in practice.",
+  adviceItems: [
+    "Explicitly build a new joiner's ramp-up period into the estimate",
+    "Treat investment in onboarding (documentation, mentorship programs) as a variable that materially affects ramp-up speed",
+    "Don't use \"fully productive\" to mean 100% output from day one",
+    "Even experienced (senior) hires need their own ramp-up period specific to the team and codebase",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "TEAM BUILDING", title: "Joy, Inc.", desc: "Richard Sheridan. Describes organizational practices — like disciplined pairing for new hires — that structurally support ramp-up.", link: "View on Amazon →", url: "https://amzn.to/4aNBCvO" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Can a new team member contribute a full person-month from day one? — Onboarding Ramp-Up Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (month, quality, a) => `${month}ヶ月目。実効生産性${Math.round(a.productivity)}%。「もう慣れたよね?」と聞かれるたびに真顔で相槌を打つ日々。見えないギャップ約${a.gap.toFixed(1)}人月。`,
+  hintScenario: (a) => `初日から即戦力扱い。実際は${Math.round(a.productivity)}%。Slackで「これどこ見ればいいですか」を1日10回聞くフェーズ。ギャップ約${a.gap.toFixed(1)}人月。`,
+  comments: [
+    "もう「あの人がいないと回らない」レベル。頼れる存在。",
+    "リポジトリ内を迷わず歩けるようになった。快挙。",
+    "「これ誰に聞けばいいですか」の回数が、まだ1日5回はある。",
+    "ドキュメントのURLを毎日3回はSlackで聞いている。",
+    "社内Wikiの場所すらまだ覚えていない、あの初々しい時期。",
+  ],
+},
+en: {
+  hint: (month, quality, a) => `Month ${month}. Effective productivity ${Math.round(a.productivity)}%. Still nodding along with a straight face every time someone asks "you've settled in by now, right?" Unseen gap: ~${a.gap.toFixed(1)} person-months.`,
+  hintScenario: (a) => `Treated as fully productive from day one. Actually at ${Math.round(a.productivity)}%. The phase where "who do I ask about this" gets typed into Slack ten times a day. Gap: ~${a.gap.toFixed(1)} person-months.`,
+  comments: [
+    "Already at \"the team can't function without them\" level. A pillar.",
+    "Can navigate the repo without getting lost now. A real achievement.",
+    "Still asking \"who do I ask about this\" a good five times a day.",
+    "Still asks for the docs URL in Slack three times a day.",
+    "Still hasn't fully found the internal wiki. That early, fresh-faced stage.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let month = 2;
+let quality = 30;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (m) => PAD_L + ((m - MONTH_MIN) / (MONTH_MAX - MONTH_MIN)) * (PW - PAD_L - PAD_R);
+const mOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = MONTH_MIN + frac * (MONTH_MAX - MONTH_MIN);
+  return Math.min(MONTH_MAX, Math.max(MONTH_MIN, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("obGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "ob-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "ob-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let m = MONTH_MIN; m <= MONTH_MAX; m += 1) {
+    const x = xOf(m);
+    gridLayer.appendChild(el("line", { class: "ob-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "ob-axis-label", x, y: PH - PAD_B + 14, "text-anchor": m === MONTH_MIN ? "start" : m === MONTH_MAX ? "end" : "middle" });
+    label.textContent = String(m);
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "ob-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.obYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "ob-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.obXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  for (let m = MONTH_MIN; m <= MONTH_MAX; m += 0.25) pts.push(`${xOf(m)},${yOf(productivityOf(m, quality))}`);
+  document.getElementById("obLine").setAttribute("d", "M " + pts.join(" L "));
+  document.getElementById("obArea").setAttribute("d", "M " + xOf(MONTH_MIN) + "," + yOf(0) + " L " + pts.join(" L ") + " L " + xOf(MONTH_MAX) + "," + yOf(0) + " Z");
+
+  const mx = xOf(month), my = yOf(productivityOf(month, quality));
+  const marker = document.getElementById("obMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+  const point = document.getElementById("obPoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", my);
+
+  const hit = document.getElementById("obMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(month, quality);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${Math.round(a.productivity)}%`;
+  document.getElementById("prodCardVal").textContent = `${Math.round(a.productivity)}%`;
+  document.getElementById("gapCardVal").textContent = t.htmlLang === "ja" ? `${a.gap.toFixed(1)}人月` : `${a.gap.toFixed(1)} PM`;
+  document.getElementById("hint").textContent = t.hint(month, quality, a);
+
+  document.getElementById("monthReadout").textContent = month;
+  document.getElementById("qualityReadout").textContent = quality + "%";
+  if (document.activeElement !== document.getElementById("monthSlider")) document.getElementById("monthSlider").value = month;
+  if (document.activeElement !== document.getElementById("monthNum")) document.getElementById("monthNum").value = month;
+  if (document.activeElement !== document.getElementById("qualitySlider")) document.getElementById("qualitySlider").value = quality;
+  if (document.activeElement !== document.getElementById("qualityNum")) document.getElementById("qualityNum").value = quality;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 30 ? " danger" : a.score < 50 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/onboarding-ramp/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("monthName").textContent = t.monthName;
+  document.getElementById("monthSub").textContent = t.monthSub;
+  document.getElementById("qualityName").textContent = t.qualityName;
+  document.getElementById("qualitySub").textContent = t.qualitySub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("monthSlider").setAttribute("aria-label", t.monthName);
+  document.getElementById("qualitySlider").setAttribute("aria-label", t.qualityName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.monthName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.qualityName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("prodCardLabel").textContent = t.prodCardLabel;
+  document.getElementById("gapCardLabel").textContent = t.gapCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "onboarding-ramp" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("monthSlider").addEventListener("input", (e) => { month = +e.target.value; render(); });
+document.getElementById("monthNum").addEventListener("change", (e) => {
+  month = Math.min(MONTH_MAX, Math.max(MONTH_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("qualitySlider").addEventListener("input", (e) => { quality = +e.target.value; render(); });
+document.getElementById("qualityNum").addEventListener("change", (e) => {
+  quality = Math.min(QUALITY_MAX, Math.max(QUALITY_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  month = 2; quality = 30;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  month = 1; quality = 0;
+  render();
+  const a = assess(month, quality);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const obChart = document.getElementById("obChart");
+function svgPoint(evt) {
+  const pt = obChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(obChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  obChart.setPointerCapture(evt.pointerId);
+  document.getElementById("obMarker").classList.add("dragging");
+  document.getElementById("obMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  month = mOfX(p.x);
+  render();
+}
+document.getElementById("obMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("obPoint").addEventListener("pointerdown", startDrag);
+obChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => obChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("obMarker").classList.remove("dragging");
+  document.getElementById("obMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

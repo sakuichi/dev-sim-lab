@@ -155,6 +155,12 @@ window.DevSimLab = (function () {
       ja: { name: "知識の呪縛シミュレーター", title: "自分がわかっていることは、相手にも伝わっている?", desc: "送り手が思う理解度と受け手が実際に理解している度合いのギャップを、有名な実験にもとづいて可視化するシミュレーター。" },
       en: { name: "Curse of Knowledge Simulator", title: "If you understand something, does the other person understand it too?", desc: "A simulator visualizing the gap between a sender's assumed understanding and a receiver's actual understanding, based on a famous experiment." },
     },
+    {
+      id: "onboarding-ramp", href: "onboarding-ramp/", status: "live",
+      tags: { ja: ["オンボーディング", "生産性"], en: ["Onboarding", "Productivity"] },
+      ja: { name: "オンボーディング立ち上がりシミュレーター", title: "新しく加わった人は、初日から「1人月」分働ける?", desc: "新しく加わったメンバーの生産性が時間をかけて立ち上がっていく様子を、業界調査データにもとづいて可視化するシミュレーター。" },
+      en: { name: "Onboarding Ramp-Up Simulator", title: "Can a new team member contribute a full \"person-month\" from day one?", desc: "A simulator visualizing how a new team member's productivity ramps up over time, based on industry survey data." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
