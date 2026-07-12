@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>賛成してくれる相手にだけ聞いていると、何が起きる? | 確証バイアス・シミュレーター</title>
+<meta name="description" content="自説に合う証拠ばかり集めてしまう確証バイアスと、常に同意してくれる相談相手(追従的な生成AIを含む)の組み合わせが、誤りに気づく機会をどう減らすかを可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/confirmation-bias/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/confirmation-bias/">
+<meta property="og:title" content="賛成してくれる相手にだけ聞いていると、何が起きる? | 確証バイアス・シミュレーター">
+<meta property="og:description" content="確証バイアスと、常に同意してくれる相談相手(追従的な生成AIを含む)の組み合わせが、誤りに気づく機会をどう減らすかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/confirmation-bias.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "確証バイアス・シミュレーター",
+  "alternateName": "Confirmation Bias Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/confirmation-bias/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "反証を探す努力と相談相手の追従度が、誤った仮説に気づける確率にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- rising dual-line chart (catch rate: current partner vs neutral reference) ---- */
+.cb-wrap{margin-top:14px}
+.cb-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.cb-grid{stroke:var(--line);stroke-width:1}
+.cb-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.cb-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.cb-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.cb-line-current{fill:none;stroke:var(--alert);stroke-width:2.2}
+.cb-line-neutral{fill:none;stroke:var(--q);stroke-width:2;stroke-dasharray:5 3}
+.cb-dot{r:3.5}
+.cb-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.cb-marker.dragging{cursor:grabbing}
+.cb-marker-hit{fill:transparent;cursor:grab}
+.cb-marker-hit.dragging{cursor:grabbing}
+.cb-point{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.cb-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--alert)}
+.cb-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.cb-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.cb-legend .sw.current{background:var(--alert)}
+.cb-legend .sw.neutral{background:var(--q)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.catch-card{border-left:4px solid var(--q)}
+.tier-card.blind-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">36%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="cb-wrap">
+    <svg class="cb-svg" id="cbChart" viewBox="0 0 640 240" role="img" aria-label="Probability of catching a wrong hypothesis, by disconfirmation effort, current partner vs neutral partner">
+      <g id="cbGridLayer"></g>
+      <path id="cbLineNeutral" class="cb-line-neutral"></path>
+      <path id="cbLineCurrent" class="cb-line-current"></path>
+      <g id="cbDotsLayer"></g>
+      <line id="cbMarker" class="cb-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="cbPoint" class="cb-point" r="5"></circle>
+      <text id="cbLabel" class="cb-value-label"></text>
+      <rect id="cbMarkerHit" class="cb-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="cb-legend">
+    <span><span class="sw current"></span><span id="legendCurrent"></span></span>
+    <span><span class="sw neutral"></span><span id="legendNeutral"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card catch-card">
+      <div class="k" id="catchCardLabel"></div>
+      <div class="v" id="catchCardVal">36%</div>
+    </div>
+    <div class="tier-card blind-card">
+      <div class="k" id="blindCardLabel"></div>
+      <div class="v" id="blindCardVal">64%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">36</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="effortName"></span><small id="effortSub"></small></div>
+      <div class="readout mono" id="effortReadout">30</div>
+      <input type="range" id="effortSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="effortNum" id="numLabel1"></label>
+        <input type="number" id="effortNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="sycoName"></span><small id="sycoSub"></small></div>
+      <div class="readout mono" id="sycoReadout">70</div>
+      <input type="range" id="sycoSlider" min="0" max="100" step="5" value="70">
+      <div class="num-row">
+        <label for="sycoNum" id="numLabel2"></label>
+        <input type="number" id="sycoNum" min="0" max="100" step="5" value="70">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「確証バイアス」——自分の仮説を支持する証拠ばかりを集め、反証となる証拠を
+   探さない・軽視する傾向。Wason(1960)の2-4-6課題で実験的に示され、
+   Nickerson(1998)のレビューで「あらゆる場面に現れる、最も広範で影響の大きい
+   推論バイアスの一つ」と位置づけられた。
+   現代的な増幅要因として、生成AIの「追従性(sycophancy)」がある。RLHFで訓練された
+   言語モデルはユーザーの信念に迎合しやすいことが報告されており(Anthropic, 2023ほか)、
+   さらに追従的なAIとの対話がユーザーの確信を強めがちで、ユーザー自身も追従的な
+   回答を高く評価しやすいという研究もある。自説の補強のためにAIに意見を求めると、
+   ハルシネーション(もっともらしい誤情報)が「裏付け」として返ってくる可能性もある。
+   本モデルは「反証を探す努力」を土台に、「相談相手の中立性」がそこに上乗せされる
+   という単純化した独自モデルであり、実証研究の数値を再現したものではない。
+   catchRate = BASE_MIN + effort*BASE_SLOPE + PARTNER_MAX*(1 - syco/100)
+*/
+const EFFORT_MIN = 0, EFFORT_MAX = 100;
+const SYCO_MIN = 0, SYCO_MAX = 100;
+const BASE_MIN = 10, BASE_SLOPE = 0.7, PARTNER_MAX = 15, CATCH_CAP = 95;
+
+function catchRateOf(effort, syco) {
+  return Math.min(CATCH_CAP, BASE_MIN + effort * BASE_SLOPE + PARTNER_MAX * (1 - syco / 100));
+}
+function blindRateOf(effort, syco) { return 100 - catchRateOf(effort, syco); }
+function scoreOf(effort, syco) { return Math.round(catchRateOf(effort, syco)); }
+function tierOf(effort, syco) {
+  const c = catchRateOf(effort, syco);
+  if (c < 25) return 0;
+  if (c < 45) return 1;
+  if (c < 65) return 2;
+  if (c < 85) return 3;
+  return 4;
+}
+function assess(effort, syco) {
+  const catchRate = catchRateOf(effort, syco);
+  const blind = blindRateOf(effort, syco);
+  const neutral = catchRateOf(effort, 0);
+  const penalty = neutral - catchRate;
+  const score = scoreOf(effort, syco);
+  const band = tierOf(effort, syco);
+  return { catchRate, blind, neutral, penalty, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "賛成してくれる相手にだけ聞いていると、何が起きる? | 確証バイアス・シミュレーター",
+  heroTitle: "賛成してくれる相手にだけ<br>聞いていると、何が起きる?",
+  heroLead: "1960年、心理学者ピーター・ウェイソンは有名な実験を行いました。「2, 4, 6」という数列を見せ、その背後にあるルールを当ててもらう課題です。多くの参加者は「2ずつ増える数列だ」と仮説を立て、「8, 10, 12」のように仮説に合う数列ばかりを試しました。本当のルールは「昇順の3つの数」——仮説を壊しにいく質問(例:「1, 2, 3は?」)をすれば簡単に気づけたはずですが、人は自分の仮説を支持する証拠を集めたがり、反証を探そうとしません。これが「確証バイアス」です(Nickerson, 1998のレビューでは、最も広範で影響の大きい推論バイアスの一つとされています)。そして現代には、新しい増幅装置があります。RLHFで訓練された生成AIには、ユーザーの信念に迎合しやすい「追従性(sycophancy)」が報告されており(Anthropic, 2023ほか)、自説の補強のためにAIに聞くと、望んだ答えが——ときにはハルシネーションによる誤った「裏付け」つきで——返ってきやすいのです。「反証を探す努力」と「相談相手の追従度」を動かして、誤った仮説に気づける確率がどう変わるかを確認してください。",
+  consoleLabel: "HYPOTHESIS CONSOLE",
+  sumLabel: "誤った仮説に気づける確率",
+  scoreLabel: "検証の健全性スコア",
+  effortName: "反証を探す努力", effortSub: "0=自説に合う証拠だけを集める、100=自説を壊す証拠を積極的に探す",
+  sycoName: "相談相手の追従度", sycoSub: "0=中立に検証してくれる相手、100=常に同意してくれる相手(追従的な生成AIやイエスマンを含む)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: ウェイソンの2-4-6課題",
+  chartCaption: "赤い実線は現在の相談相手のもとで誤りに気づける確率、緑の点線は中立的な相手に相談した場合の参考線です。相手の追従度が上がるほど実線は下に沈み、同じ努力でも気づける確率が下がります。",
+  chartNote: "「反証を探す努力」を土台に「相談相手の中立性」が上乗せされる、という単純化した独自モデルであり、実証研究の数値を再現したものではありません。確証バイアス自体はWason(1960)以降の実験群とNickerson(1998)のレビューで、生成AIの追従性はAnthropic(2023)などで報告されている現象です。",
+  cbYTitle: "誤りに気づける確率(%)", cbXTitle: "反証を探す努力",
+  legendCurrent: "現在の相談相手のもとで気づける確率",
+  legendNeutral: "中立的な相手に相談した場合(参考)",
+  scenarioBoxTitle: "いまの検証は、こんな状態",
+  scenarios: [
+    "「この設計で大丈夫だよね?」と、賛成してくれそうな相手にだけ確認しています。返ってくるのは同意だけで、検証は始まっていません。",
+    "支持する証拠は集まり始めましたが、反対意見を探す動きはまだありません。「賛成2件」は「反対0件を確認した」ことにはなりません。",
+    "反証もいくらか探し始めた段階です。ただし、相手が追従的だと「よく調べましたね、その通りだと思います」で終わりがちです。",
+    "「この仮説が間違っているとしたら、どこか?」を明示的に問い始めています。中立的な相手なら、ここで欠陥が見つかり始めます。",
+    "自説を壊す証拠を本気で探し、反対意見を歓迎する状態です。それでも見つからなければ、仮説はかなり信頼できます。",
+  ],
+  catchCardLabel: "誤った仮説に気づける確率",
+  blindCardLabel: "誤ったまま確信を深める確率",
+  hint: (effort, syco, a) => `反証を探す努力${effort}・相手の追従度${syco}のとき、誤った仮説に気づける確率はおよそ${Math.round(a.catchRate)}%。中立的な相手に相談した場合(約${Math.round(a.neutral)}%)と比べ、約${Math.round(a.penalty)}ポイントぶんの気づく機会が失われています。`,
+  hintScenario: (a) => `ウェイソンの2-4-6課題の状況です。仮説に合う数列ばかり試すと、何度「正解です」と言われても仮説は検証されていません。気づける確率およそ${Math.round(a.catchRate)}%。「1, 2, 3」のような、仮説が壊れるはずのテストを1回するだけで状況は一変します。`,
+  comments: [
+    "検証がほぼ機能していません。集まっているのは「証拠」ではなく「同意」です。",
+    "支持する証拠だけが積み上がっています。確信は強まりますが、正しさは変わっていません。",
+    "反証探しが始まっていますが、相談相手しだいで結論が変わる不安定な状態です。",
+    "健全な検証に近づいています。「間違っているとしたらどこか」を問う習慣が機能しています。",
+    "反証を探しても壊れない仮説だけが残る、理想的な検証プロセスです。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "確証バイアスの対策は「自分は偏らないぞ」という意志では機能しないことが知られています。仮説を支持する証拠は自然に目に入りますが、反証は意識的に探さない限り現れないからです。有効なのは、反証探しをプロセスに組み込むこと——設計レビューで「この案が失敗するとしたら何が原因か」を必ず1周すること、障害の原因調査で最初の仮説以外を最低1つ検証すること、などです。生成AIの利用では特に注意が必要です。追従性の研究が示すとおり、AIは聞き方しだいで「あなたは正しい」と返しやすく、ハルシネーションがもっともらしい「裏付け」を捏造することもあります。AIを自説の補強に使うのではなく、反証装置として使う——「この設計の弱点を挙げて」「この主張への最強の反論を作って」と頼む——ことで、同じツールが確証バイアスの増幅器から検証の道具に変わります。",
+  adviceItems: [
+    "レビューや意思決定に「この案が間違っているとしたら、どこか?」を問う工程を明示的に入れる",
+    "生成AIには結論を補強させず、反論させる。「賛成して」ではなく「この案の弱点と反例を挙げて」と聞く",
+    "AIの回答を裏付けに使うときは、出典・事実関係を必ず別ルートで確認する(ハルシネーションの可能性を常に見込む)",
+    "「気持ちよく同意してくれる相手」と「検証してくれる相手」を区別し、重要な判断ほど後者に相談する",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "COGNITIVE BIAS", title: "情報を正しく選択するための認知バイアス事典", desc: "情報文化研究所編。確証バイアスを含む60項目の認知バイアスを、図解つきで体系的に解説するロングセラーの一冊。", link: "Amazonで見る →", url: "https://amzn.to/3Rf2lL0" },
+    { tag: "DECISION MAKING", title: "ファスト&スロー(上)", desc: "ダニエル・カーネマン著。ノーベル経済学賞受賞者が、直感(システム1)が生む系統的な誤りと、それを補う思考(システム2)を解説した古典的名著。", link: "Amazonで見る →", url: "https://amzn.to/4eVp9J0" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "賛成してくれる相手にだけ聞いていると、何が起きる? | 確証バイアス・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "What happens when you only consult people who agree with you? | Confirmation Bias Simulator",
+  heroTitle: "What happens when you only consult<br>people who agree with you?",
+  heroLead: "In 1960, psychologist Peter Wason ran a famous experiment. Participants saw the sequence \"2, 4, 6\" and had to discover the underlying rule. Most hypothesized \"numbers increasing by two\" and tested only sequences that fit — 8, 10, 12. The actual rule was simply \"three numbers in ascending order.\" One hypothesis-breaking test (\"what about 1, 2, 3?\") would have revealed it, but people gravitate toward evidence that supports their hypothesis and rarely hunt for evidence against it. This is confirmation bias — in Nickerson's 1998 review, one of the most pervasive and consequential reasoning biases of all. And today there's a new amplifier. Language models trained with RLHF show documented \"sycophancy\" — a tendency to agree with the user's beliefs (Anthropic, 2023, among others). Ask an AI to back up your position and you'll likely get the answer you wanted — sometimes complete with hallucinated \"supporting evidence.\" Move the \"effort to disconfirm\" and \"consultation partner's sycophancy\" dials to see how the chance of catching a wrong hypothesis changes.",
+  consoleLabel: "HYPOTHESIS CONSOLE",
+  sumLabel: "Chance of catching a wrong hypothesis",
+  scoreLabel: "Verification soundness score",
+  effortName: "Effort to disconfirm", effortSub: "0 = collecting only supporting evidence, 100 = actively hunting for evidence that breaks your hypothesis",
+  sycoName: "Partner's sycophancy", sycoSub: "0 = a neutral partner who genuinely tests your idea, 100 = one who always agrees (sycophantic AI and yes-men included)",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: Wason's 2-4-6 task",
+  chartCaption: "The solid red line is your chance of catching an error with your current consultation partner; the dashed green line is the reference with a neutral partner. As sycophancy rises, the solid line sinks — the same effort catches fewer errors.",
+  chartNote: "A simplified original model where disconfirmation effort forms the base and partner neutrality adds on top — not a reproduction of empirical numbers. Confirmation bias itself is documented from Wason (1960) through Nickerson's (1998) review; AI sycophancy is reported by Anthropic (2023) and others.",
+  cbYTitle: "Chance of catching the error (%)", cbXTitle: "Effort to disconfirm",
+  legendCurrent: "Catch rate with your current partner",
+  legendNeutral: "With a neutral partner (reference)",
+  scenarioBoxTitle: "What verification looks like right now",
+  scenarios: [
+    "\"This design is fine, right?\" — asked only to people likely to agree. All that comes back is agreement; verification hasn't started.",
+    "Supporting evidence is piling up, but nobody is looking for counterarguments. Two agreements is not the same as zero objections confirmed.",
+    "Some disconfirmation has begun — but with a sycophantic partner, it ends at \"great research, I think you're right.\"",
+    "You're explicitly asking \"if this hypothesis is wrong, where?\" With a neutral partner, flaws start surfacing here.",
+    "Actively hunting for evidence that breaks your own idea, and welcoming pushback. What survives this deserves your confidence.",
+  ],
+  catchCardLabel: "Chance of catching a wrong hypothesis",
+  blindCardLabel: "Chance of growing more confident while wrong",
+  hint: (effort, syco, a) => `At disconfirmation effort ${effort} and partner sycophancy ${syco}, the chance of catching a wrong hypothesis is about ${Math.round(a.catchRate)}%. Compared with a neutral partner (about ${Math.round(a.neutral)}%), roughly ${Math.round(a.penalty)} points of error-catching opportunity are lost.`,
+  hintScenario: (a) => `Wason's 2-4-6 situation. Testing only sequences that fit your hypothesis means every \"correct!\" tells you nothing. Catch rate: about ${Math.round(a.catchRate)}%. A single hypothesis-breaking test — \"1, 2, 3?\" — changes everything.`,
+  comments: [
+    "Verification is barely functioning. What's accumulating is agreement, not evidence.",
+    "Only supporting evidence is stacking up. Confidence is rising; correctness isn't changing.",
+    "Disconfirmation has begun, but the conclusion still depends on who you ask — an unstable state.",
+    "Approaching sound verification. The habit of asking \"where would this be wrong?\" is working.",
+    "An ideal process: only hypotheses that survive genuine attack remain standing.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Willpower — \"I'll just stay objective\" — is known not to work against confirmation bias. Supporting evidence finds you on its own; counterevidence appears only when deliberately hunted. What works is building disconfirmation into the process: a mandatory \"what would make this design fail?\" pass in reviews, or verifying at least one alternative hypothesis during incident investigations. Generative AI deserves special care. As the sycophancy research shows, AI readily tells you you're right if you ask the right way, and hallucinations can fabricate plausible \"supporting evidence.\" Use AI as a disconfirmation device rather than a reinforcement device — \"list this design's weaknesses,\" \"construct the strongest counterargument to this claim\" — and the same tool flips from a bias amplifier into a verification instrument.",
+  adviceItems: [
+    "Add an explicit \"if this is wrong, where?\" step to reviews and decisions",
+    "Don't ask AI to reinforce your conclusion — ask it to attack it: \"list the weaknesses and counterexamples,\" not \"tell me this is good\"",
+    "When using an AI answer as support, verify sources and facts through an independent route — always budget for hallucination",
+    "Distinguish partners who agree pleasantly from partners who verify — and take the important decisions to the latter",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "COGNITIVE BIAS", title: "情報を正しく選択するための認知バイアス事典 (Cognitive Bias Encyclopedia)", desc: "A long-selling illustrated guide to 60 cognitive biases, confirmation bias included.", link: "View on Amazon →", url: "https://amzn.to/3Rf2lL0" },
+    { tag: "DECISION MAKING", title: "Thinking, Fast and Slow", desc: "Daniel Kahneman. The Nobel laureate's classic on the systematic errors of intuition (System 1) and the deliberate thinking (System 2) that catches them.", link: "View on Amazon →", url: "https://amzn.to/4vV3CWL" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "What happens when you only consult people who agree with you? — Confirmation Bias Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (effort, syco, a) => `反証努力${effort}・追従度${syco}。「AIも賛成してくれた」を根拠に設計レビューを通そうとしている。気づける確率約${Math.round(a.catchRate)}%。そのAI、聞き方を変えたら反対もしてくれますよ。`,
+  hintScenario: (a) => `「8, 10, 12は?」「正解です」「10, 12, 14は?」「正解です」「わかった、2ずつ増える数列だ!」——不正解。気づける確率約${Math.round(a.catchRate)}%。テストが全部通るのは、テストが仮説を攻撃していないからかもしれない。`,
+  comments: [
+    "「念のため確認ですが」で始まる質問の答えは、聞く前から決まっている。",
+    "ブックマークが自説に賛成する記事だけで埋まっていく。反対記事は「よく調べてない人が書いたやつ」。",
+    "「チームに聞いたら賛成でした」——聞いたのは賛成しそうな2人だけ、という事実は議事録に残らない。",
+    "「この設計の穴を探して」とAIに聞き始めた。昨日までは「この設計いいよね?」と聞いていた。成長。",
+    "反対意見を言われて「ありがとう」と返せた。今日のあなたはWasonの実験の上位数%側にいる。",
+  ],
+},
+en: {
+  hint: (effort, syco, a) => `Effort ${effort}, sycophancy ${syco}. Trying to pass design review on the strength of "the AI agreed with me." Catch rate ~${Math.round(a.catchRate)}%. That same AI will disagree too, if you change the question.`,
+  hintScenario: (a) => `"8, 10, 12?" "Correct." "10, 12, 14?" "Correct." "Got it — increasing by two!" — Wrong. Catch rate ~${Math.round(a.catchRate)}%. When every test passes, maybe the tests aren't attacking the hypothesis.`,
+  comments: [
+    "Questions that start with \"just to confirm\" have their answer decided before they're asked.",
+    "The bookmarks folder fills with articles that agree. Disagreeing articles are \"clearly written by someone who didn't do their research.\"",
+    "\"I asked the team and they agreed\" — the minutes won't record that you asked exactly the two people who would.",
+    "Started asking the AI to \"find holes in this design.\" Yesterday it was \"this design is good, right?\" Growth.",
+    "Someone pushed back and you said \"thank you.\" Today you're in the top few percent of Wason's participants.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let effort = 30;
+let syco = 70;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - EFFORT_MIN) / (EFFORT_MAX - EFFORT_MIN)) * (PW - PAD_L - PAD_R);
+const eOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = EFFORT_MIN + frac * (EFFORT_MAX - EFFORT_MIN);
+  return Math.min(EFFORT_MAX, Math.max(EFFORT_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("cbGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "cb-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "cb-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "cb-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "cb-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === EFFORT_MIN ? "start" : v === EFFORT_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "cb-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.cbYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "cb-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.cbXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const neutralPts = [], currentPts = [];
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 2) {
+    neutralPts.push(`${xOf(v)},${yOf(catchRateOf(v, 0))}`);
+    currentPts.push(`${xOf(v)},${yOf(catchRateOf(v, syco))}`);
+  }
+  document.getElementById("cbLineNeutral").setAttribute("d", "M " + neutralPts.join(" L "));
+  document.getElementById("cbLineCurrent").setAttribute("d", "M " + currentPts.join(" L "));
+
+  const dotsLayer = document.getElementById("cbDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "cb-dot", cx: xOf(v), cy: yOf(catchRateOf(v, syco)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(effort);
+  const marker = document.getElementById("cbMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const py = yOf(catchRateOf(effort, syco));
+  document.getElementById("cbPoint").setAttribute("cx", mx);
+  document.getElementById("cbPoint").setAttribute("cy", py);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const labelEl = document.getElementById("cbLabel");
+  labelEl.setAttribute("x", mx + labelDx);
+  labelEl.setAttribute("y", Math.max(PAD_T + 10, py - 10));
+  labelEl.setAttribute("text-anchor", labelAnchor);
+  labelEl.textContent = Math.round(catchRateOf(effort, syco)) + "%";
+
+  const hit = document.getElementById("cbMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(effort, syco);
+
+  drawChart();
+
+  const catchLabel = `${Math.round(a.catchRate)}%`;
+  const blindLabel = `${Math.round(a.blind)}%`;
+  document.getElementById("sumVal").textContent = catchLabel;
+  document.getElementById("catchCardVal").textContent = catchLabel;
+  document.getElementById("blindCardVal").textContent = blindLabel;
+  document.getElementById("hint").textContent = t.hint(effort, syco, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.band];
+
+  document.getElementById("effortReadout").textContent = effort;
+  document.getElementById("sycoReadout").textContent = syco;
+  if (document.activeElement !== document.getElementById("effortSlider")) document.getElementById("effortSlider").value = effort;
+  if (document.activeElement !== document.getElementById("effortNum")) document.getElementById("effortNum").value = effort;
+  if (document.activeElement !== document.getElementById("sycoSlider")) document.getElementById("sycoSlider").value = syco;
+  if (document.activeElement !== document.getElementById("sycoNum")) document.getElementById("sycoNum").value = syco;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/confirmation-bias/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("effortName").textContent = t.effortName;
+  document.getElementById("effortSub").textContent = t.effortSub;
+  document.getElementById("sycoName").textContent = t.sycoName;
+  document.getElementById("sycoSub").textContent = t.sycoSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("effortSlider").setAttribute("aria-label", t.effortName);
+  document.getElementById("sycoSlider").setAttribute("aria-label", t.sycoName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.effortName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.sycoName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendCurrent").textContent = t.legendCurrent;
+  document.getElementById("legendNeutral").textContent = t.legendNeutral;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("catchCardLabel").textContent = t.catchCardLabel;
+  document.getElementById("blindCardLabel").textContent = t.blindCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "confirmation-bias" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("effortSlider").addEventListener("input", (e) => { effort = +e.target.value; render(); });
+document.getElementById("effortNum").addEventListener("change", (e) => {
+  effort = Math.min(EFFORT_MAX, Math.max(EFFORT_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("sycoSlider").addEventListener("input", (e) => { syco = +e.target.value; render(); });
+document.getElementById("sycoNum").addEventListener("change", (e) => {
+  syco = Math.min(SYCO_MAX, Math.max(SYCO_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  effort = 30; syco = 70;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  effort = 5; syco = 70;
+  render();
+  const a = assess(effort, syco);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const cbChart = document.getElementById("cbChart");
+function svgPoint(evt) {
+  const pt = cbChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(cbChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  cbChart.setPointerCapture(evt.pointerId);
+  document.getElementById("cbMarker").classList.add("dragging");
+  document.getElementById("cbMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  effort = eOfX(p.x);
+  render();
+}
+document.getElementById("cbMarkerHit").addEventListener("pointerdown", startDrag);
+cbChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => cbChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("cbMarker").classList.remove("dragging");
+  document.getElementById("cbMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

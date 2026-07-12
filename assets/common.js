@@ -209,6 +209,12 @@ window.DevSimLab = (function () {
       ja: { name: "XY問題シミュレーター", title: "聞かれたことに答えたのに、なぜ解決しない?", desc: "質問時の背景・目的の共有度が、解決までの往復回数と所要時間にどう影響するかを可視化するシミュレーター。" },
       en: { name: "XY Problem Simulator", title: "You answered exactly what was asked — so why is nothing solved?", desc: "A simulator visualizing how the context shared when asking a question drives the round trips and time needed to reach a real solution." },
     },
+    {
+      id: "confirmation-bias", href: "confirmation-bias/", status: "live",
+      tags: { ja: ["確証バイアス", "生成AI"], en: ["Confirmation bias", "Generative AI"] },
+      ja: { name: "確証バイアス・シミュレーター", title: "賛成してくれる相手にだけ聞いていると、何が起きる?", desc: "反証を探す努力と相談相手の追従度(追従的な生成AIを含む)が、誤った仮説に気づける確率にどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Confirmation Bias Simulator", title: "What happens when you only consult people who agree with you?", desc: "A simulator visualizing how disconfirmation effort and a consultation partner's sycophancy (AI included) drive the chance of catching a wrong hypothesis." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
