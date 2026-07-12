@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業を止めても、コストは増え続ける? | 中断コスト・シミュレーター</title>
+<meta name="description" content="長期間中断した作業を再開するときの「思い出し工数」と「作業漏れ・手順ミスのリスク」を可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/pause-cost/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/pause-cost/">
+<meta property="og:title" content="作業を止めても、コストは増え続ける? | 中断コスト・シミュレーター">
+<meta property="og:description" content="長期間中断した作業を再開するときの「思い出し工数」と「作業漏れ・手順ミスのリスク」を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/pause-cost.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "中断コスト・シミュレーター",
+  "alternateName": "Pause Cost Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/pause-cost/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "長期間中断した作業を再開するときの思い出し工数と作業漏れリスクを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-curve chart ---- */
+.pc-wrap{margin-top:14px}
+.pc-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.pc-grid{stroke:var(--line);stroke-width:1}
+.pc-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.pc-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.pc-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.pc-line-reacq{fill:none;stroke:var(--d);stroke-width:2.2}
+.pc-line-risk{fill:none;stroke:var(--alert);stroke-width:2.2}
+.pc-dot{r:3.5}
+.pc-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.pc-marker.dragging{cursor:grabbing}
+.pc-marker-hit{fill:transparent;cursor:grab}
+.pc-marker-hit.dragging{cursor:grabbing}
+.pc-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.pc-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.pc-legend .sw.reacq{background:var(--d)}
+.pc-legend .sw.risk{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.reacq-card{border-left:4px solid var(--d)}
+.tier-card.risk-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">+30%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="pc-wrap">
+    <svg class="pc-svg" id="pcChart" viewBox="0 0 640 240" role="img" aria-label="Reacquisition cost and omission risk vs pause duration">
+      <g id="pcGridLayer"></g>
+      <path id="pcLineReacq" class="pc-line-reacq"></path>
+      <path id="pcLineRisk" class="pc-line-risk"></path>
+      <g id="pcDotsLayer"></g>
+      <line id="pcMarker" class="pc-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="pcMarkerHit" class="pc-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="pc-legend">
+    <span><span class="sw reacq"></span><span id="legendReacq"></span></span>
+    <span><span class="sw risk"></span><span id="legendRisk"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card reacq-card">
+      <div class="k" id="reacqCardLabel"></div>
+      <div class="v" id="reacqCardVal">+30%</div>
+    </div>
+    <div class="tier-card risk-card">
+      <div class="k" id="riskCardLabel"></div>
+      <div class="v" id="riskCardVal">中</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">70</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="pauseName"></span><small id="pauseSub"></small></div>
+      <div class="readout mono" id="pauseReadout">3</div>
+      <input type="range" id="pauseSlider" min="0" max="12" step="1" value="3">
+      <div class="num-row">
+        <label for="pauseNum" id="numLabel1"></label>
+        <input type="number" id="pauseNum" min="0" max="12" step="1" value="3">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="docName"></span><small id="docSub"></small></div>
+      <div class="readout mono" id="docReadout">30%</div>
+      <input type="range" id="docSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="docNum" id="numLabel2"></label>
+        <input type="number" id="docNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   長期間の中断が生む2つの異なるコストを、それぞれ別のメカニズムとして表現する簡易モデル。
+   1) 思い出し工数(reacquisition): プログラム理解研究における「メンタルモデルの再構築コスト」
+      (von Mayrhauser & Vans, 1994の統合メタモデルなど)を参考にした、中断期間とともに
+      頭打ちになりながら増えていく飽和カーブ。
+   2) 作業漏れ・手順ミスのリスク(omission risk): 認知心理学の「展望的記憶」研究
+      (Einstein & McDanielほか)を参考にした、同様の飽和カーブ。展望的記憶はチェックリスト等の
+      外部記憶補助で大きく改善することが知られているため、引き継ぎ資料の充実度による軽減幅を
+      思い出し工数より大きく設定している。
+   いずれも特定の実証研究の数値を再現したものではなく、両分野の定性的な知見(飽和的に増加する・
+   対策で軽減される)を可視化するための簡易モデルであることに注意。
+*/
+const PAUSE_MIN = 0, PAUSE_MAX = 12;
+const DOC_MIN = 0, DOC_MAX = 100;
+const MAX_REACQ = 100;
+const MAX_RISK = 90;
+const K_REACQ = 4;
+const K_RISK = 3;
+const MIT_REACQ = 0.6;
+const MIT_RISK = 0.85;
+
+function reacqPctOf(pauseMonths, docQuality) {
+  const raw = MAX_REACQ * (1 - Math.exp(-pauseMonths / K_REACQ));
+  return raw * (1 - (docQuality / 100) * MIT_REACQ);
+}
+function riskPctOf(pauseMonths, docQuality) {
+  const raw = MAX_RISK * (1 - Math.exp(-pauseMonths / K_RISK));
+  return raw * (1 - (docQuality / 100) * MIT_RISK);
+}
+function scoreOf(pauseMonths, docQuality) {
+  const avg = (reacqPctOf(pauseMonths, docQuality) + riskPctOf(pauseMonths, docQuality)) / 2;
+  return Math.max(0, Math.min(100, Math.round(100 - avg)));
+}
+function riskLevelOf(riskPct) {
+  return riskPct >= 60 ? 3 : riskPct >= 35 ? 2 : riskPct >= 15 ? 1 : 0;
+}
+function assess(pauseMonths, docQuality) {
+  const reacq = reacqPctOf(pauseMonths, docQuality);
+  const risk = riskPctOf(pauseMonths, docQuality);
+  const score = scoreOf(pauseMonths, docQuality);
+  const band = score >= 85 ? 0 : score >= 65 ? 1 : score >= 45 ? 2 : score >= 25 ? 3 : 4;
+  return { reacq, risk, score, band, riskLevel: riskLevelOf(risk) };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "作業を止めても、コストは増え続ける? | 中断コスト・シミュレーター",
+  heroTitle: "作業を止めても、<br>コストは増え続ける?",
+  heroLead: "顧客都合などで作業を一時中断しても、再開すればまた同じコストで続きから進められる——そう思いたくなります。しかし中断期間が長くなるほど、仕様や案件内容を思い出す「思い出し工数」と、申し送り事項の見落としによる「作業漏れ・手順ミスのリスク」の両方が膨らんでいきます。これは並行作業による切り替えコスト(→関連ページ「コンテキストスイッチ」)とは別の、時間経過そのものによるコストです。中断期間と引き継ぎ資料の充実度を動かして、その関係を確認してください。",
+  consoleLabel: "PAUSE CONSOLE",
+  sumLabel: "思い出し工数の増加率",
+  scoreLabel: "再開しやすさスコア",
+  pauseName: "中断期間", pauseSub: "作業を中断してから再開するまでの期間(ヶ月)",
+  docName: "引き継ぎ資料の充実度", docSub: "中断前にどれだけ記録・文書化できているか",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 資料を作らずに半年間放置",
+  chartCaption: "青線は思い出し工数の増加率、赤線は作業漏れ・手順ミスのリスクの目安です。どちらも中断期間とともに頭打ちになりながら増加します。",
+  chartNote: "特定の実証研究の数値を再現したものではない簡易モデルです。「頭打ちになりながら増える」という方向性を示すことを目的としています。",
+  pcYTitle: "増加率・リスクの目安(%)", pcXTitle: "中断期間(ヶ月)",
+  legendReacq: "思い出し工数の増加率",
+  legendRisk: "作業漏れ・手順ミスのリスク",
+  reacqCardLabel: "思い出し工数の増加率",
+  riskCardLabel: "作業漏れ・手順ミスのリスク",
+  riskLevels: ["低", "中", "高", "非常に高い"],
+  hint: (pause, doc, a) => `中断期間${pause}ヶ月・引き継ぎ資料の充実度${doc}%のとき、思い出し工数は元の作業量の+${Math.round(a.reacq)}%、作業漏れ・手順ミスのリスクは目安で${Math.round(a.risk)}%(${T().riskLevels[a.riskLevel]})になります。`,
+  hintScenario: (a) => `引き継ぎ資料を作らないまま半年間放置しました。再開時の思い出し工数は+${Math.round(a.reacq)}%、作業漏れ・手順ミスのリスクは${Math.round(a.risk)}%(${T().riskLevels[a.riskLevel]})まで膨らむ計算になります。`,
+  comments: [
+    "中断期間が短く、資料も整っています。再開はスムーズでしょう。",
+    "概ね良好です。中断が長引く前に再開できると、コストを抑えられます。",
+    "思い出し工数・見落としリスクともに、無視できない水準になっています。",
+    "再開時にまとまった思い出し工数と、見落としのリスクを見込んでおく必要があります。",
+    "ほぼゼロから状況を再構築する必要がある水準です。再開そのものを一つの作業として計画してください。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象は、性質の異なる2つの研究領域と関係しています。1つは、ソフトウェア保守研究における「プログラム理解」です。von Mayrhauser & Vans(1994)らの理論では、コードや仕様を保守するコストの多くは「メンタルモデル(頭の中の理解)」の構築・再構築に費やされるとされ、保守工数の50〜70%が理解に費やされるという報告もあります。もう1つは、認知心理学の「展望的記憶」です。Einstein & McDanielらの研究によれば、人は「将来やるべきこと」を時間の経過や割り込みによって忘れやすく、この弱点を補うのがチェックリストです(アトゥール・ガワンデ『チェックリスト』は、1935年のB-17試験飛行の墜落事故をきっかけに生まれたパイロット用チェックリストの逸話を紹介しています)。どちらも特定の中断期間に対する正確な工数式が確立しているわけではなく、このシミュレーターは方向性を示す簡易モデルです。",
+  adviceItems: [
+    "中断する前に、仕様・意思決定の経緯・残作業を明文化しておく(思い出し工数を軽減)",
+    "再開時の手順は、記憶に頼らずチェックリスト化しておく(作業漏れ・手順ミスのリスクを軽減)",
+    "中断が見込まれる時点で、再開作業そのものを見積もりに含めておく",
+    "リリース直前の中断は特に危険度が高いと認識し、直前ほど手順の明文化を厚くする",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "MANAGEMENT", title: "とにかく仕組み化", desc: "安藤広大著、2023年年間ベストセラー3位。「誰かの頭の中にしかない情報」に頼らず、仕組み・ドキュメントで運用する考え方は、本ページで言う「引き継ぎ資料の充実度」を組織的に実現する方法そのもの。", link: "Amazonで見る →", url: "https://amzn.to/4wAE3dv" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "作業を止めても、コストは増え続ける? | 中断コスト・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If you pause the work, does the cost keep climbing? | Pause Cost Simulator",
+  heroTitle: "If you pause the work,<br>does the cost keep climbing?",
+  heroLead: "When a client delays a release, it's tempting to assume you can just pick the work back up later at the same cost. But the longer the pause, the more two different costs grow: \"reacquisition cost\" — re-learning the spec and decisions you'd already internalized — and \"omission risk\" — forgetting handover steps and details. This is a different cost from the switching overhead of concurrent multitasking (see the related Context Switch simulator) — it's a cost driven purely by elapsed time. Move the pause duration and documentation quality to see how it plays out.",
+  consoleLabel: "PAUSE CONSOLE",
+  sumLabel: "Reacquisition cost increase",
+  scoreLabel: "Resumability score",
+  pauseName: "Pause duration", pauseSub: "Time between pausing and resuming the work (months)",
+  docName: "Handover documentation quality", docSub: "How much was recorded/documented before pausing",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: shelved for 6 months with no documentation",
+  chartCaption: "The blue line is the reacquisition cost increase; the red line is the estimated omission/mistake risk. Both grow and level off as the pause gets longer.",
+  chartNote: "A simplified model, not a reproduction of any specific empirical study — intended to show the general shape (saturating growth, mitigated by documentation), not precise figures.",
+  pcYTitle: "Increase / risk estimate (%)", pcXTitle: "Pause duration (months)",
+  legendReacq: "Reacquisition cost increase",
+  legendRisk: "Omission / mistake risk",
+  reacqCardLabel: "Reacquisition cost increase",
+  riskCardLabel: "Omission / mistake risk",
+  riskLevels: ["Low", "Medium", "High", "Very high"],
+  hint: (pause, doc, a) => `At a ${pause}-month pause with ${doc}% documentation quality, reacquisition cost runs about +${Math.round(a.reacq)}% of the original work, and omission/mistake risk is roughly ${Math.round(a.risk)}% (${T().riskLevels[a.riskLevel]}).`,
+  hintScenario: (a) => `Shelved for six months with no documentation written. Reacquisition cost on resume comes out to +${Math.round(a.reacq)}%, and omission/mistake risk climbs to ${Math.round(a.risk)}% (${T().riskLevels[a.riskLevel]}).`,
+  comments: [
+    "A short pause with solid documentation. Resuming should be smooth.",
+    "Broadly fine. Resuming before the pause drags on further keeps costs down.",
+    "Both reacquisition cost and omission risk have reached a level worth taking seriously.",
+    "Budget real reacquisition effort and expect a meaningful risk of missed steps on resume.",
+    "You're close to rebuilding the whole picture from scratch. Treat resuming itself as a planned task.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This connects to two distinct research areas. The first is \"program comprehension\" in software maintenance research: theories like von Mayrhauser and Vans' (1994) integrated metamodel hold that much of maintenance cost goes toward building and rebuilding a \"mental model\" of the code and spec, with some estimates putting 50–70% of maintenance effort into comprehension alone. The second is \"prospective memory\" in cognitive psychology: research by Einstein, McDaniel, and others shows that people are prone to forgetting things they intended to do later, especially across delays and interruptions — which is exactly the weakness checklists are designed to offset (Atul Gawande's \"The Checklist Manifesto\" traces this back to the pilot's checklist invented after a 1935 B-17 test-flight crash). Neither field has pinned down a precise cost formula for a given pause length — this simulator is a simplified model meant to show direction, not exact figures.",
+  adviceItems: [
+    "Before pausing, write down the spec, key decisions, and remaining work (reduces reacquisition cost)",
+    "Turn the resume procedure into a checklist rather than relying on memory (reduces omission/mistake risk)",
+    "If a pause looks likely, budget the resumption itself as part of the estimate",
+    "Treat pauses right before release as especially high-risk, and document more thoroughly the closer to release the pause happens",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "COGNITIVE SCIENCE", title: "The Checklist Manifesto", desc: "Atul Gawande. Explores how checklists compensate for the limits of human memory, with examples from medicine and aviation — the mechanism behind this page's \"omission risk\" metric.", link: "View on Amazon →", url: "https://amzn.to/44qY2zl" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If you pause the work, does the cost keep climbing? — Pause Cost Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (pause, doc, a) => `${pause}ヶ月放置。資料充実度${doc}%。思い出し工数+${Math.round(a.reacq)}%。再開初日は「えーと、これ何でしたっけ」から始まる。作業漏れリスク${Math.round(a.risk)}%(${T().riskLevels[a.riskLevel]})。`,
+  hintScenario: (a) => `資料なしで半年放置。再開初日、Slackの過去ログを3時間掘り返すところから始まる。思い出し工数+${Math.round(a.reacq)}%。作業漏れリスク${Math.round(a.risk)}%。`,
+  comments: [
+    "「よし、続きからやるか」で本当に続きからできる、貴重な状態。",
+    "まだ思い出せる。Gitログを2、3回見れば大丈夫。",
+    "「これ誰が決めたんだっけ」が口癖になり始める。",
+    "議事録を漁る時間の方が、実装する時間より長くなる。",
+    "「一旦、最初から仕様を洗い出しましょうか」という提案が飛び出す状態。",
+  ],
+},
+en: {
+  hint: (pause, doc, a) => `Shelved ${pause} months. Docs at ${doc}%. Reacquisition +${Math.round(a.reacq)}%. Day one back starts with "wait, what was this again." Omission risk ${Math.round(a.risk)}% (${T().riskLevels[a.riskLevel]}).`,
+  hintScenario: (a) => `Six months, zero documentation. Day one back starts with three hours of digging through old Slack threads. Reacquisition +${Math.round(a.reacq)}%. Omission risk ${Math.round(a.risk)}%.`,
+  comments: [
+    "\"Alright, picking up where we left off\" — and you actually can. Rare and precious.",
+    "Still fresh enough. A couple passes through the git log and you're fine.",
+    "\"Wait, who decided this?\" starts becoming a regular refrain.",
+    "You spend more time digging through old meeting notes than actually coding.",
+    "Someone suggests \"let's just re-gather the requirements from scratch.\" That's where you are.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let pauseMonths = 3;
+let docQuality = 30;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (m) => PAD_L + ((m - PAUSE_MIN) / (PAUSE_MAX - PAUSE_MIN)) * (PW - PAD_L - PAD_R);
+const mOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = PAUSE_MIN + frac * (PAUSE_MAX - PAUSE_MIN);
+  return Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("pcGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "pc-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "pc-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let m = PAUSE_MIN; m <= PAUSE_MAX; m += 2) {
+    const x = xOf(m);
+    gridLayer.appendChild(el("line", { class: "pc-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "pc-axis-label", x, y: PH - PAD_B + 14, "text-anchor": m === PAUSE_MIN ? "start" : m === PAUSE_MAX ? "end" : "middle" });
+    label.textContent = String(m);
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "pc-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.pcYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "pc-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.pcXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const reacqPts = [], riskPts = [];
+  for (let m = PAUSE_MIN; m <= PAUSE_MAX; m += 0.25) {
+    reacqPts.push(`${xOf(m)},${yOf(reacqPctOf(m, docQuality))}`);
+    riskPts.push(`${xOf(m)},${yOf(riskPctOf(m, docQuality))}`);
+  }
+  document.getElementById("pcLineReacq").setAttribute("d", "M " + reacqPts.join(" L "));
+  document.getElementById("pcLineRisk").setAttribute("d", "M " + riskPts.join(" L "));
+
+  const dotsLayer = document.getElementById("pcDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let m = PAUSE_MIN; m <= PAUSE_MAX; m += 2) {
+    dotsLayer.appendChild(el("circle", { class: "pc-dot", cx: xOf(m), cy: yOf(reacqPctOf(m, docQuality)), fill: "var(--d)" }));
+    dotsLayer.appendChild(el("circle", { class: "pc-dot", cx: xOf(m), cy: yOf(riskPctOf(m, docQuality)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(pauseMonths);
+  const marker = document.getElementById("pcMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("pcMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(pauseMonths, docQuality);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `+${Math.round(a.reacq)}%`;
+  document.getElementById("reacqCardVal").textContent = `+${Math.round(a.reacq)}%`;
+  document.getElementById("riskCardVal").textContent = `${Math.round(a.risk)}% (${t.riskLevels[a.riskLevel]})`;
+  document.getElementById("hint").textContent = t.hint(pauseMonths, docQuality, a);
+
+  document.getElementById("pauseReadout").textContent = pauseMonths;
+  document.getElementById("docReadout").textContent = docQuality + "%";
+  if (document.activeElement !== document.getElementById("pauseSlider")) document.getElementById("pauseSlider").value = pauseMonths;
+  if (document.activeElement !== document.getElementById("pauseNum")) document.getElementById("pauseNum").value = pauseMonths;
+  if (document.activeElement !== document.getElementById("docSlider")) document.getElementById("docSlider").value = docQuality;
+  if (document.activeElement !== document.getElementById("docNum")) document.getElementById("docNum").value = docQuality;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/pause-cost/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("pauseName").textContent = t.pauseName;
+  document.getElementById("pauseSub").textContent = t.pauseSub;
+  document.getElementById("docName").textContent = t.docName;
+  document.getElementById("docSub").textContent = t.docSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("pauseSlider").setAttribute("aria-label", t.pauseName);
+  document.getElementById("docSlider").setAttribute("aria-label", t.docName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.pauseName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.docName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendReacq").textContent = t.legendReacq;
+  document.getElementById("legendRisk").textContent = t.legendRisk;
+  document.getElementById("reacqCardLabel").textContent = t.reacqCardLabel;
+  document.getElementById("riskCardLabel").textContent = t.riskCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "pause-cost" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("pauseSlider").addEventListener("input", (e) => { pauseMonths = +e.target.value; render(); });
+document.getElementById("pauseNum").addEventListener("change", (e) => {
+  pauseMonths = Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("docSlider").addEventListener("input", (e) => { docQuality = +e.target.value; render(); });
+document.getElementById("docNum").addEventListener("change", (e) => {
+  docQuality = Math.min(DOC_MAX, Math.max(DOC_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  pauseMonths = 3; docQuality = 30;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  pauseMonths = 6; docQuality = 0;
+  render();
+  const a = assess(pauseMonths, docQuality);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const pcChart = document.getElementById("pcChart");
+function svgPoint(evt) {
+  const pt = pcChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(pcChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  pcChart.setPointerCapture(evt.pointerId);
+  document.getElementById("pcMarker").classList.add("dragging");
+  document.getElementById("pcMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  pauseMonths = mOfX(p.x);
+  render();
+}
+document.getElementById("pcMarkerHit").addEventListener("pointerdown", startDrag);
+pcChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => pcChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("pcMarker").classList.remove("dragging");
+  document.getElementById("pcMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

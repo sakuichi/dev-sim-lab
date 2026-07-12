@@ -137,6 +137,12 @@ window.DevSimLab = (function () {
       ja: { name: "WIP・リードタイム シミュレーター", title: "仕掛かり(WIP)を増やせば、もっと早く終わる?", desc: "リトルの法則にもとづき、仕掛かり件数を増やすほどリードタイムが伸びていく様子を可視化するシミュレーター。" },
       en: { name: "WIP & Lead Time Simulator", title: "If we take on more work in parallel, will it finish faster?", desc: "A simulator visualizing how lead time grows as work in progress increases, based on Little's Law." },
     },
+    {
+      id: "pause-cost", href: "pause-cost/", status: "live",
+      tags: { ja: ["中断コスト", "ナレッジ管理"], en: ["Pause cost", "Knowledge management"] },
+      ja: { name: "中断コスト・シミュレーター", title: "作業を止めても、コストは増え続ける?", desc: "長期間中断した作業を再開するときの思い出し工数と作業漏れリスクを可視化するシミュレーター。" },
+      en: { name: "Pause Cost Simulator", title: "If you pause the work, does the cost keep climbing?", desc: "A simulator visualizing the reacquisition cost and omission risk of resuming work after a long pause." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
