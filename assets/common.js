@@ -250,6 +250,12 @@ window.DevSimLab = (function () {
       ja: { name: "チェスタトンのフェンス・シミュレーター", title: "誰も理由を知らないコードは、消してもいい?", desc: "撤去前の調査努力が、謎コードの用途に気づける確率と削除が障害につながる確率にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Chesterton's Fence Simulator", title: "Nobody knows why this code exists — safe to delete?", desc: "A simulator visualizing how pre-removal investigation drives the chance of discovering a mystery code's purpose versus causing an incident." },
     },
+    {
+      id: "who-says-it", href: "who-says-it/", status: "live", cat: "team",
+      tags: { ja: ["発言力", "会議"], en: ["Influence", "Meetings"] },
+      ja: { name: "発言力ループ・シミュレーター", title: "同じ意見なのに、なぜあの人が言うと通る?", desc: "「地位→発言機会→さらに地位」の強化ループが、中身と無関係な初期差をどう増幅するかを地位特性理論をもとに可視化するシミュレーター。" },
+      en: { name: "Influence Loop Simulator", title: "Same idea — so why does it pass only when that person says it?", desc: "A simulator visualizing how the status-to-floor-time loop amplifies content-irrelevant initial gaps, grounded in status characteristics theory." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -365,7 +371,7 @@ window.DevSimLab = (function () {
     "curse-of-knowledge": ["xy-problem", "rubber-duck", "onboarding-ramp"],
     "onboarding-ramp": ["brooks-law", "skill-variance", "curse-of-knowledge"],
     "skill-variance": ["onboarding-ramp", "estimation-uncertainty", "survivorship-bias"],
-    "speak-up-cost": ["psychological-safety", "code-review", "xy-problem"],
+    "speak-up-cost": ["psychological-safety", "who-says-it", "xy-problem"],
     "psychological-safety": ["speak-up-cost", "survivorship-bias", "confirmation-bias"],
     "survivorship-bias": ["confirmation-bias", "psychological-safety", "skill-variance"],
     "bikeshedding": ["code-review", "yak-shaving", "speak-up-cost"],
@@ -375,6 +381,7 @@ window.DevSimLab = (function () {
     "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
     "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
     "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
+    "who-says-it": ["speak-up-cost", "psychological-safety", "confirmation-bias"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */

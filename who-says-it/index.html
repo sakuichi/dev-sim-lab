@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同じ意見なのに、なぜあの人が言うと通る? | 発言力ループ・シミュレーター</title>
+<meta name="description" content="「地位→発言機会→さらに地位」の強化ループが、中身と無関係な初期差をどう増幅するかを、地位特性理論などの研究をもとに可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/who-says-it/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/who-says-it/">
+<meta property="og:title" content="同じ意見なのに、なぜあの人が言うと通る? | 発言力ループ・シミュレーター">
+<meta property="og:description" content="「地位→発言機会→さらに地位」の強化ループが、中身と無関係な初期差をどう増幅するかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/who-says-it.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "発言力ループ・シミュレーター",
+  "alternateName": "Who Says It Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/who-says-it/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "初期の地位差と、中身を見る評価の仕組みの強さが、発言機会の偏りの拡大・収束にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- time-series diverge/converge chart (share of speaking opportunities over months) ---- */
+.ws-wrap{margin-top:14px}
+.ws-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.ws-grid{stroke:var(--line);stroke-width:1}
+.ws-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.ws-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.ws-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.ws-line-a{fill:none;stroke:var(--alert);stroke-width:2.2}
+.ws-line-b{fill:none;stroke:var(--d);stroke-width:2.2}
+.ws-line-fair{fill:none;stroke:var(--ink-soft);stroke-width:1.6;stroke-dasharray:5 3}
+.ws-dot{r:3.5}
+.ws-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.ws-marker.dragging{cursor:grabbing}
+.ws-marker-hit{fill:transparent;cursor:grab}
+.ws-marker-hit.dragging{cursor:grabbing}
+.ws-point-a{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.ws-point-b{fill:var(--surface);stroke:var(--d);stroke-width:2}
+.ws-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.ws-value-label-a{fill:var(--alert)}
+.ws-value-label-b{fill:var(--d)}
+.ws-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.ws-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.ws-legend .sw.a{background:var(--alert)}
+.ws-legend .sw.b{background:var(--d)}
+.ws-legend .sw.fair{background:var(--ink-soft)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- descriptive-not-normative disclaimer, kept visually prominent ---- */
+.disclaimer{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC;font-size:12.5px;color:var(--ink-soft)}
+.disclaimer b{color:var(--ink)}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.a-card{border-left:4px solid var(--alert)}
+.tier-card.b-card{border-left:4px solid var(--d)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+  <p class="disclaimer" id="disclaimer"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">71% / 29%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="ws-wrap">
+    <svg class="ws-svg" id="wsChart" viewBox="0 0 640 240" role="img" aria-label="Share of speaking opportunities for member A and member B over twelve months">
+      <g id="wsGridLayer"></g>
+      <path id="wsLineFair" class="ws-line-fair"></path>
+      <path id="wsLineA" class="ws-line-a"></path>
+      <path id="wsLineB" class="ws-line-b"></path>
+      <g id="wsDotsLayer"></g>
+      <line id="wsMarker" class="ws-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="wsPointA" class="ws-point-a" r="5"></circle>
+      <circle id="wsPointB" class="ws-point-b" r="5"></circle>
+      <text id="wsLabelA" class="ws-value-label ws-value-label-a"></text>
+      <text id="wsLabelB" class="ws-value-label ws-value-label-b"></text>
+      <rect id="wsMarkerHit" class="ws-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="ws-legend">
+    <span><span class="sw a"></span><span id="legendA"></span></span>
+    <span><span class="sw b"></span><span id="legendB"></span></span>
+    <span><span class="sw fair"></span><span id="legendFair"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card a-card">
+      <div class="k" id="aCardLabel"></div>
+      <div class="v" id="aCardVal">71%</div>
+    </div>
+    <div class="tier-card b-card">
+      <div class="k" id="bCardLabel"></div>
+      <div class="v" id="bCardVal">29%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">57</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="gapName"></span><small id="gapSub"></small></div>
+      <div class="readout mono" id="gapReadout">30pt</div>
+      <input type="range" id="gapSlider" min="0" max="80" step="5" value="30">
+      <div class="num-row">
+        <label for="gapNum" id="numLabel1"></label>
+        <input type="number" id="gapNum" min="0" max="80" step="5" value="30">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="corrName"></span><small id="corrSub"></small></div>
+      <div class="readout mono" id="corrReadout">30</div>
+      <input type="range" id="corrSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="corrNum" id="numLabel2"></label>
+        <input type="number" id="corrNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「何を言うかではなく、誰が言うか」で発言の影響力が決まる現象を、
+   「地位 → 発言機会 → さらに地位」の強化ループとしてモデル化する。
+   背骨は地位特性理論/期待状態理論(Berger ら、1960年代〜):
+   タスク集団では「実際の能力」ではなく「期待される能力」で影響力の序列が
+   急速に形成され、その期待は在籍年数・肩書きなどタスクと無関係な属性にも
+   引きずられる。発言機会の配分自体が地位で決まることも含まれる。
+   補助線1: 特異性信用(Hollander, 1958) — 貢献の蓄積が「逸脱を許される信用残高」
+   になるという古典理論(小集団実験が中心で、職場への外挿は拡張である点に注意)。
+   補助線2: バブル仮説(MacLaren et al., 2020) — 発言時間の長さがリーダー認知を
+   予測するという実証(因果の向きには議論がある)。
+   本モデル: 同じ質の提案をする2人(A=初期地位高、B=初期地位低)について、
+   発言機会シェアの差 d を毎月更新する。
+     d_{t+1} = d_t × (1 + LOOP×(1-c) - PULL×c)   (c=中身を見る仕組みの強さ 0..1)
+   仕組みが弱いほどループが差を複利で増幅し、強いほど平等(50/50)へ収束する。
+   数値は方向性を示す演出であり、実証研究のパラメータを再現したものではない。
+*/
+const GAP_MIN = 0, GAP_MAX = 80;
+const CORR_MIN = 0, CORR_MAX = 100;
+const MONTHS = 12;
+const LOOP_RATE = 0.15, PULL_RATE = 0.25;
+
+function seriesOf(gap, corr) {
+  const c = corr / 100;
+  const f = 1 + LOOP_RATE * (1 - c) - PULL_RATE * c;
+  const ds = [gap / 2];
+  for (let t = 1; t <= MONTHS; t++) {
+    ds.push(Math.max(0, Math.min(50, ds[t - 1] * f)));
+  }
+  return ds; // d_t: Aのシェア = 50 + d_t, Bのシェア = 50 - d_t
+}
+function shareAAt(gap, corr, t) { return 50 + seriesOf(gap, corr)[t]; }
+function shareBAt(gap, corr, t) { return 50 - seriesOf(gap, corr)[t]; }
+function finalGapOf(gap, corr) { return seriesOf(gap, corr)[MONTHS]; }
+function scoreOf(gap, corr) { return Math.round(100 - finalGapOf(gap, corr) * 2); }
+function tierOf(gap, corr) {
+  const s = scoreOf(gap, corr);
+  if (s >= 85) return 4;
+  if (s >= 65) return 3;
+  if (s >= 45) return 2;
+  if (s >= 25) return 1;
+  return 0;
+}
+function assess(gap, corr, month) {
+  const ds = seriesOf(gap, corr);
+  const d = ds[month];
+  const shareA = 50 + d;
+  const shareB = 50 - d;
+  const dFinal = ds[MONTHS];
+  const score = scoreOf(gap, corr);
+  const band = tierOf(gap, corr);
+  return { shareA, shareB, d, dFinal, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "同じ意見なのに、なぜあの人が言うと通る? | 発言力ループ・シミュレーター",
+  heroTitle: "同じ意見なのに、<br>なぜあの人が言うと通る?",
+  heroLead: "会議で新人が提案しても流れたのに、数週間後にベテランが同じことを言ったら即採用——見覚えのある光景ではないでしょうか。社会心理学の地位特性理論(Bergerら、1960年代〜)は、この現象を数十年の実験で裏づけてきました。タスク集団では、実際の能力ではなく「期待される能力」で影響力の序列が急速にでき、その期待は在籍年数や肩書きなど、中身と無関係な属性にも引きずられます。しかも地位が高いほど発言機会そのものが多く配分される——つまり「地位が高いから長く話せて、長く話すからさらに地位が上がる」という強化ループが回ります(発言時間の長さ自体がリーダー認知を予測するという研究もあります。Hollanderの「特異性信用」——貢献の蓄積が信用残高になるという理論——は、このループの正当な側面を説明します)。「中身と無関係な初期差」と「中身を見る仕組みの強さ」を動かして、12か月後に差がどうなるかを確認してください。",
+  disclaimer: "※ これは影響力が「実際にどう働きがちか」を示す記述モデルであり、「こうあるべき」という規範ではありません。特定の個人の発言の価値や、経験の差そのものの良し悪しを評価するものでもありません。会議運営・評価プロセスというチームの仕組みを点検するためのモデルです。",
+  consoleLabel: "INFLUENCE CONSOLE",
+  sumLabel: "12か月後の発言機会シェア(A/B)",
+  scoreLabel: "評価の中身度スコア",
+  gapName: "中身と無関係な初期差", gapSub: "在籍年数・肩書きなど、提案の中身と無関係な要因による開始時点の発言機会の差(ポイント)",
+  corrName: "中身を見る仕組みの強さ", corrSub: "0=誰が言ったかで決まる、100=提案を中身で評価する仕組み(書面レビュー・機会の均等化など)が機能",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 「誰が言うか」で決まる職場",
+  chartCaption: "赤線はA(初期地位が高い側)、青線はB(初期地位が低い側)の発言機会シェア、灰色の点線は対等(50%)です。2人の提案の質は同じという前提でも、提案を中身で評価する仕組みが弱ければ差は複利で開き、その仕組みが強ければ50%に収束します。縦線をドラッグすると各月の値を確認できます。",
+  chartNote: "「地位→発言機会→さらに地位」というループの方向性を示す独自の簡易モデルであり、実証研究のパラメータを再現したものではありません。地位特性理論は実験的裏付けの厚い理論ですが、増幅の速さは職場によって大きく異なります。",
+  wsYTitle: "発言機会シェア(%)", wsXTitle: "経過月",
+  legendA: "A(初期地位が高い側)",
+  legendB: "B(初期地位が低い側)",
+  legendFair: "対等(50%)",
+  scenarioBoxTitle: "いまの会議は、こんな状態",
+  scenarios: [
+    "Aの発言で会議が始まりAの発言で終わります。Bの提案は「検討しておきます」の箱に入り、数週間後にAが同じ内容を言うと採用されます。",
+    "Bが発言するには「すみません、一点だけ」という前置きが必要です。同じ内容でも、誰が言ったかで議事録での扱いが変わります。",
+    "議題によってはBの意見も通りますが、Aの反対が付くと中身の議論に入る前に終わることがあります。",
+    "提案は書面でも受け付けられ、中身が先に読まれます。Bの提案が「誰の案か」より先に「良い案か」で語られ始めています。",
+    "提案の評価と提案者の地位がほぼ切り離されています。新しいメンバーの初提案でも、中身が良ければその場で採用されます。",
+  ],
+  aCardLabel: "A(初期地位が高い側)の12か月後シェア",
+  bCardLabel: "B(初期地位が低い側)の12か月後シェア",
+  hint: (gap, corr, month, a) => `初期差${gap}ポイント・中身を見る仕組みの強さ${corr}のとき、${month}か月目の発言機会シェアはA約${a.shareA.toFixed(0)}%/B約${a.shareB.toFixed(0)}%。この偏りは両方向に損を生みます——Bの良い提案は届きにくく、Aの提案は中身の検証なしに通りやすくなります。`,
+  hintScenario: (a) => `「誰が言うか」で決まる職場です。12か月後、発言機会はA約${(50 + a.dFinal).toFixed(0)}%/B約${(50 - a.dFinal).toFixed(0)}%まで開きます。Bの提案が採用されない一方で、Aの提案はレビューされずに通る——組織は両側で損をしています。`,
+  comments: [
+    "ループが全開です。1年後、会議はほぼ一人の声で構成され、その声への検証も消えています。",
+    "差が複利で開いています。「あの人が言うなら」と「あの人が言っても」が固定化しつつあります。",
+    "増幅と収束が拮抗しています。中身を見る仕組みを少し強めるだけで、流れが反転する位置です。",
+    "中身を見る仕組みが機能し、初期差が縮まり始めています。",
+    "提案が中身で評価される状態です。初期差があっても1年でほぼ対等に収束します。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "このループの厄介なところは、悪意なしに回ることです。「実績のある人の意見を重視する」のは一見合理的で、Hollanderの特異性信用が示すように、貢献の蓄積が信用になること自体は集団の正当な仕組みです。問題は、初期差の一部が中身と無関係な要因(在籍年数・肩書き・声の大きさ)で生じ、それがループで増幅されることです。放置すると組織は二重に損をします——地位の低い側の良い提案は埋もれ(機会損失)、地位の高い側の提案は検証なしで通ります(ラバースタンプ化)。対策の要点は、個人の意識ではなく仕組みで提案と提案者を切り離すことです。なお、このページの処方はすべてチームの仕組みに向けたものです。個人に「信用が貯まるまで待て」と求めるものではありません。",
+  adviceItems: [
+    "重要な提案は書面(RFC・デザインドキュメント)で提出し、中身の議論を発言者の特定より先に行う運用を試す",
+    "会議のファシリテーターが発言機会を明示的に配分する(全員が一度発言してから2巡目に入る、など)",
+    "「同じ提案が過去に出ていなかったか」を決定録に残す。誰が言ったときに通ったかの記録は、ループの存在を可視化する",
+    "地位の高い人の提案にこそ明示的なレビュー役を置く。信用は検証を免除する理由にならない",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "INFLUENCE", title: "影響力の武器[新版]", desc: "ロバート・B・チャルディーニ著。権威や好意が判断に及ぼす影響を体系化した社会心理学の世界的ベストセラー。第7の原理を加えた2023年の新版。「誰が言うか」が効いてしまう仕組みの背景を学べる。", link: "Amazonで見る →", url: "https://amzn.to/4eX9uZF" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "同じ意見なのに、なぜあの人が言うと通る? | 発言力ループ・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Same idea — so why does it pass only when that person says it? | Influence Loop Simulator",
+  heroTitle: "Same idea — so why does it pass<br>only when that person says it?",
+  heroLead: "A newcomer floats a proposal in a meeting and it goes nowhere. Weeks later a veteran says the same thing — adopted on the spot. Sound familiar? Status characteristics theory (Berger et al., from the 1960s) has backed this phenomenon with decades of experiments: in task groups, influence hierarchies form quickly based on expected — not actual — competence, and those expectations are dragged around by attributes irrelevant to the content, like tenure and titles. Higher status even earns you more speaking opportunities themselves — so a reinforcing loop spins: higher status means more floor time, and more floor time means higher status (there's research suggesting sheer speaking time predicts being seen as a leader; Hollander's \"idiosyncrasy credit\" — contributions accumulating into a trust balance — describes the legitimate side of the same loop). Move the \"content-irrelevant initial gap\" and the \"strength of content-based evaluation\" to see where the gap ends up after twelve months.",
+  disclaimer: "* This is a descriptive model of how influence tends to work — not a claim about how it should work. It does not judge the value of any individual's voice, nor whether experience differences are good or bad. It is a tool for examining meeting and evaluation processes.",
+  consoleLabel: "INFLUENCE CONSOLE",
+  sumLabel: "Speaking-opportunity share after 12 months (A/B)",
+  scoreLabel: "Content-based evaluation score",
+  gapName: "Content-irrelevant initial gap", gapSub: "Starting gap in speaking opportunities (points) from factors unrelated to content — tenure, titles, and the like",
+  corrName: "Strength of content-based evaluation", corrSub: "0 = who says it decides; 100 = mechanisms that judge proposals on content (written review, balanced facilitation) are working",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: a workplace where who-says-it decides",
+  chartCaption: "The red line is A (higher initial status), the blue line is B (lower initial status), and the dashed gray line is parity (50%). Even with both members' proposals equal in quality, a weak content-based evaluation system compounds the gap, while a strong one converges it back to 50%. Drag the vertical line to read each month.",
+  chartNote: "An original, simplified model of the status-to-floor-time-to-status loop — not a reproduction of empirical parameters. Status characteristics theory is experimentally well-supported, but how fast the loop amplifies varies greatly between workplaces.",
+  wsYTitle: "Share of speaking opportunities (%)", wsXTitle: "Months elapsed",
+  legendA: "A (higher initial status)",
+  legendB: "B (lower initial status)",
+  legendFair: "Parity (50%)",
+  scenarioBoxTitle: "What meetings look like right now",
+  scenarios: [
+    "Meetings open with A and close with A. B's proposals go into the \"we'll consider it\" box — until A says the same thing weeks later and it's adopted.",
+    "B needs a \"sorry, just one small point\" preamble to speak at all. Identical content gets different treatment in the minutes depending on the speaker.",
+    "B's ideas pass on some topics, but one objection from A can end the discussion before the content is even examined.",
+    "Proposals are accepted in writing and read before attribution. B's ideas are starting to be discussed as good or bad before whose they are.",
+    "Evaluation is largely decoupled from the proposer's status. A brand-new member's first proposal gets adopted on the spot if the content holds up.",
+  ],
+  aCardLabel: "A's share after 12 months (higher initial status)",
+  bCardLabel: "B's share after 12 months (lower initial status)",
+  hint: (gap, corr, month, a) => `With an initial gap of ${gap} points and content-evaluation strength ${corr}, month ${month} shares are about ${a.shareA.toFixed(0)}% for A and ${a.shareB.toFixed(0)}% for B. The skew costs both ways — B's good proposals struggle to land, while A's pass with less scrutiny.`,
+  hintScenario: (a) => `A who-says-it workplace. After 12 months the split reaches about ${(50 + a.dFinal).toFixed(0)}% / ${(50 - a.dFinal).toFixed(0)}%. B's proposals go unadopted while A's sail through unreviewed — the organization loses on both sides.`,
+  comments: [
+    "The loop is running wide open. A year in, meetings are effectively one voice — and nobody is checking that voice either.",
+    "The gap is compounding. \"If they say so\" and \"even if they say so\" are both hardening.",
+    "Amplification and convergence are balanced. A small push on content-based evaluation flips the direction here.",
+    "Content-based evaluation is working; the initial gap is starting to close.",
+    "Proposals are judged on content. Even a real initial gap converges to near-parity within the year.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "What makes this loop insidious is that it spins without malice. Weighing the opinions of proven people seems rational — and as Hollander's idiosyncrasy credit describes, contributions accumulating into trust is a legitimate group mechanism. The problem is that part of the initial gap comes from factors irrelevant to content (tenure, titles, loudness), and the loop then compounds it. Left alone, the organization loses twice: good proposals from the low-status side get buried (missed opportunities), while proposals from the high-status side pass unexamined (rubber-stamping). The key countermeasures separate the proposal from the proposer through process, not through individual willpower. Note that every prescription on this page targets team mechanisms — none of it asks individuals to wait quietly until their credit accumulates.",
+  adviceItems: [
+    "Try submitting significant proposals in writing (RFCs, design docs) so content gets discussed before attribution",
+    "Have facilitators allocate the floor explicitly — for example, everyone speaks once before anyone speaks twice",
+    "Record in decisions whether the same proposal had been raised before — a log of who was speaking when it finally passed makes the loop visible",
+    "Assign explicit reviewers precisely for high-status members' proposals — credit is not an exemption from scrutiny",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "INFLUENCE", title: "Influence, New and Expanded", desc: "Robert B. Cialdini. The classic on how authority and liking sway judgment — the background machinery of why who-says-it works on us.", link: "View on Amazon →", url: "https://amzn.to/3Rsdpol" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Same idea — so why does it pass only when that person says it? — Influence Loop Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (gap, corr, month, a) => `${month}か月目。シェアA${a.shareA.toFixed(0)}%/B${a.shareB.toFixed(0)}%。Bの提案がスルーされた3週間後、Aが同じ内容を言って「それだ!」と全員が言った。議事録にBの名前はない。`,
+  hintScenario: (a) => `「誰が言うか」全開の職場。若手のSlack提案は既読スルー、同じ内容の部長の思いつきは緊急会議が開かれる。12か月後のシェアはA${(50 + a.dFinal).toFixed(0)}%。`,
+  comments: [
+    "会議の議事録が実質一人の講演録になっている。質疑応答: なし。",
+    "「前も言ったんですけど」が若手の口癖になり始めた。誰も気づいていない。",
+    "たまにBの案が通る。Aが休みの日に。",
+    "書面レビューを導入したら、「あの新人の案、実は良くない?」が月1で発生するようになった。",
+    "初提案が即採用された新人が、驚いて3回聞き返した。「え、通るんですか?」",
+  ],
+},
+en: {
+  hint: (gap, corr, month, a) => `Month ${month}. Shares: A ${a.shareA.toFixed(0)}% / B ${a.shareB.toFixed(0)}%. Three weeks after B's proposal was ignored, A said the same thing and everyone shouted "that's it!" The minutes do not mention B.`,
+  hintScenario: (a) => `Full who-says-it mode. The junior's Slack proposal gets left on read; the director's identical shower thought triggers an emergency meeting. A's share after 12 months: ${(50 + a.dFinal).toFixed(0)}%.`,
+  comments: [
+    "The meeting minutes are effectively one person's lecture transcript. Q&A: none.",
+    "\"As I mentioned before\" is becoming the junior members' catchphrase. Nobody has noticed.",
+    "B's proposals do pass occasionally. On days A is out.",
+    "Since written review was introduced, \"wait, isn't the new hire's idea actually good?\" happens about monthly.",
+    "A newcomer's first proposal was adopted immediately. They asked three times in disbelief: \"wait, it passed?\"",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let gap = 30;
+let corr = 30;
+let month = 12;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (m) => PAD_L + (m / MONTHS) * (PW - PAD_L - PAD_R);
+const mOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = frac * MONTHS;
+  return Math.min(MONTHS, Math.max(0, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("wsGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 25, 50, 75, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "ws-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "ws-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let m = 0; m <= MONTHS; m += 2) {
+    const x = xOf(m);
+    gridLayer.appendChild(el("line", { class: "ws-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "ws-axis-label", x, y: PH - PAD_B + 14, "text-anchor": m === 0 ? "start" : m === MONTHS ? "end" : "middle" });
+    label.textContent = m;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "ws-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.wsYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "ws-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.wsXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const fairY = yOf(50);
+  document.getElementById("wsLineFair").setAttribute("d", `M ${PAD_L} ${fairY} L ${PW - PAD_R} ${fairY}`);
+
+  const ds = seriesOf(gap, corr);
+  const ptsA = [], ptsB = [];
+  for (let m = 0; m <= MONTHS; m++) {
+    ptsA.push(`${xOf(m)},${yOf(50 + ds[m])}`);
+    ptsB.push(`${xOf(m)},${yOf(50 - ds[m])}`);
+  }
+  document.getElementById("wsLineA").setAttribute("d", "M " + ptsA.join(" L "));
+  document.getElementById("wsLineB").setAttribute("d", "M " + ptsB.join(" L "));
+
+  const dotsLayer = document.getElementById("wsDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let m = 0; m <= MONTHS; m += 2) {
+    dotsLayer.appendChild(el("circle", { class: "ws-dot", cx: xOf(m), cy: yOf(50 + ds[m]), fill: "var(--alert)" }));
+    dotsLayer.appendChild(el("circle", { class: "ws-dot", cx: xOf(m), cy: yOf(50 - ds[m]), fill: "var(--d)" }));
+  }
+
+  const mx = xOf(month);
+  const marker = document.getElementById("wsMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const aY = yOf(50 + ds[month]);
+  const bY = yOf(50 - ds[month]);
+  document.getElementById("wsPointA").setAttribute("cx", mx);
+  document.getElementById("wsPointA").setAttribute("cy", aY);
+  document.getElementById("wsPointB").setAttribute("cx", mx);
+  document.getElementById("wsPointB").setAttribute("cy", bY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+
+  const labelA = document.getElementById("wsLabelA");
+  labelA.setAttribute("x", mx + labelDx);
+  labelA.setAttribute("y", clampY(aY - 10));
+  labelA.setAttribute("text-anchor", labelAnchor);
+  labelA.textContent = Math.round(50 + ds[month]) + "%";
+
+  const labelB = document.getElementById("wsLabelB");
+  labelB.setAttribute("x", mx + labelDx);
+  labelB.setAttribute("y", clampY(bY + 20));
+  labelB.setAttribute("text-anchor", labelAnchor);
+  labelB.textContent = Math.round(50 - ds[month]) + "%";
+
+  const hit = document.getElementById("wsMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(gap, corr, month);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${(50 + a.dFinal).toFixed(0)}% / ${(50 - a.dFinal).toFixed(0)}%`;
+  document.getElementById("aCardVal").textContent = `${(50 + a.dFinal).toFixed(0)}%`;
+  document.getElementById("bCardVal").textContent = `${(50 - a.dFinal).toFixed(0)}%`;
+  document.getElementById("hint").textContent = t.hint(gap, corr, month, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.band];
+
+  document.getElementById("gapReadout").textContent = gap + "pt";
+  document.getElementById("corrReadout").textContent = corr;
+  if (document.activeElement !== document.getElementById("gapSlider")) document.getElementById("gapSlider").value = gap;
+  if (document.activeElement !== document.getElementById("gapNum")) document.getElementById("gapNum").value = gap;
+  if (document.activeElement !== document.getElementById("corrSlider")) document.getElementById("corrSlider").value = corr;
+  if (document.activeElement !== document.getElementById("corrNum")) document.getElementById("corrNum").value = corr;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/who-says-it/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("disclaimer").innerHTML = t.disclaimer;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("gapName").textContent = t.gapName;
+  document.getElementById("gapSub").textContent = t.gapSub;
+  document.getElementById("corrName").textContent = t.corrName;
+  document.getElementById("corrSub").textContent = t.corrSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("gapSlider").setAttribute("aria-label", t.gapName);
+  document.getElementById("corrSlider").setAttribute("aria-label", t.corrName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.gapName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.corrName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendA").textContent = t.legendA;
+  document.getElementById("legendB").textContent = t.legendB;
+  document.getElementById("legendFair").textContent = t.legendFair;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("aCardLabel").textContent = t.aCardLabel;
+  document.getElementById("bCardLabel").textContent = t.bCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "who-says-it" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("gapSlider").addEventListener("input", (e) => { gap = +e.target.value; render(); });
+document.getElementById("gapNum").addEventListener("change", (e) => {
+  gap = Math.min(GAP_MAX, Math.max(GAP_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("corrSlider").addEventListener("input", (e) => { corr = +e.target.value; render(); });
+document.getElementById("corrNum").addEventListener("change", (e) => {
+  corr = Math.min(CORR_MAX, Math.max(CORR_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  gap = 30; corr = 30; month = 12;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  gap = 40; corr = 5; month = 12;
+  render();
+  const a = assess(gap, corr, month);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the month cursor directly on the chart ---- */
+const wsChart = document.getElementById("wsChart");
+function svgPoint(evt) {
+  const pt = wsChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(wsChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  wsChart.setPointerCapture(evt.pointerId);
+  document.getElementById("wsMarker").classList.add("dragging");
+  document.getElementById("wsMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  month = mOfX(p.x);
+  render();
+}
+document.getElementById("wsMarkerHit").addEventListener("pointerdown", startDrag);
+wsChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => wsChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("wsMarker").classList.remove("dragging");
+  document.getElementById("wsMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
