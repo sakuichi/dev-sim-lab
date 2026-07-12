@@ -203,6 +203,12 @@ window.DevSimLab = (function () {
       ja: { name: "ラバーダック・デバッグ・シミュレーター", title: "誰かに説明した瞬間、答えに気づくのはなぜ?", desc: "説明の丁寧さが「説明の途中で自分で答えに気づく確率」にどう効くかを、自己説明効果の研究を背景に可視化するシミュレーター。" },
       en: { name: "Rubber Duck Debugging Simulator", title: "Why do you find the answer the moment you explain it to someone?", desc: "A simulator visualizing how thoroughness of explanation drives the chance of solving your own problem mid-explanation, grounded in self-explanation research." },
     },
+    {
+      id: "xy-problem", href: "xy-problem/", status: "live",
+      tags: { ja: ["XY問題", "コミュニケーション"], en: ["XY problem", "Communication"] },
+      ja: { name: "XY問題シミュレーター", title: "聞かれたことに答えたのに、なぜ解決しない?", desc: "質問時の背景・目的の共有度が、解決までの往復回数と所要時間にどう影響するかを可視化するシミュレーター。" },
+      en: { name: "XY Problem Simulator", title: "You answered exactly what was asked — so why is nothing solved?", desc: "A simulator visualizing how the context shared when asking a question drives the round trips and time needed to reach a real solution." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
