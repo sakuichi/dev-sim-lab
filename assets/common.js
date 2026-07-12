@@ -191,6 +191,12 @@ window.DevSimLab = (function () {
       ja: { name: "ビケシェッディング・シミュレーター", title: "自転車置き場の色は45分、原子炉の契約は2分で決まる?", desc: "パーキンソンの法則(1957年)にもとづき、議題の専門性が本来かけるべき時間と実際にかけられがちな時間のズレにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Bikeshedding Simulator", title: "The bike shed color takes 45 minutes, the reactor contract takes 2?", desc: "Based on Parkinson's Law (1957), a simulator visualizing how a topic's required expertise drives a gap between ideal and actual discussion time." },
     },
+    {
+      id: "yak-shaving", href: "yak-shaving/", status: "live",
+      tags: { ja: ["ヤク剃り", "集中"], en: ["Yak shaving", "Focus"] },
+      ja: { name: "ヤク剃り・シミュレーター", title: "その作業、本題とどうつながってるんだっけ?", desc: "「先にアレが必要」の連鎖(ヤク剃り)の深さが、本題に着手できる時刻と1日の残り時間にどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Yak Shaving Simulator", title: "Wait — how is this task connected to what I was doing?", desc: "A simulator visualizing how the depth of a \"but first I need...\" chain pushes back the real task's start time and eats the workday." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */

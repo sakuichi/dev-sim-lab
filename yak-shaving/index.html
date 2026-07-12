@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>その作業、本題とどうつながってるんだっけ? | ヤク剃り・シミュレーター</title>
+<meta name="description" content="本題に取りかかる前の「先にアレが必要」の連鎖(ヤク剃り)が、1日の作業時間をどう食いつぶすかを可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/yak-shaving/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/yak-shaving/">
+<meta property="og:title" content="その作業、本題とどうつながってるんだっけ? | ヤク剃り・シミュレーター">
+<meta property="og:description" content="本題に取りかかる前の「先にアレが必要」の連鎖(ヤク剃り)が、1日の作業時間をどう食いつぶすかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/yak-shaving.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ヤク剃り・シミュレーター",
+  "alternateName": "Yak Shaving Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/yak-shaving/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "前提作業の連鎖の深さが、本題に着手できる時刻と1日の残り時間にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- staircase chart (cumulative detour time by yak depth) ---- */
+.ys-wrap{margin-top:14px}
+.ys-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.ys-grid{stroke:var(--line);stroke-width:1}
+.ys-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.ys-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.ys-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.ys-line-stair{fill:none;stroke:var(--alert);stroke-width:2.2}
+.ys-line-day{fill:none;stroke:var(--ink-soft);stroke-width:2;stroke-dasharray:5 3}
+.ys-day-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:10px;fill:var(--ink-soft)}
+.ys-dot{r:3.5}
+.ys-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.ys-marker.dragging{cursor:grabbing}
+.ys-marker-hit{fill:transparent;cursor:grab}
+.ys-marker-hit.dragging{cursor:grabbing}
+.ys-point{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.ys-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--alert)}
+.ys-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.ys-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.ys-legend .sw.stair{background:var(--alert)}
+.ys-legend .sw.day{background:var(--ink-soft)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.delay-card{border-left:4px solid var(--alert)}
+.tier-card.remain-card{border-left:4px solid var(--q)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">80分</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="ys-wrap">
+    <svg class="ys-svg" id="ysChart" viewBox="0 0 640 240" role="img" aria-label="Cumulative time before the original task starts, by depth of prerequisite detours">
+      <g id="ysGridLayer"></g>
+      <path id="ysLineDay" class="ys-line-day"></path>
+      <path id="ysLineStair" class="ys-line-stair"></path>
+      <g id="ysDotsLayer"></g>
+      <line id="ysMarker" class="ys-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="ysPoint" class="ys-point" r="5"></circle>
+      <text id="ysLabel" class="ys-value-label"></text>
+      <rect id="ysMarkerHit" class="ys-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="ys-legend">
+    <span><span class="sw stair"></span><span id="legendStair"></span></span>
+    <span><span class="sw day"></span><span id="legendDay"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card delay-card">
+      <div class="k" id="delayCardLabel"></div>
+      <div class="v" id="delayCardVal">80分</div>
+    </div>
+    <div class="tier-card remain-card">
+      <div class="k" id="remainCardLabel"></div>
+      <div class="v" id="remainCardVal">400分</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">67</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="depthName"></span><small id="depthSub"></small></div>
+      <div class="readout mono" id="depthReadout">4段</div>
+      <input type="range" id="depthSlider" min="0" max="12" step="1" value="4">
+      <div class="num-row">
+        <label for="depthNum" id="numLabel1"></label>
+        <input type="number" id="depthNum" min="0" max="12" step="1" value="4">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="avgName"></span><small id="avgSub"></small></div>
+      <div class="readout mono" id="avgReadout">20分</div>
+      <input type="range" id="avgSlider" min="10" max="60" step="5" value="20">
+      <div class="num-row">
+        <label for="avgNum" id="numLabel2"></label>
+        <input type="number" id="avgNum" min="10" max="60" step="5" value="20">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「ヤク剃り(yak shaving)」——本題に取りかかろうとすると「先にアレが必要」が
+   連鎖して、気づけば本題と一見無関係な作業をしている現象。1990年代にMIT AIラボの
+   Carlin Vieriが命名し(由来は1991年のアニメ『レンとスティンピー』のワンシーン)、
+   同僚Jeremy H. Brownによる説明「本来のタスクと12段の因果関係でつながった先にある、
+   一見無関係で些末な作業をしている状態」がよく知られる。2000年代半ばに
+   Seth Godinのブログを通じて広まった。
+   本モデルは「寄り道の深さ(段数)×寄り道1つあたりの平均時間」という単純な掛け算で、
+   本題に着手できるまでの時間と、1日(480分)のうち本題に残された時間を示す。
+   深さの上限12はBrownの「12段の因果関係」という表現に合わせた演出であり、
+   実証研究にもとづく数値ではない。
+*/
+const DEPTH_MIN = 0, DEPTH_MAX = 12;
+const AVG_MIN = 10, AVG_MAX = 60;
+const WORKDAY_MIN = 480;
+
+function delayOf(depth, avg) { return depth * avg; }
+function remainOf(depth, avg) { return Math.max(0, WORKDAY_MIN - delayOf(depth, avg)); }
+function scoreOf(depth) { return Math.round(100 * (1 - depth / DEPTH_MAX)); }
+function tierOf(depth) {
+  if (depth === 0) return 0;
+  if (depth <= 3) return 1;
+  if (depth <= 6) return 2;
+  if (depth <= 9) return 3;
+  return 4;
+}
+function assess(depth, avg) {
+  const delay = delayOf(depth, avg);
+  const remain = remainOf(depth, avg);
+  const overflow = delay > WORKDAY_MIN;
+  const score = scoreOf(depth);
+  const band = tierOf(depth);
+  return { delay, remain, overflow, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "その作業、本題とどうつながってるんだっけ? | ヤク剃り・シミュレーター",
+  heroTitle: "その作業、<br>本題とどうつながってるんだっけ?",
+  heroLead: "小さなバグを直そうとしたら、まずライブラリの更新が必要で、そのためにはビルド環境の修正が必要で、そのドキュメントが古いから先に直して——気づけば、本題と一見無関係な作業に没頭している。この現象は「ヤク剃り(yak shaving)」と呼ばれます。1990年代にMIT AIラボのカーリン・ヴィエリが名づけ、同僚ジェレミー・H・ブラウンの説明——「本来のタスクと12段の因果関係でつながった先にある、一見無関係で些末な作業をしている状態」——とともに、開発者の間で広く知られるようになりました。「寄り道の深さ」と「寄り道1つあたりの平均時間」を動かして、本題に着手できる時刻がどう遠ざかっていくかを確認してください。",
+  consoleLabel: "DETOUR CONSOLE",
+  sumLabel: "本題に着手できるまで",
+  scoreLabel: "本題への直行度スコア",
+  depthName: "寄り道の深さ", depthSub: "「先にアレが必要」が何段連鎖しているか(0=直行、12=ブラウンの言う12段)",
+  avgName: "寄り道1つあたりの平均時間", avgSub: "各前提作業の平均所要時間",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 書類を1枚送りたかっただけの日",
+  chartCaption: "赤い階段は、寄り道が1段増えるごとに本題への着手が遅れていく様子です。灰色の点線は1日の労働時間(480分)——階段がこの線を越えると、本題に着手する前に定時が来ます。",
+  chartNote: "寄り道の深さ×平均時間という単純な掛け算による簡易モデルです。深さの上限12は、ジェレミー・H・ブラウンの「12段の因果関係」という表現に合わせた演出であり、実証研究にもとづく数値ではありません。",
+  ysYTitle: "経過時間(分)", ysXTitle: "寄り道の深さ(段)",
+  legendStair: "本題に着手できるまでの時間",
+  legendDay: "1日の労働時間(480分)",
+  delayCardLabel: "本題に着手できるまで",
+  remainCardLabel: "本題に使える残り時間",
+  hint: (depth, avg, a) => a.overflow
+    ? `寄り道${depth}段×平均${avg}分で、本題に着手できるのは${a.delay}分後。1日の労働時間(480分)を超えているため、今日は本題に着手できません。`
+    : `寄り道${depth}段×平均${avg}分で、本題に着手できるのは${a.delay}分後。1日のうち本題に使える時間は${a.remain}分残ります。`,
+  hintScenario: (a) => `命名者カーリン・ヴィエリの逸話は「書類を1枚発送したかっただけ」の日でした。発送にはあの機材が要り、機材にはあの部品が要り——と連鎖した結果がこの状態です。本題(発送)に着手できるのは${a.delay}分後です。`,
+  comments: [
+    "寄り道ゼロ。本題に直行できています。今日のあなたは強い。",
+    "多少の寄り道はありますが、まだ本題は見えています。",
+    "寄り道が本題を侵食し始めています。「自分は今、何をしようとしていたんだっけ?」と一度声に出してみましょう。",
+    "もはや本題より寄り道の方が長い状態です。この寄り道、本当に全部「今」必要ですか?",
+    "完全なヤク剃り状態です。目の前の作業と本題の間には、思い出せないほど長い因果の鎖があります。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "ヤク剃りが厄介なのは、一つひとつの寄り道には正当な理由があることです。「ライブラリを更新しないとバグが直せない」のは事実で、どの1段も間違っていません。しかし鎖全体を見ると、本題への着手が際限なく遠ざかっています。ポイントは、寄り道そのものを悪と見なすことではなく、「今この鎖の何段目にいるか」を自覚できる仕組みを持つことです。なお、寄り道の一部(環境整備やドキュメント修正)は、将来の作業を速くする投資である場合もあります。問題は投資かどうかではなく、それを「無自覚に」「今」やっているかどうかです。",
+  adviceItems: [
+    "作業を始める前に、本題を1行で書き留めておく。迷子になったとき戻る場所をつくる",
+    "寄り道が2段を超えたら、いったん手を止めて「この鎖は本当に全部必要か」を確認する",
+    "寄り道で見つけた課題は、その場で直さずチケット化して本題に戻る選択肢を常に持つ",
+    "「先にアレが必要」の連鎖が長い場合、それは個人の問題ではなく、環境構築やツールチェーンの整備不足という組織課題のシグナルかもしれない",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "FOCUS", title: "エッセンシャル思考", desc: "グレッグ・マキューン著。「より少なく、しかしより良く」を軸に、本質的な仕事に集中するための考え方を説くベストセラー。寄り道の鎖を断つ判断基準になる一冊。", link: "Amazonで見る →", url: "https://amzn.to/4wyonr7" },
+    { tag: "PROGRAMMER CULTURE", title: "達人プログラマー(第2版)", desc: "Andrew Hunt / David Thomas著。ヤク剃りやラバーダック・デバッグなど、開発者文化の語彙を数多く生んだ古典の20周年記念版。", link: "Amazonで見る →", url: "https://amzn.to/4wHbKKH" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "その作業、本題とどうつながってるんだっけ? | ヤク剃り・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Wait — how is this task connected to what I was doing? | Yak Shaving Simulator",
+  heroTitle: "Wait — how is this task connected<br>to what I was doing?",
+  heroLead: "You sit down to fix a small bug. But first the library needs updating, which needs the build environment fixed, whose docs are outdated so you fix those first — and before you know it, you're deep in work that looks nothing like the original task. This is \"yak shaving.\" Carlin Vieri at the MIT AI Lab coined the term in the 1990s (inspired by a 1991 scene in the cartoon Ren & Stimpy), and his colleague Jeremy H. Brown's description made it famous: doing some fiddly little task with no obvious relationship to the real goal, \"yet a chain of twelve causal relations links what you're doing to the original meta-task.\" Move the detour depth and the average time per detour to watch the start of your actual task drift away.",
+  consoleLabel: "DETOUR CONSOLE",
+  sumLabel: "Time until the real task starts",
+  scoreLabel: "Straight-to-task score",
+  depthName: "Detour depth", depthSub: "How many levels of \"but first I need...\" are chained (0 = straight to work, 12 = Brown's twelve causal relations)",
+  avgName: "Average time per detour", avgSub: "Average time each prerequisite task takes",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: all I wanted was to mail one document",
+  chartCaption: "The red staircase shows the real task's start time slipping with each added detour. The dashed gray line is one workday (480 min) — once the staircase crosses it, the day ends before the real task begins.",
+  chartNote: "A simple depth-times-average-time model. The maximum depth of 12 is a nod to Jeremy H. Brown's \"chain of twelve causal relations\" phrasing — not a number from empirical research.",
+  ysYTitle: "Elapsed time (min)", ysXTitle: "Detour depth (levels)",
+  legendStair: "Time until the real task starts",
+  legendDay: "One workday (480 min)",
+  delayCardLabel: "Time until the real task starts",
+  remainCardLabel: "Time left for the real task",
+  hint: (depth, avg, a) => a.overflow
+    ? `At ${depth} detour levels averaging ${avg} min each, the real task starts after ${a.delay} minutes — past the 480-minute workday. The real task doesn't start today.`
+    : `At ${depth} detour levels averaging ${avg} min each, the real task starts after ${a.delay} minutes, leaving ${a.remain} minutes of the day for the actual work.`,
+  hintScenario: (a) => `In coiner Carlin Vieri's original anecdote, all he wanted was to overnight one document. But mailing it needed equipment, which needed parts, which needed... — this is where the chain ends up. The real task (mailing) starts after ${a.delay} minutes.`,
+  comments: [
+    "Zero detours. Straight to the real task. You are unstoppable today.",
+    "A few detours, but the real task is still in sight.",
+    "The detours are starting to eat the day. Try saying out loud: \"what was I actually trying to do?\"",
+    "The detours now outweigh the task itself. Does every link in this chain really need to happen now?",
+    "Full yak-shaving mode. The chain between what you're doing and why you started is too long to remember.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "What makes yak shaving insidious is that every individual detour is justified. \"The bug can't be fixed without updating the library\" is true — no single link in the chain is wrong. But viewed as a whole, the real task keeps receding. The point isn't to treat detours as evil; it's to build the habit of noticing which link of the chain you're currently standing on. Note that some detours (fixing the dev environment, updating docs) are genuine investments that speed up future work. The problem isn't whether it's an investment — it's whether you're doing it unconsciously, right now.",
+  adviceItems: [
+    "Before starting, write the real task down in one line — give yourself somewhere to return to when lost",
+    "When detours go more than two levels deep, stop and ask whether every link in the chain is really necessary",
+    "Ticket issues you discover along the way instead of fixing them on the spot — keep the option of returning to the real task",
+    "A chronically long \"but first...\" chain may not be a personal failing — it can signal an organizational gap in environment setup or toolchain maintenance",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "FOCUS", title: "Essentialism", desc: "Greg McKeown. The bestseller on \"less but better\" — a framework for deciding which links in the chain actually deserve your day.", link: "View on Amazon →", url: "https://amzn.to/4wyonr7" },
+    { tag: "PROGRAMMER CULTURE", title: "The Pragmatic Programmer (20th Anniversary Edition)", desc: "Andrew Hunt and David Thomas. The classic that gave developer culture much of its vocabulary — from tracer bullets to rubber ducks.", link: "View on Amazon →", url: "https://amzn.to/4wHbKKH" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Wait — how is this task connected to what I was doing? — Yak Shaving Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (depth, avg, a) => a.overflow
+    ? `寄り道${depth}段。CSSを1行直すためにDockerを再構築し、そのためにOSをアップデートしている。本日の本題着手予定: なし。`
+    : `寄り道${depth}段。本題まであと${a.delay}分。ブラウザのタブは現在${12 + depth * 6}枚。最初のタブに何が書いてあったかはもう誰も知らない。`,
+  hintScenario: (a) => `「READMEのtypo直すだけ」のはずが、リポジトリのlint設定と格闘して${a.delay}分。typoはまだ直っていない。`,
+  comments: [
+    "着席即コーディング。伝説の一日。",
+    "寄り道はしたが、ちゃんと帰ってきた。えらい。",
+    "「あれ、俺なんでvimの設定いじってるんだっけ」——気づけたあなたはまだ引き返せる。",
+    "本題のブランチ名すら思い出せなくなってきた。git branchで過去の自分と対話中。",
+    "気づけば夕方。今日書いたコードは全部.dotfiles。本題のissueは明日も無傷で待っている。",
+  ],
+},
+en: {
+  hint: (depth, avg, a) => a.overflow
+    ? `Detour depth ${depth}. Rebuilding Docker to fix one line of CSS, which required an OS update. Real task ETA: not today.`
+    : `Detour depth ${depth}. Real task in ${a.delay} min. Browser tab count: ${12 + depth * 6}. Nobody remembers what the first tab was for.`,
+  hintScenario: (a) => `"Just fixing a README typo" — ${a.delay} minutes into fighting the repo's lint config. The typo remains unfixed.`,
+  comments: [
+    "Sat down, started coding. A legendary day.",
+    "Took a detour, but actually came back. Impressive.",
+    "\"Wait, why am I editing my vim config?\" — if you caught yourself, you can still turn back.",
+    "Can't even remember the branch name for the real task. Currently interviewing past-you via git branch.",
+    "Suddenly it's evening. Everything written today lives in .dotfiles. The real issue awaits tomorrow, untouched.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let depth = 4;
+let avg = 20;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 44, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 720;
+const xOf = (d) => PAD_L + ((d - DEPTH_MIN) / (DEPTH_MAX - DEPTH_MIN)) * (PW - PAD_L - PAD_R);
+const dOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = DEPTH_MIN + frac * (DEPTH_MAX - DEPTH_MIN);
+  return Math.min(DEPTH_MAX, Math.max(DEPTH_MIN, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("ysGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 120, 240, 360, 480, 600, 720].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "ys-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "ys-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  });
+  for (let d = DEPTH_MIN; d <= DEPTH_MAX; d += 2) {
+    const x = xOf(d);
+    gridLayer.appendChild(el("line", { class: "ys-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "ys-axis-label", x, y: PH - PAD_B + 14, "text-anchor": d === DEPTH_MIN ? "start" : d === DEPTH_MAX ? "end" : "middle" });
+    label.textContent = d;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "ys-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.ysYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "ys-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.ysXTitle;
+  gridLayer.appendChild(xTitle);
+
+  /* workday reference line */
+  const dayY = yOf(WORKDAY_MIN);
+  document.getElementById("ysLineDay").setAttribute("d", `M ${PAD_L} ${dayY} L ${PW - PAD_R} ${dayY}`);
+
+  /* staircase: value at depth d is d*avg; steps rise at each integer depth */
+  let path = `M ${xOf(0)} ${yOf(0)}`;
+  for (let d = 1; d <= DEPTH_MAX; d++) {
+    path += ` L ${xOf(d)} ${yOf(delayOf(d - 1, avg))}`;
+    path += ` L ${xOf(d)} ${yOf(delayOf(d, avg))}`;
+  }
+  document.getElementById("ysLineStair").setAttribute("d", path);
+
+  const dotsLayer = document.getElementById("ysDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let d = DEPTH_MIN; d <= DEPTH_MAX; d += 2) {
+    dotsLayer.appendChild(el("circle", { class: "ys-dot", cx: xOf(d), cy: yOf(delayOf(d, avg)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(depth);
+  const marker = document.getElementById("ysMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const py = yOf(delayOf(depth, avg));
+  document.getElementById("ysPoint").setAttribute("cx", mx);
+  document.getElementById("ysPoint").setAttribute("cy", py);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const labelEl = document.getElementById("ysLabel");
+  labelEl.setAttribute("x", mx + labelDx);
+  labelEl.setAttribute("y", Math.max(PAD_T + 10, py - 10));
+  labelEl.setAttribute("text-anchor", labelAnchor);
+  labelEl.textContent = T().htmlLang === "ja" ? `${delayOf(depth, avg)}分` : `${delayOf(depth, avg)} min`;
+
+  const hit = document.getElementById("ysMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(depth, avg);
+
+  drawChart();
+
+  const delayLabel = t.htmlLang === "ja" ? `${a.delay}分` : `${a.delay} min`;
+  const remainLabel = t.htmlLang === "ja" ? `${a.remain}分` : `${a.remain} min`;
+  document.getElementById("sumVal").textContent = delayLabel;
+  document.getElementById("delayCardVal").textContent = delayLabel;
+  document.getElementById("remainCardVal").textContent = remainLabel;
+  document.getElementById("hint").textContent = t.hint(depth, avg, a);
+
+  document.getElementById("depthReadout").textContent = t.htmlLang === "ja" ? `${depth}段` : `${depth}`;
+  document.getElementById("avgReadout").textContent = t.htmlLang === "ja" ? `${avg}分` : `${avg} min`;
+  if (document.activeElement !== document.getElementById("depthSlider")) document.getElementById("depthSlider").value = depth;
+  if (document.activeElement !== document.getElementById("depthNum")) document.getElementById("depthNum").value = depth;
+  if (document.activeElement !== document.getElementById("avgSlider")) document.getElementById("avgSlider").value = avg;
+  if (document.activeElement !== document.getElementById("avgNum")) document.getElementById("avgNum").value = avg;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/yak-shaving/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("depthName").textContent = t.depthName;
+  document.getElementById("depthSub").textContent = t.depthSub;
+  document.getElementById("avgName").textContent = t.avgName;
+  document.getElementById("avgSub").textContent = t.avgSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("depthSlider").setAttribute("aria-label", t.depthName);
+  document.getElementById("avgSlider").setAttribute("aria-label", t.avgName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.depthName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.avgName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendStair").textContent = t.legendStair;
+  document.getElementById("legendDay").textContent = t.legendDay;
+  document.getElementById("delayCardLabel").textContent = t.delayCardLabel;
+  document.getElementById("remainCardLabel").textContent = t.remainCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "yak-shaving" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("depthSlider").addEventListener("input", (e) => { depth = +e.target.value; render(); });
+document.getElementById("depthNum").addEventListener("change", (e) => {
+  depth = Math.min(DEPTH_MAX, Math.max(DEPTH_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("avgSlider").addEventListener("input", (e) => { avg = +e.target.value; render(); });
+document.getElementById("avgNum").addEventListener("change", (e) => {
+  avg = Math.min(AVG_MAX, Math.max(AVG_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  depth = 4; avg = 20;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  depth = 12;
+  render();
+  const a = assess(depth, avg);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const ysChart = document.getElementById("ysChart");
+function svgPoint(evt) {
+  const pt = ysChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(ysChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  ysChart.setPointerCapture(evt.pointerId);
+  document.getElementById("ysMarker").classList.add("dragging");
+  document.getElementById("ysMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  depth = dOfX(p.x);
+  render();
+}
+document.getElementById("ysMarkerHit").addEventListener("pointerdown", startDrag);
+ysChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => ysChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("ysMarker").classList.remove("dragging");
+  document.getElementById("ysMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
