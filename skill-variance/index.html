@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見積もりの「1人日」は、誰が担当しても同じ? | 生産性ばらつきシミュレーター</title>
+<meta name="description" content="開発者間の生産性のばらつき(いわゆる「10倍プログラマ」)が、見積もりとの乖離にどう影響するかを、実証研究にもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/skill-variance/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/skill-variance/">
+<meta property="og:title" content="見積もりの「1人日」は、誰が担当しても同じ? | 生産性ばらつきシミュレーター">
+<meta property="og:description" content="開発者間の生産性のばらつきが、見積もりとの乖離にどう影響するかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/skill-variance.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "生産性ばらつきシミュレーター",
+  "alternateName": "Developer Productivity Variance Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/skill-variance/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "開発者間の生産性のばらつきが見積もりとの乖離にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- productivity-variance curve ---- */
+.sv-wrap{margin-top:14px}
+.sv-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.sv-grid{stroke:var(--line);stroke-width:1}
+.sv-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.sv-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.sv-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.sv-area{fill:var(--d);opacity:.10}
+.sv-line{fill:none;stroke:var(--ink);stroke-width:2.2}
+.sv-baseline{stroke:var(--q);stroke-width:1.4;stroke-dasharray:4 3}
+.sv-baseline-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--q);font-weight:700}
+.sv-marker{stroke:var(--alert);stroke-width:3;stroke-linecap:round;cursor:grab}
+.sv-marker.dragging{cursor:grabbing}
+.sv-marker-hit{fill:transparent;cursor:grab}
+.sv-marker-hit.dragging{cursor:grabbing}
+.sv-point{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.actual-card{border-left:4px solid var(--alert)}
+.tier-card.dev-card{border-left:4px solid var(--d)}
+
+/* ---- callout debunking the seniority-correlation misconception ---- */
+.callout{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;background:#FDFDFC;font-size:13px;color:var(--ink-soft)}
+.callout b{color:var(--ink)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">10.0日</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="sv-wrap">
+    <svg class="sv-svg" id="svChart" viewBox="0 0 640 240" role="img" aria-label="Actual days needed vs individual productivity multiplier">
+      <g id="svGridLayer"></g>
+      <path id="svArea" class="sv-area"></path>
+      <line id="svBaseline" class="sv-baseline" x1="0" y1="0" x2="0" y2="0"></line>
+      <text id="svBaselineLabel" class="sv-baseline-label"></text>
+      <path id="svLine" class="sv-line"></path>
+      <line id="svMarker" class="sv-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="svPoint" class="sv-point" r="5"></circle>
+      <rect id="svMarkerHit" class="sv-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card actual-card">
+      <div class="k" id="actualCardLabel"></div>
+      <div class="v" id="actualCardVal">10.0日</div>
+    </div>
+    <div class="tier-card dev-card">
+      <div class="k" id="devCardLabel"></div>
+      <div class="v" id="devCardVal">±0%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="callout" id="callout"></div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="multName"></span><small id="multSub"></small></div>
+      <div class="readout mono" id="multReadout">1.0倍</div>
+      <input type="range" id="multSlider" min="0.3" max="3.0" step="0.1" value="1.0">
+      <div class="num-row">
+        <label for="multNum" id="numLabel1"></label>
+        <input type="number" id="multNum" min="0.3" max="3.0" step="0.1" value="1.0">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="estName"></span><small id="estSub"></small></div>
+      <div class="readout mono" id="estReadout">10</div>
+      <input type="range" id="estSlider" min="1" max="60" step="1" value="10">
+      <div class="num-row">
+        <label for="estNum" id="numLabel2"></label>
+        <input type="number" id="estNum" min="1" max="60" step="1" value="10">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   開発者間の生産性のばらつき(いわゆる「10倍プログラマ」)にもとづくモデル。
+   Sackman, Erikson, Grant(1968)の研究では、最良と最悪の開発者の間で
+   コーディング時間に約20倍、デバッグ時間に約25倍の差が報告され、その後の
+   複数の追試(Curtis 1981、DeMarco & Lister 1985、Boehm & Papaccio 1988など)でも
+   同程度のオーダーの差が繰り返し確認されている。一方で、この生産性のばらつきは
+   経験年数と強く相関するわけではないと報告されており(同一の実験で経験と生産性の
+   相関は見出されなかった)、「シニアだから速い、ジュニアだから遅い」という単純な
+   図式は成り立たない。ここでは生産性倍率0.3倍〜3.0倍(最良/最悪でおよそ10倍の開き)を
+   軸に、見積もり(平均的な生産性を想定)との乖離を示す。
+*/
+const MULT_MIN = 0.3, MULT_MAX = 3.0;
+const EST_MIN = 1, EST_MAX = 60;
+
+function actualDaysOf(estimateDays, mult) { return estimateDays / mult; }
+function deviationPctOf(mult) { return (1 / mult - 1) * 100; }
+function scoreOf(mult) {
+  const logDev = Math.abs(Math.log2(mult));
+  return Math.max(0, Math.min(100, Math.round(100 - logDev * 40)));
+}
+function assess(estimateDays, mult) {
+  const actual = actualDaysOf(estimateDays, mult);
+  const deviation = deviationPctOf(mult);
+  const score = scoreOf(mult);
+  const band = score >= 90 ? 0 : score >= 70 ? 1 : score >= 50 ? 2 : score >= 30 ? 3 : 4;
+  return { actual, deviation, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "見積もりの「1人日」は、誰が担当しても同じ? | 生産性ばらつきシミュレーター",
+  heroTitle: "見積もりの「1人日」は、<br>誰が担当しても同じ?",
+  heroLead: "見積もりでは、担当者を「平均的な生産性の開発者」と仮定して工数を積算しがちです。しかし実証研究では、開発者間の生産性には最良と最悪で10倍近い個人差があることが繰り返し報告されています。重要なのは、この差が経験年数(ジュニアかシニアか)とはあまり相関しないという点です——生産性の高いジュニアも、平均的なシニアもいます。あくまで個人の資質・能力によるばらつきです。これは参画してからの時間経過による立ち上がりの話(→関連ページ「オンボーディング立ち上がり」)とは別の要因です。担当者の生産性倍率と見積もり工数を動かして、実日数への影響を確認してください。",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "見積もり工数",
+  scoreLabel: "見積もり的中度スコア",
+  multName: "担当者の生産性倍率", multSub: "平均的な生産性を1.0倍とした相対値(経験年数ではなく個人差)",
+  estName: "見積もり工数", estSub: "平均的な生産性を前提にした場合の工数(人日)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 最も生産性の低いメンバーがアサインされた",
+  chartCaption: "緑の点線は見積もり(平均的な生産性を想定)です。赤線は、担当者の生産性倍率に応じて実際にかかる日数がどう変わるかを示します。",
+  chartNote: "Sackman, Erikson, Grant(1968)らの研究を参考にした簡易モデルです。個々のプロジェクトの正確な日数を予測するものではありません。倍率の範囲(0.3〜3.0倍)は、報告されている「最良・最悪で約10倍」という開きを、平均を中心に対数的に対称配置したものです。",
+  svYTitle: "実際にかかる日数", svXTitle: "担当者の生産性倍率",
+  baselineLabel: "見積もり",
+  actualCardLabel: "実際にかかる日数",
+  devCardLabel: "見積もりとの乖離",
+  calloutText: "誤解に注意: 生産性のばらつきは、経験年数(ジュニア/シニア)とは強く相関しないと報告されています。「シニアを増やせば早くなる」とは限りません。",
+  hint: (est, mult, a) => `見積もり${est}人日(平均的な生産性を想定)に対し、担当者の生産性が平均の${mult.toFixed(1)}倍の場合、実際には約${a.actual.toFixed(1)}日かかる計算です(見積もりとの乖離 ${a.deviation >= 0 ? "+" : ""}${Math.round(a.deviation)}%)。`,
+  hintScenario: (est, a) => `見積もりは${est}人日でしたが、最も生産性の低いメンバー(平均の0.3倍)がアサインされました。実際には約${a.actual.toFixed(1)}日かかり、見積もりから+${Math.round(a.deviation)}%乖離する計算です。`,
+  comments: [
+    "ほぼ平均的な生産性です。見積もり通りに近い結果が期待できます。",
+    "多少の乖離はありますが、致命的ではありません。",
+    "見積もりとの乖離が無視できない水準です。",
+    "見積もりから大きく外れています。担当者次第で計画全体が揺らぎかねません。",
+    "見積もりの前提(平均的な生産性)が大きく崩れています。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "開発者間の生産性のばらつきは、ソフトウェア工学において最も繰り返し確認されてきた知見の一つです。Sackman, Erikson, Grant(1968)の実験では、最良と最悪の開発者の間でコーディング時間に約20倍、デバッグ時間に約25倍の差が報告され、Curtis(1981)、DeMarco & Lister(1985)、Boehm & Papaccio(1988)など後続の複数の研究でも、同程度のオーダーの個人差が繰り返し確認されています。一方でこれらの研究では、経験年数と生産性の間に強い相関は見出されていません。この生産性のばらつきは、あくまで個人の資質・能力によるものであり、「シニアだから速い」という単純な図式は成り立ちません。ただし元となった研究にはサンプル数の少なさなど方法論上の限界も指摘されており、個々の課題完了時間には偶然の要因も大きく影響するという指摘もあります。",
+  adviceItems: [
+    "見積もりを「平均的な生産性」だけでなく、担当者が確定している場合はその人の実績を踏まえて調整する",
+    "「シニアを増やせば速くなる」という短絡的な人員配置ではなく、個々人の実績を見て判断する",
+    "個人の生産性差は資質・能力によるものであり、経験年数だけで代替できないことを踏まえる",
+    "見積もりの不確実性の一因として、担当者未定の段階では生産性のばらつきをリスクとして織り込む",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "SOFTWARE ENGINEERING", title: "Making Software ―エビデンスが変えるソフトウェア開発", desc: "Andy Oram, Greg Wilson編。本シミュレーターの元になった「10倍」論争の実証研究を、複数の論考で詳しく検証した一冊。", link: "Amazonで見る →", url: "https://amzn.to/4wvv0uu" },
+    { tag: "SOFTWARE ENGINEERING", title: "世界一流エンジニアの思考法", desc: "牛尾剛著。米マイクロソフトの現役エンジニアが、生産性の高いエンジニアの思考プロセスを解説した一冊。", link: "Amazonで見る →", url: "https://amzn.to/4gzgI7q" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "見積もりの「1人日」は、誰が担当しても同じ? | 生産性ばらつきシミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Is a \"person-day\" the same no matter who's assigned? | Developer Productivity Variance Simulator",
+  heroTitle: "Is a \"person-day\" the same<br>no matter who's assigned?",
+  heroLead: "Estimates tend to assume whoever gets assigned will perform at \"average\" productivity. But research has repeatedly found close to a 10x gap in productivity between the best and worst developers. Crucially, this gap doesn't correlate strongly with years of experience — there are highly productive juniors and average seniors. It comes down to individual aptitude and ability, not tenure. This is a separate factor from the ramp-up that happens over time after joining a team (see the related Onboarding Ramp-Up simulator). Move the assigned person's productivity multiplier and the estimate to see the impact on actual days needed.",
+  consoleLabel: "ESTIMATE CONSOLE",
+  sumLabel: "Estimated effort",
+  scoreLabel: "Estimate accuracy score",
+  multName: "Assignee's productivity multiplier", multSub: "Relative to average = 1.0x (individual aptitude, not experience)",
+  estName: "Estimated effort", estSub: "Days assumed under average productivity",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: the least productive available person got assigned",
+  chartCaption: "The dashed green line is the estimate (assuming average productivity). The red line shows how actual days needed shifts with the assignee's productivity multiplier.",
+  chartNote: "A simplified model based on Sackman, Erikson, and Grant (1968) and later work — not a precise predictor for any specific project. The multiplier range (0.3x–3.0x) places the reported \"~10x best-to-worst\" spread symmetrically on a log scale around the average.",
+  svYTitle: "Actual days needed", svXTitle: "Assignee's productivity multiplier",
+  baselineLabel: "Estimate",
+  actualCardLabel: "Actual days needed",
+  devCardLabel: "Deviation from estimate",
+  calloutText: "Watch out for this misconception: productivity variance is not reported to correlate strongly with years of experience (junior vs. senior). \"Add more seniors\" doesn't reliably fix it.",
+  hint: (est, mult, a) => `Against an estimate of ${est} person-days (assuming average productivity), if the assignee's productivity is ${mult.toFixed(1)}x average, actual effort runs about ${a.actual.toFixed(1)} days (a ${a.deviation >= 0 ? "+" : ""}${Math.round(a.deviation)}% deviation from the estimate).`,
+  hintScenario: (est, a) => `The estimate was ${est} person-days, but the least productive available person (0.3x average) got assigned. Actual effort comes out to about ${a.actual.toFixed(1)} days — a +${Math.round(a.deviation)}% deviation from the estimate.`,
+  comments: [
+    "Close to average productivity. The outcome should land near the estimate.",
+    "Some deviation, but nothing critical.",
+    "A deviation from the estimate worth taking seriously.",
+    "Far off from the estimate — the whole plan could wobble depending on who's assigned.",
+    "The estimate's core assumption (average productivity) has broken down significantly.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Variance in individual developer productivity is one of the most consistently replicated findings in software engineering research. Sackman, Erikson, and Grant's 1968 study found roughly a 20x gap in coding time and a 25x gap in debugging time between the best and worst programmers, and later studies — Curtis (1981), DeMarco and Lister (1985), Boehm and Papaccio (1988), among others — repeatedly found individual differences of a similar order of magnitude. None of these studies found a strong correlation between years of experience and productivity, though. The variance comes down to individual aptitude and ability — \"seniors are faster\" isn't a reliable rule. That said, the original research has known methodological limits (small sample sizes among them), and some researchers note that a meaningful share of task-completion-time variance may come down to chance factors as well.",
+  adviceItems: [
+    "Once an assignee is known, adjust the estimate using their track record, not just an \"average\" assumption",
+    "Don't staff by the simplistic logic of \"add more seniors, go faster\" — judge by individual track record",
+    "Recognize that individual productivity differences are about aptitude, not something years of experience alone can substitute for",
+    "While the assignee is still unknown, treat productivity variance itself as a source of estimate uncertainty",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "SOFTWARE ENGINEERING", title: "Making Software: What Really Works, and Why We Believe It", desc: "Edited by Andy Oram, Greg Wilson. Examines the evidence behind the \"10x\" debate this simulator is based on, across multiple essays.", link: "View on Amazon →", url: "https://amzn.to/4gzi2ah" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Is a person-day the same no matter who's assigned? — Developer Productivity Variance Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (est, mult, a) => `見積もり${est}人日。担当は生産性${mult.toFixed(1)}倍の人。実際は${a.actual.toFixed(1)}日。「誰がやっても一緒でしょ」と言った人ほど、この乖離(${Math.round(a.deviation)}%)を知らない。`,
+  hintScenario: (est, a) => `見積もり${est}人日。よりによって一番大変な人にアサイン。実際は${a.actual.toFixed(1)}日。進捗会議で「なぜ遅れているのか」と聞かれるたびに、この記事を貼りたくなる。`,
+  comments: [
+    "涼しい顔でサクサク終わらせる。伝説の人。",
+    "普通に終わる。それが一番ありがたい。",
+    "「巻き取ります」と言った人が巻き取れていない状態。",
+    "見積もりを立てた人が真顔になる進捗報告。",
+    "「一旦、担当を変えましょう」という提案が出始める空気。",
+  ],
+},
+en: {
+  hint: (est, mult, a) => `Estimated ${est} days. Assignee's productivity: ${mult.toFixed(1)}x. Actual: ${a.actual.toFixed(1)} days. Whoever said "anyone can do this in the same time" definitely didn't know about this ${Math.round(a.deviation)}% gap.`,
+  hintScenario: (est, a) => `Estimated ${est} days. Somehow assigned to the person having the hardest time. Actual: ${a.actual.toFixed(1)} days. Every "why is this late" standup question makes you want to link this page.`,
+  comments: [
+    "Wraps it up without breaking a sweat. Legend status.",
+    "Finishes on schedule. Underrated blessing.",
+    "The person who said \"I'll take care of it\" is not, in fact, taking care of it.",
+    "The status update that makes whoever wrote the estimate go quiet.",
+    "The air in the room where someone starts suggesting \"maybe let's reassign this.\"",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let multiplier = 1.0;
+let estimateDays = 10;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 44, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const xOf = (m) => PAD_L + ((m - MULT_MIN) / (MULT_MAX - MULT_MIN)) * (PW - PAD_L - PAD_R);
+const mOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = MULT_MIN + frac * (MULT_MAX - MULT_MIN);
+  return Math.min(MULT_MAX, Math.max(MULT_MIN, Math.round(raw * 10) / 10));
+};
+let Y_MAX = 40;
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  Y_MAX = Math.max(20, Math.ceil((estimateDays / MULT_MIN) / 10) * 10);
+
+  const gridLayer = document.getElementById("svGridLayer");
+  gridLayer.innerHTML = "";
+  const yStep = Y_MAX / 5;
+  for (let v = 0; v <= Y_MAX + 1e-9; v += yStep) {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "sv-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "sv-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = Math.round(v);
+    gridLayer.appendChild(label);
+  }
+  [0.3, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].forEach((m) => {
+    const x = xOf(m);
+    gridLayer.appendChild(el("line", { class: "sv-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "sv-axis-label", x, y: PH - PAD_B + 14, "text-anchor": m === MULT_MIN ? "start" : m === MULT_MAX ? "end" : "middle" });
+    label.textContent = m.toFixed(1) + "x";
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "sv-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.svYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "sv-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.svXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  for (let m = MULT_MIN; m <= MULT_MAX; m += 0.02) pts.push(`${xOf(m)},${yOf(actualDaysOf(estimateDays, m))}`);
+  document.getElementById("svLine").setAttribute("d", "M " + pts.join(" L "));
+  document.getElementById("svArea").setAttribute("d", "M " + xOf(MULT_MIN) + "," + yOf(0) + " L " + pts.join(" L ") + " L " + xOf(MULT_MAX) + "," + yOf(0) + " Z");
+
+  const by = yOf(estimateDays);
+  const baseline = document.getElementById("svBaseline");
+  baseline.setAttribute("x1", PAD_L); baseline.setAttribute("x2", PW - PAD_R);
+  baseline.setAttribute("y1", by); baseline.setAttribute("y2", by);
+  const baselineLabel = document.getElementById("svBaselineLabel");
+  baselineLabel.setAttribute("x", PW - PAD_R - 4);
+  baselineLabel.setAttribute("y", by - 6);
+  baselineLabel.setAttribute("text-anchor", "end");
+  baselineLabel.textContent = t.baselineLabel;
+
+  const mx = xOf(multiplier), my = yOf(actualDaysOf(estimateDays, multiplier));
+  const marker = document.getElementById("svMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+  const point = document.getElementById("svPoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", my);
+
+  const hit = document.getElementById("svMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(estimateDays, multiplier);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = t.htmlLang === "ja" ? `${estimateDays}日` : `${estimateDays}d`;
+  document.getElementById("actualCardVal").textContent = t.htmlLang === "ja" ? `${a.actual.toFixed(1)}日` : `${a.actual.toFixed(1)}d`;
+  document.getElementById("devCardVal").textContent = `${a.deviation >= 0 ? "+" : ""}${Math.round(a.deviation)}%`;
+  document.getElementById("hint").textContent = t.hint(estimateDays, multiplier, a);
+  document.getElementById("callout").textContent = t.calloutText;
+
+  document.getElementById("multReadout").textContent = multiplier.toFixed(1) + (t.htmlLang === "ja" ? "倍" : "x");
+  document.getElementById("estReadout").textContent = estimateDays;
+  if (document.activeElement !== document.getElementById("multSlider")) document.getElementById("multSlider").value = multiplier;
+  if (document.activeElement !== document.getElementById("multNum")) document.getElementById("multNum").value = multiplier;
+  if (document.activeElement !== document.getElementById("estSlider")) document.getElementById("estSlider").value = estimateDays;
+  if (document.activeElement !== document.getElementById("estNum")) document.getElementById("estNum").value = estimateDays;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 30 ? " danger" : a.score < 50 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/skill-variance/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("multName").textContent = t.multName;
+  document.getElementById("multSub").textContent = t.multSub;
+  document.getElementById("estName").textContent = t.estName;
+  document.getElementById("estSub").textContent = t.estSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("multSlider").setAttribute("aria-label", t.multName);
+  document.getElementById("estSlider").setAttribute("aria-label", t.estName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.multName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.estName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("actualCardLabel").textContent = t.actualCardLabel;
+  document.getElementById("devCardLabel").textContent = t.devCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "skill-variance" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("multSlider").addEventListener("input", (e) => { multiplier = +e.target.value; render(); });
+document.getElementById("multNum").addEventListener("change", (e) => {
+  multiplier = Math.min(MULT_MAX, Math.max(MULT_MIN, +e.target.value));
+  render();
+});
+document.getElementById("estSlider").addEventListener("input", (e) => { estimateDays = +e.target.value; render(); });
+document.getElementById("estNum").addEventListener("change", (e) => {
+  estimateDays = Math.min(EST_MAX, Math.max(EST_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  multiplier = 1.0; estimateDays = 10;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  multiplier = 0.3;
+  render();
+  const a = assess(estimateDays, multiplier);
+  document.getElementById("hint").textContent = T().hintScenario(estimateDays, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const svChart = document.getElementById("svChart");
+function svgPoint(evt) {
+  const pt = svChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  svChart.setPointerCapture(evt.pointerId);
+  document.getElementById("svMarker").classList.add("dragging");
+  document.getElementById("svMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  multiplier = mOfX(p.x);
+  render();
+}
+document.getElementById("svMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("svPoint").addEventListener("pointerdown", startDrag);
+svChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => svChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("svMarker").classList.remove("dragging");
+  document.getElementById("svMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

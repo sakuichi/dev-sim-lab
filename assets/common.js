@@ -161,6 +161,12 @@ window.DevSimLab = (function () {
       ja: { name: "オンボーディング立ち上がりシミュレーター", title: "新しく加わった人は、初日から「1人月」分働ける?", desc: "新しく加わったメンバーの生産性が時間をかけて立ち上がっていく様子を、業界調査データにもとづいて可視化するシミュレーター。" },
       en: { name: "Onboarding Ramp-Up Simulator", title: "Can a new team member contribute a full \"person-month\" from day one?", desc: "A simulator visualizing how a new team member's productivity ramps up over time, based on industry survey data." },
     },
+    {
+      id: "skill-variance", href: "skill-variance/", status: "live",
+      tags: { ja: ["生産性", "見積もり"], en: ["Productivity", "Estimation"] },
+      ja: { name: "生産性ばらつきシミュレーター", title: "見積もりの「1人日」は、誰が担当しても同じ?", desc: "開発者間の生産性のばらつき(いわゆる「10倍プログラマ」)が見積もりとの乖離にどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Developer Productivity Variance Simulator", title: "Is a \"person-day\" the same no matter who's assigned?", desc: "A simulator visualizing how developer productivity variance (the \"10x programmer\" debate) affects deviation from estimates." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
