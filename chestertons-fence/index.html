@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>誰も理由を知らないコードは、消してもいい? | チェスタトンのフェンス・シミュレーター</title>
+<meta name="description" content="「用途が分からないものを撤去してはいけない」——チェスタトンのフェンス(1929年)を、謎コードの削除前の調査努力と障害確率で体験できるシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/chestertons-fence/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/chestertons-fence/">
+<meta property="og:title" content="誰も理由を知らないコードは、消してもいい? | チェスタトンのフェンス・シミュレーター">
+<meta property="og:description" content="「用途が分からないものを撤去してはいけない」——チェスタトンのフェンス(1929年)を、謎コードの削除前の調査努力と障害確率で体験できるシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/chestertons-fence.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "チェスタトンのフェンス・シミュレーター",
+  "alternateName": "Chesterton's Fence Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/chestertons-fence/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "撤去前の調査努力が、謎コードの用途に気づける確率と撤去が障害につながる確率にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- crossing dual-line chart (discover rate rising, incident rate falling) ---- */
+.cf-wrap{margin-top:14px}
+.cf-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.cf-grid{stroke:var(--line);stroke-width:1}
+.cf-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.cf-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.cf-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.cf-line-discover{fill:none;stroke:var(--q);stroke-width:2.2}
+.cf-line-incident{fill:none;stroke:var(--alert);stroke-width:2.2}
+.cf-dot{r:3.5}
+.cf-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.cf-marker.dragging{cursor:grabbing}
+.cf-marker-hit{fill:transparent;cursor:grab}
+.cf-marker-hit.dragging{cursor:grabbing}
+.cf-point-discover{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.cf-point-incident{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.cf-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.cf-value-label-discover{fill:var(--q)}
+.cf-value-label-incident{fill:var(--alert)}
+.cf-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.cf-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.cf-legend .sw.discover{background:var(--q)}
+.cf-legend .sw.incident{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box (what "investigation" looks like right now) ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.discover-card{border-left:4px solid var(--q)}
+.tier-card.incident-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">19.4%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="cf-wrap">
+    <svg class="cf-svg" id="cfChart" viewBox="0 0 640 240" role="img" aria-label="Chance of discovering the purpose vs chance of removal causing an incident, by investigation effort">
+      <g id="cfGridLayer"></g>
+      <path id="cfLineDiscover" class="cf-line-discover"></path>
+      <path id="cfLineIncident" class="cf-line-incident"></path>
+      <g id="cfDotsLayer"></g>
+      <line id="cfMarker" class="cf-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="cfPointDiscover" class="cf-point-discover" r="5"></circle>
+      <circle id="cfPointIncident" class="cf-point-incident" r="5"></circle>
+      <text id="cfLabelDiscover" class="cf-value-label cf-value-label-discover"></text>
+      <text id="cfLabelIncident" class="cf-value-label cf-value-label-incident"></text>
+      <rect id="cfMarkerHit" class="cf-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="cf-legend">
+    <span><span class="sw discover"></span><span id="legendDiscover"></span></span>
+    <span><span class="sw incident"></span><span id="legendIncident"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card discover-card">
+      <div class="k" id="discoverCardLabel"></div>
+      <div class="v" id="discoverCardVal">36%</div>
+    </div>
+    <div class="tier-card incident-card">
+      <div class="k" id="incidentCardLabel"></div>
+      <div class="v" id="incidentCardVal">19.4%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">69</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="effortName"></span><small id="effortSub"></small></div>
+      <div class="readout mono" id="effortReadout">30</div>
+      <input type="range" id="effortSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="effortNum" id="numLabel1"></label>
+        <input type="number" id="effortNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="loadName"></span><small id="loadSub"></small></div>
+      <div class="readout mono" id="loadReadout">30%</div>
+      <input type="range" id="loadSlider" min="10" max="70" step="5" value="30">
+      <div class="num-row">
+        <label for="loadNum" id="numLabel2"></label>
+        <input type="number" id="loadNum" min="10" max="70" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「チェスタトンのフェンス」——G.K.チェスタトンが『The Thing』(1929年)の
+   「The Drift from Domesticity」章で示した原則。道をふさぐフェンスを見て
+   「用途が分からないから撤去しよう」と言う改革者に対し、賢明な改革者はこう答える:
+   「用途が分からないなら、撤去させるわけにはいかない。考えてきなさい。
+   用途が分かったと言えるようになったら、壊すことを許可しよう」。
+   ソフトウェアでは「誰も理由を知らない謎コード・謎設定の削除」がこれにあたる。
+   現代的な対応物として「ハイラムの法則」(Hyrum Wright, Google/
+   『Software Engineering at Google』): 利用者が十分に多ければ、契約で何を約束したかに
+   関係なく、システムの観測可能な挙動すべてに誰かが依存する——一見無意味な挙動にも
+   依存者がいる可能性がある、という経験則が知られている。
+   本モデルは「撤去前の調査努力」が上がるほど用途に気づける確率が上がり、
+   「一見不要なコードが実は何かを支えている割合」との積で障害確率が決まる、
+   という単純化した独自モデルであり、実証研究の数値を再現したものではない。
+*/
+const EFFORT_MIN = 0, EFFORT_MAX = 100;
+const LOAD_MIN = 10, LOAD_MAX = 70;
+const DISCOVER_BASE = 10, DISCOVER_SLOPE = 0.85;
+/* スコア正規化用: 最悪ケース(調査0・支持率70%)の障害確率 */
+const INCIDENT_WORST = LOAD_MAX * (1 - DISCOVER_BASE / 100);
+
+function discoverRateOf(effort) { return DISCOVER_BASE + effort * DISCOVER_SLOPE; }
+function incidentRateOf(effort, load) { return load * (1 - discoverRateOf(effort) / 100); }
+function scoreOf(effort, load) {
+  return Math.max(0, Math.min(100, Math.round(100 - (incidentRateOf(effort, load) / INCIDENT_WORST) * 100)));
+}
+function tierOf(effort) { return Math.min(4, Math.floor(effort / 20)); }
+function assess(effort, load) {
+  const discover = discoverRateOf(effort);
+  const incident = incidentRateOf(effort, load);
+  const score = scoreOf(effort, load);
+  const band = tierOf(effort);
+  return { discover, incident, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "誰も理由を知らないコードは、消してもいい? | チェスタトンのフェンス・シミュレーター",
+  heroTitle: "誰も理由を知らないコードは、<br>消してもいい?",
+  heroLead: "リファクタリング中に、何のためにあるのか分からないコードを見つけました。コメントはなく、書いた人は退職済み。「どうせ誰も使っていないから消そう」——その瞬間、どこか遠くのシステムが壊れます。1929年、G.K.チェスタトンは著書『The Thing』でこう書きました。道をふさぐ理由の分からないフェンスを「無意味だから撤去しよう」と言う人には、こう答えるべきだ——「用途が分からないなら、撤去させるわけにはいかない。考えてきなさい。用途が分かったと言えるようになったら、壊すことを許可しよう」。ソフトウェアの世界には、これを裏打ちする経験則もあります。Googleのハイラムの法則いわく「利用者が十分に多ければ、システムの観測可能な挙動すべてに誰かが依存する」——一見無意味な挙動でさえ、です。「撤去前の調査努力」と「一見不要なコードが実は何かを支えている割合」を動かして、削除が障害につながる確率を確認してください。",
+  consoleLabel: "FENCE CONSOLE",
+  sumLabel: "撤去が障害につながる確率",
+  scoreLabel: "撤去判断の安全度スコア",
+  effortName: "撤去前の調査努力", effortSub: "0=「使ってなさそう」で即削除、100=履歴・関係者・計測で用途を確認してから判断",
+  loadName: "実は何かを支えている割合", loadSub: "一見不要に見えるコード・設定のうち、実際には何かを支えているものの割合(想定)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 「どうせ誰も使ってない」で即削除",
+  chartCaption: "緑線は撤去前に用途に気づける確率、赤線は気づかないまま撤去して障害につながる確率です。調査努力を上げるほど赤線は下がり、「実は支えている割合」を上げると赤線全体が持ち上がります。",
+  chartNote: "調査努力と障害確率の関係を単純化した独自モデルであり、実証研究の数値を再現したものではありません。チェスタトンのフェンス自体は1929年の原則、ハイラムの法則はGoogleのエンジニアリング経験則です。",
+  cfYTitle: "確率(%)", cfXTitle: "撤去前の調査努力",
+  legendDiscover: "撤去前に用途に気づける確率",
+  legendIncident: "撤去が障害につながる確率",
+  scenarioBoxTitle: "いまの調査は、こんな状態",
+  scenarios: [
+    "「使ってなさそう」という見た目の印象だけで削除しています。git blameすら開いていません。",
+    "コミットメッセージを流し読みした程度です。「fix」とだけ書かれた10年前のコミットに突き当たって調査が止まっています。",
+    "履歴と参照箇所を調べ、ドキュメントを探しています。当時のチケットが見つかれば大きな手がかりになります。",
+    "書いた本人や当時を知るチームに経緯を確認しています。「ああ、それは月末バッチのためのやつ」の一言で謎が解けることがあります。",
+    "ログやトラフィックの計測で「実際に使われているか」を確認してから判断しています。フェンスの用途を説明できる状態です。",
+  ],
+  discoverCardLabel: "撤去前に用途に気づける確率",
+  incidentCardLabel: "撤去が障害につながる確率",
+  hint: (effort, load, a) => `調査努力${effort}のとき、撤去前に用途に気づける確率はおよそ${Math.round(a.discover)}%。実は支えている割合${load}%とあわせると、撤去が障害につながる確率は約${a.incident.toFixed(1)}%です。`,
+  hintScenario: (load, a) => `「どうせ誰も使ってない」——ハイラムの法則によれば、観測可能な挙動には誰かが依存しています。用途に気づける確率は約${Math.round(a.discover)}%まで下がり、障害確率は約${a.incident.toFixed(1)}%。消した瞬間に、どこかのチームのアラートが鳴るかもしれません。`,
+  comments: [
+    "見た目の印象だけの削除です。フェンスの向こうで何が起きるかは、消してから分かります。",
+    "最低限の確認はしていますが、経緯の大半はまだ謎のままです。",
+    "調査が機能し始めています。ただし「調べても分からなかった」は「不要」の証明ではありません。",
+    "経緯の確認がプロセスになっています。撤去も残置も、根拠を持って判断できる状態です。",
+    "用途を説明できてから撤去する——チェスタトンの言う「賢明な改革者」の状態です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "チェスタトンのフェンスは「何も消すな」という保守主義ではありません。原則はむしろ逆で、「用途を説明できるようになれば、壊してよい」——つまり削除を許可するための手順を示しています。謎コードの放置はそれ自体が技術的負債であり、恐くて誰も触れないコードが増えるほど変更コストは上がり続けます。健全なのは「調べずに消す」でも「恐くて残す」でもなく、調査を軽量にする仕組みに投資することです。なぜそのコードがあるのかをコミットメッセージ・ADR(意思決定記録)・チケットに残す文化があれば、次にフェンスの前に立つ人の調査コストは激減します。ハイラムの法則が示すとおり、観測可能な挙動には依存者がいる前提で、削除は段階的に(非推奨化→計測→撤去)進めるのが実務的です。",
+  adviceItems: [
+    "消す前に最低限、履歴(git blame/log)と参照箇所を確認する。「見た目が不要」は根拠にならない",
+    "調べても用途が分からない場合は、いきなり消さず計測を仕込む(ログ・フラグで実使用を観測してから判断)",
+    "削除は段階的に: 非推奨化して警告→一定期間の計測→撤去。ロールバック手段を残す",
+    "次の人のためにフェンスの理由を残す: なぜ入れたかをコミットメッセージ・ADR・コメントに書く文化をつくる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "REFACTORING", title: "レガシーコードからの脱却", desc: "David Scott Bernstein著。恐くて触れないコードとどう向き合い、安全に変更できるソフトウェアへ近づけるかを説く実践書。", link: "Amazonで見る →", url: "https://amzn.to/44qyouA" },
+    { tag: "ENGINEERING CULTURE", title: "Googleのソフトウェアエンジニアリング", desc: "Winters/Manshreck/Wright著の日本語版。本ページで引用したハイラムの法則の出典であり、変更とメンテナンスの規律を体系的に学べる一冊。", link: "Amazonで見る →", url: "https://amzn.to/4vrEZ2X" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "誰も理由を知らないコードは、消してもいい? | チェスタトンのフェンス・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Nobody knows why this code exists — safe to delete? | Chesterton's Fence Simulator",
+  heroTitle: "Nobody knows why this code exists —<br>safe to delete?",
+  heroLead: "Mid-refactor, you find code with no apparent purpose. No comments; the author left years ago. \"Nobody's using this — let's delete it.\" The moment you do, something far away breaks. In 1929, G.K. Chesterton wrote in The Thing: to the reformer who wants to clear away a fence because he sees no use for it, the intelligent answer is — \"If you don't see the use of it, I certainly won't let you clear it away. Go away and think. Then, when you can come back and tell me that you do see the use of it, I may allow you to destroy it.\" Software has its own supporting heuristic: Hyrum's Law, from Google — \"with a sufficient number of users, all observable behaviors of your system will be depended on by somebody\" — even the seemingly meaningless ones. Move the \"investigation effort before removal\" and the \"share of seemingly useless code that's actually load-bearing\" to see how removal turns into incidents.",
+  consoleLabel: "FENCE CONSOLE",
+  sumLabel: "Chance removal causes an incident",
+  scoreLabel: "Removal-decision safety score",
+  effortName: "Investigation effort before removal", effortSub: "0 = delete on sight, 100 = check history, people, and measurements before deciding",
+  loadName: "Share that's actually load-bearing", loadSub: "Assumed share of seemingly useless code/config that actually supports something",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: \"nobody uses this anyway\" — instant delete",
+  chartCaption: "The green line is the chance of discovering the purpose before removal; the red line is the chance of removing it blind and causing an incident. More investigation pushes the red line down; a higher load-bearing share lifts the whole red line.",
+  chartNote: "A simplified original model of the effort-to-incident relationship — not a reproduction of empirical numbers. Chesterton's fence itself is the 1929 principle; Hyrum's Law is an engineering heuristic from Google.",
+  cfYTitle: "Probability (%)", cfXTitle: "Investigation effort before removal",
+  legendDiscover: "Chance of discovering the purpose first",
+  legendIncident: "Chance removal causes an incident",
+  scenarioBoxTitle: "What the investigation looks like right now",
+  scenarios: [
+    "Deleting on visual impression alone. git blame hasn't even been opened.",
+    "Skimmed the commit messages. The trail went cold at a ten-year-old commit that just says \"fix.\"",
+    "Checking history and references, hunting for documentation. Finding the original ticket would be a real lead.",
+    "Asking the author or people who were around at the time. One \"oh, that's for the month-end batch\" can solve the whole mystery.",
+    "Measuring actual usage via logs and traffic before deciding. You can explain what the fence is for.",
+  ],
+  discoverCardLabel: "Chance of discovering the purpose first",
+  incidentCardLabel: "Chance removal causes an incident",
+  hint: (effort, load, a) => `At investigation effort ${effort}, the chance of discovering the purpose before removal is about ${Math.round(a.discover)}%. Combined with a ${load}% load-bearing share, removal causes an incident with roughly ${a.incident.toFixed(1)}% probability.`,
+  hintScenario: (load, a) => `"Nobody uses this anyway" — per Hyrum's Law, somebody depends on every observable behavior. Discovery odds drop to about ${Math.round(a.discover)}%, incident odds hit ${a.incident.toFixed(1)}%. The moment you delete it, some team's alert may light up.`,
+  comments: [
+    "Deletion by visual impression. What's behind the fence becomes known only after it's gone.",
+    "Minimal checks done; most of the history is still a mystery.",
+    "Investigation is starting to work — but \"I looked and couldn't tell\" is not proof of \"unused.\"",
+    "Checking the history is now part of the process. Remove or keep, the decision has grounds.",
+    "Explain the purpose first, then remove — Chesterton's \"more intelligent type of reformer.\"",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Chesterton's fence is not \"never delete anything.\" The principle points the other way: once you can explain the fence's purpose, you may tear it down — it's a procedure for earning the right to delete. Leaving mystery code untouched is itself technical debt: the more code people are afraid to touch, the higher every change costs. The healthy path is neither deleting blind nor keeping out of fear, but investing in making investigation cheap. A culture of recording why — commit messages, ADRs (architecture decision records), tickets — slashes the investigation cost for the next person standing at the fence. And since Hyrum's Law says observable behaviors have dependents, practical removal is staged: deprecate, measure, then remove.",
+  adviceItems: [
+    "Before deleting, check at minimum the history (git blame/log) and references — \"looks unused\" is not evidence",
+    "If investigation can't determine the purpose, don't delete — instrument it (logs/flags) and observe real usage first",
+    "Remove in stages: deprecate with warnings → measure for a period → remove, keeping a rollback path",
+    "Leave the fence's reason for the next person: write the why into commit messages, ADRs, and comments",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ENGINEERING CULTURE", title: "Software Engineering at Google", desc: "The book that codified Google's engineering culture — and the source of Hyrum's Law quoted on this page.", link: "View on Amazon →", url: "https://amzn.to/4vqTQe8" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Nobody knows why this code exists — safe to delete? — Chesterton's Fence Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (effort, load, a) => `調査${effort}。「dead code」とコメントされたコードが本番の祝日判定を支えていた事件、覚えていますか。障害確率約${a.incident.toFixed(1)}%。削除PRのdiffは美しい。美しさと安全性は別物。`,
+  hintScenario: (load, a) => `「grepしたけど参照なかったです」——動的に組み立てられた文字列からの呼び出しは、grepには映らない。障害確率約${a.incident.toFixed(1)}%。消した3分後、別チームのSlackが光る。`,
+  comments: [
+    "削除コミットのメッセージは「cleanup」。3日後のrevertコミットのメッセージは「Revert cleanup」。",
+    "「たぶん大丈夫」のたぶんが取れないまま、金曜の夕方にマージされた。",
+    "調査を始めたら、そのコードを書いたのが過去の自分だと判明した。それでも理由は思い出せない。",
+    "「これ消していいですか?」をチームに聞けている。この一言が言える空気が、実は一番の安全装置。",
+    "非推奨化して1か月ログを取った。使用者: 毎月末に1回、経理部の全社集計バッチ。消していたら大惨事だった。",
+  ],
+},
+en: {
+  hint: (effort, load, a) => `Investigation ${effort}. Remember when the code commented "dead code" turned out to run production holiday logic? Incident odds ~${a.incident.toFixed(1)}%. The deletion PR's diff is beautiful. Beautiful and safe are different things.`,
+  hintScenario: (load, a) => `"I grepped, no references" — calls built from dynamic strings don't show up in grep. Incident odds ~${a.incident.toFixed(1)}%. Three minutes after deletion, another team's Slack lights up.`,
+  comments: [
+    "The deletion commit says \"cleanup.\" The commit three days later says \"Revert cleanup.\"",
+    "The \"probably\" in \"probably fine\" never got resolved, and it merged on a Friday evening.",
+    "Investigation revealed the author of the mystery code: past you. The reason remains a mystery anyway.",
+    "\"Mind if I delete this?\" gets asked out loud. That one sentence being sayable is the real safety system.",
+    "Deprecated it and logged for a month. Sole user: the accounting department's company-wide month-end batch. Deleting it would have been a catastrophe.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let effort = 30;
+let load = 30;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - EFFORT_MIN) / (EFFORT_MAX - EFFORT_MIN)) * (PW - PAD_L - PAD_R);
+const eOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = EFFORT_MIN + frac * (EFFORT_MAX - EFFORT_MIN);
+  return Math.min(EFFORT_MAX, Math.max(EFFORT_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("cfGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "cf-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "cf-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "cf-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "cf-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === EFFORT_MIN ? "start" : v === EFFORT_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "cf-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.cfYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "cf-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.cfXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const discoverPts = [], incidentPts = [];
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 2) {
+    discoverPts.push(`${xOf(v)},${yOf(discoverRateOf(v))}`);
+    incidentPts.push(`${xOf(v)},${yOf(incidentRateOf(v, load))}`);
+  }
+  document.getElementById("cfLineDiscover").setAttribute("d", "M " + discoverPts.join(" L "));
+  document.getElementById("cfLineIncident").setAttribute("d", "M " + incidentPts.join(" L "));
+
+  const dotsLayer = document.getElementById("cfDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = EFFORT_MIN; v <= EFFORT_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "cf-dot", cx: xOf(v), cy: yOf(discoverRateOf(v)), fill: "var(--q)" }));
+    dotsLayer.appendChild(el("circle", { class: "cf-dot", cx: xOf(v), cy: yOf(incidentRateOf(v, load)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(effort);
+  const marker = document.getElementById("cfMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const discoverY = yOf(discoverRateOf(effort));
+  const incidentY = yOf(incidentRateOf(effort, load));
+  document.getElementById("cfPointDiscover").setAttribute("cx", mx);
+  document.getElementById("cfPointDiscover").setAttribute("cy", discoverY);
+  document.getElementById("cfPointIncident").setAttribute("cx", mx);
+  document.getElementById("cfPointIncident").setAttribute("cy", incidentY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const discoverIsHigher = discoverY <= incidentY;
+
+  const labelDiscover = document.getElementById("cfLabelDiscover");
+  labelDiscover.setAttribute("x", mx + labelDx);
+  labelDiscover.setAttribute("y", clampY(discoverIsHigher ? discoverY - 10 : discoverY + 20));
+  labelDiscover.setAttribute("text-anchor", labelAnchor);
+  labelDiscover.textContent = Math.round(discoverRateOf(effort)) + "%";
+
+  const labelIncident = document.getElementById("cfLabelIncident");
+  labelIncident.setAttribute("x", mx + labelDx);
+  labelIncident.setAttribute("y", clampY(discoverIsHigher ? incidentY + 20 : incidentY - 10));
+  labelIncident.setAttribute("text-anchor", labelAnchor);
+  labelIncident.textContent = incidentRateOf(effort, load).toFixed(1) + "%";
+
+  const hit = document.getElementById("cfMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(effort, load);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${a.incident.toFixed(1)}%`;
+  document.getElementById("discoverCardVal").textContent = `${Math.round(a.discover)}%`;
+  document.getElementById("incidentCardVal").textContent = `${a.incident.toFixed(1)}%`;
+  document.getElementById("hint").textContent = t.hint(effort, load, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.band];
+
+  document.getElementById("effortReadout").textContent = effort;
+  document.getElementById("loadReadout").textContent = load + "%";
+  if (document.activeElement !== document.getElementById("effortSlider")) document.getElementById("effortSlider").value = effort;
+  if (document.activeElement !== document.getElementById("effortNum")) document.getElementById("effortNum").value = effort;
+  if (document.activeElement !== document.getElementById("loadSlider")) document.getElementById("loadSlider").value = load;
+  if (document.activeElement !== document.getElementById("loadNum")) document.getElementById("loadNum").value = load;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 70 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/chestertons-fence/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("effortName").textContent = t.effortName;
+  document.getElementById("effortSub").textContent = t.effortSub;
+  document.getElementById("loadName").textContent = t.loadName;
+  document.getElementById("loadSub").textContent = t.loadSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("effortSlider").setAttribute("aria-label", t.effortName);
+  document.getElementById("loadSlider").setAttribute("aria-label", t.loadName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.effortName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.loadName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendDiscover").textContent = t.legendDiscover;
+  document.getElementById("legendIncident").textContent = t.legendIncident;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("discoverCardLabel").textContent = t.discoverCardLabel;
+  document.getElementById("incidentCardLabel").textContent = t.incidentCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "chestertons-fence" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("effortSlider").addEventListener("input", (e) => { effort = +e.target.value; render(); });
+document.getElementById("effortNum").addEventListener("change", (e) => {
+  effort = Math.min(EFFORT_MAX, Math.max(EFFORT_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("loadSlider").addEventListener("input", (e) => { load = +e.target.value; render(); });
+document.getElementById("loadNum").addEventListener("change", (e) => {
+  load = Math.min(LOAD_MAX, Math.max(LOAD_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  effort = 30; load = 30;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  effort = 0;
+  render();
+  const a = assess(effort, load);
+  document.getElementById("hint").textContent = T().hintScenario(load, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const cfChart = document.getElementById("cfChart");
+function svgPoint(evt) {
+  const pt = cfChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(cfChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  cfChart.setPointerCapture(evt.pointerId);
+  document.getElementById("cfMarker").classList.add("dragging");
+  document.getElementById("cfMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  effort = eOfX(p.x);
+  render();
+}
+document.getElementById("cfMarkerHit").addEventListener("pointerdown", startDrag);
+cfChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => cfChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("cfMarker").classList.remove("dragging");
+  document.getElementById("cfMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

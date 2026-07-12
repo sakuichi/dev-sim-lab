@@ -221,6 +221,12 @@ window.DevSimLab = (function () {
       ja: { name: "ホフスタッターの法則シミュレーター", title: "多めに見積もったのに、なぜまた遅れる?", desc: "バッファをどれだけ積んでも実際の所要時間がその先を行く、自己言及的な見積もりの法則と計画錯誤の研究を体験できるシミュレーター。" },
       en: { name: "Hofstadter's Law Simulator", title: "You padded the estimate — so why is it late again?", desc: "A simulator of the self-referential estimation law and the planning fallacy: however much buffer you stack, the actual duration stays ahead." },
     },
+    {
+      id: "chestertons-fence", href: "chestertons-fence/", status: "live",
+      tags: { ja: ["チェスタトンのフェンス", "リファクタリング"], en: ["Chesterton's fence", "Refactoring"] },
+      ja: { name: "チェスタトンのフェンス・シミュレーター", title: "誰も理由を知らないコードは、消してもいい?", desc: "撤去前の調査努力が、謎コードの用途に気づける確率と削除が障害につながる確率にどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Chesterton's Fence Simulator", title: "Nobody knows why this code exists — safe to delete?", desc: "A simulator visualizing how pre-removal investigation drives the chance of discovering a mystery code's purpose versus causing an incident." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -326,7 +332,7 @@ window.DevSimLab = (function () {
     "utilization-trap": ["wip-lead-time", "context-switch", "brooks-law"],
     "context-switch": ["pause-cost", "wip-lead-time", "utilization-trap"],
     "estimation-uncertainty": ["hofstadters-law", "skill-variance", "qcd-tradeoff"],
-    "technical-debt": ["cost-of-change", "zero-bugs", "code-review"],
+    "technical-debt": ["cost-of-change", "chestertons-fence", "zero-bugs"],
     "code-review": ["bikeshedding", "technical-debt", "speak-up-cost"],
     "release-frequency": ["wip-lead-time", "qcd-tradeoff", "technical-debt"],
     "cost-of-change": ["technical-debt", "estimation-uncertainty", "zero-bugs"],
@@ -345,6 +351,7 @@ window.DevSimLab = (function () {
     "xy-problem": ["curse-of-knowledge", "rubber-duck", "speak-up-cost"],
     "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
     "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
+    "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
   };
 
   function renderRelated(container, opts) {
