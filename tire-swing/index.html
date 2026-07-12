@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕様どおり完成したのに、なぜ喜ばれない? | タイヤのブランコ・シミュレーター</title>
+<meta name="description" content="顧客の言う仕様をそのまま実装しても本来の課題は解決しないことがある——有名な「木のブランコ」風刺画の現象を、要求の裏の課題を掘る度合いで可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/tire-swing/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/tire-swing/">
+<meta property="og:title" content="仕様どおり完成したのに、なぜ喜ばれない? | タイヤのブランコ・シミュレーター">
+<meta property="og:description" content="顧客の言う仕様をそのまま実装しても本来の課題は解決しないことがある——「木のブランコ」風刺画の現象を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/tire-swing.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "タイヤのブランコ・シミュレーター",
+  "alternateName": "Tire Swing Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/tire-swing/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "要求の裏の課題を掘る度合いが、仕様どおりの完成率と本来の課題の解決度の乖離にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- flat spec-completion line vs rising problem-solved curve ---- */
+.ts-wrap{margin-top:14px}
+.ts-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.ts-grid{stroke:var(--line);stroke-width:1}
+.ts-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.ts-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.ts-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.ts-line-spec{fill:none;stroke:var(--q);stroke-width:2;stroke-dasharray:5 3}
+.ts-line-solved{fill:none;stroke:var(--alert);stroke-width:2.2}
+.ts-spec-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:10px;fill:var(--ink-soft)}
+.ts-dot{r:3.5}
+.ts-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.ts-marker.dragging{cursor:grabbing}
+.ts-marker-hit{fill:transparent;cursor:grab}
+.ts-marker-hit.dragging{cursor:grabbing}
+.ts-point-solved{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.ts-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--alert)}
+.ts-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.ts-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.ts-legend .sw.spec{background:var(--q)}
+.ts-legend .sw.solved{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.spec-card{border-left:4px solid var(--q)}
+.tier-card.solved-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">56%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="ts-wrap">
+    <svg class="ts-svg" id="tsChart" viewBox="0 0 640 240" role="img" aria-label="Spec completion rate vs real problem solved rate, by how deeply the underlying problem is explored">
+      <g id="tsGridLayer"></g>
+      <path id="tsLineSpec" class="ts-line-spec"></path>
+      <text id="tsSpecLabel" class="ts-spec-label"></text>
+      <path id="tsLineSolved" class="ts-line-solved"></path>
+      <g id="tsDotsLayer"></g>
+      <line id="tsMarker" class="ts-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="tsPointSolved" class="ts-point-solved" r="5"></circle>
+      <text id="tsLabelSolved" class="ts-value-label"></text>
+      <rect id="tsMarkerHit" class="ts-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="ts-legend">
+    <span><span class="sw spec"></span><span id="legendSpec"></span></span>
+    <span><span class="sw solved"></span><span id="legendSolved"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card spec-card">
+      <div class="k" id="specCardLabel"></div>
+      <div class="v" id="specCardVal">95%</div>
+    </div>
+    <div class="tier-card solved-card">
+      <div class="k" id="solvedCardLabel"></div>
+      <div class="v" id="solvedCardVal">56%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">56</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="digName"></span><small id="digSub"></small></div>
+      <div class="readout mono" id="digReadout">30</div>
+      <input type="range" id="digSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="digNum" id="numLabel1"></label>
+        <input type="number" id="digNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="articName"></span><small id="articSub"></small></div>
+      <div class="readout mono" id="articReadout">50</div>
+      <input type="range" id="articSlider" min="20" max="80" step="5" value="50">
+      <div class="num-row">
+        <label for="articNum" id="numLabel2"></label>
+        <input type="number" id="articNum" min="20" max="80" step="5" value="50">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「木のブランコ」風刺画——顧客が説明したもの、営業が売ったもの、設計されたもの、
+   実装されたもの…がすべて食い違い、最終コマ「顧客が本当に必要だったもの」には
+   シンプルなタイヤのブランコが描かれる。記録に残る最古の出典はロンドン大学
+   計算センター(ULCC)のニュースレター#53(1973年3月)で作者不詳。1960年代末から
+   非公式に流通していたとみられ、以後IBM研修資料などで世界中に広まった。
+   真面目な背骨はBrooks "No Silver Bullet"(1987)の一文:
+   「ソフトウェアシステム構築で最も難しいのは、何を作るかを正確に決めることである」。
+   XY問題(社内Q&Aで質問者が手段を聞く)との違い: 本ページは顧客が「自分で考えた
+   最強の仕様」を要求として持ち込む場面を扱う。課題から掘り直せば、より良い解
+   (開発不要を含む)があり得る。
+   モデル: 仕様どおりの完成率は常に95%(完成はする)。本来の課題の解決度は
+   solvedOf(dig, artic) = 0.9 * (artic + (dig/100) * (100-artic) * 0.85)
+   ——顧客の言語化精度(artic)なりの下限から、課題を掘る(dig)ことで回復する。
+   数値は方向性を示す独自の簡易モデルであり、実証値ではない。
+*/
+const DIG_MIN = 0, DIG_MAX = 100;
+const ARTIC_MIN = 20, ARTIC_MAX = 80;
+const SPEC_DONE = 95;
+
+function specDoneOf() { return SPEC_DONE; }
+function solvedOf(dig, artic) { return 0.9 * (artic + (dig / 100) * (100 - artic) * 0.85); }
+function scoreOf(dig, artic) { return Math.round(solvedOf(dig, artic)); }
+function tierOf(dig, artic) {
+  const s = solvedOf(dig, artic);
+  if (s >= 80) return 4;
+  if (s >= 65) return 3;
+  if (s >= 50) return 2;
+  if (s >= 35) return 1;
+  return 0;
+}
+function boxTierOf(dig) { return Math.min(4, Math.floor(dig / 20)); }
+function assess(dig, artic) {
+  const spec = specDoneOf();
+  const solved = solvedOf(dig, artic);
+  const gap = spec - solved;
+  const score = scoreOf(dig, artic);
+  const band = tierOf(dig, artic);
+  const box = boxTierOf(dig);
+  return { spec, solved, gap, score, band, box };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "仕様どおり完成したのに、なぜ喜ばれない? | タイヤのブランコ・シミュレーター",
+  heroTitle: "仕様どおり完成したのに、<br>なぜ喜ばれない?",
+  heroLead: "「顧客が説明したもの」「営業が売ったもの」「設計されたもの」「実装されたもの」——どのコマも食い違った木のブランコが描かれ、最終コマ「顧客が本当に必要だったもの」にはタイヤを吊るしただけのシンプルなブランコが描かれる。開発者なら一度は見たことのある、あの風刺画です(記録に残る最古の出典は1973年3月、ロンドン大学計算センターのニュースレター。作者不詳のまま半世紀、世界中の研修資料で使われ続けています)。ブルックスは「No Silver Bullet」(1987年)でこう書きました——「ソフトウェアシステム構築で最も難しいのは、何を作るかを正確に決めることである」。顧客が「とにかくこれを実装してくれ」と仕様を持ち込むとき、それは顧客が考えた最善の解決策であって、本来の課題そのものではありません。課題から掘り直せば、もっと良い解——ときには「開発しない」という解——があるかもしれません。「要求の裏の課題を掘る度合い」を動かして、仕様どおりの完成率と、本来の課題の解決度がどう乖離するかを確認してください。",
+  consoleLabel: "REQUIREMENTS CONSOLE",
+  sumLabel: "本来の課題の解決度",
+  scoreLabel: "課題解決スコア",
+  digName: "要求の裏の課題を掘る度合い", digSub: "0=仕様を受け取ってそのまま実装、100=「そもそも何にお困りですか」から始める",
+  articName: "顧客が課題を言語化できている度合い", articSub: "持ち込まれた仕様が、本来の課題をどの程度言い当てているか",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 「とにかくこれを実装してくれ」",
+  chartCaption: "緑の点線は「仕様どおりの完成率」——課題を掘っても掘らなくても、仕様どおりのものは完成します(95%で真っ平ら)。赤線は「本来の課題の解決度」——課題を掘るほど上がります。完成と解決は別物である、というのがこのチャートの全部です。",
+  chartNote: "方向性を示す独自の簡易モデルであり、実証研究の数値を再現したものではありません。木のブランコ風刺画は1973年の記録が最古の作者不詳の寓話、ブルックスの引用は1987年の論文の実文です。",
+  tsYTitle: "達成度(%)", tsXTitle: "要求の裏の課題を掘る度合い",
+  tsSpecTag: "完成はする",
+  legendSpec: "仕様どおりの完成率",
+  legendSolved: "本来の課題の解決度",
+  scenarioBoxTitle: "いまの要求分析は、こんな状態",
+  scenarios: [
+    "仕様書を受領し、そのまま実装を開始しました。顧客への質問は納期の確認のみです。",
+    "仕様の曖昧な箇所だけ質問しています。「なぜこの機能が要るのか」はまだ聞いていません。",
+    "「この機能で何を実現したいですか」を聞き始めました。仕様の背景が半分ほど見えてきます。",
+    "課題→解決策の順で要求を整理し直しています。仕様の一部が「実は不要」と判明し始めます。",
+    "「そもそも何にお困りですか」から確認しています。開発しない選択肢も含めて、課題に最短の解を提案できています。",
+  ],
+  specCardLabel: "仕様どおりの完成率",
+  solvedCardLabel: "本来の課題の解決度",
+  hint: (dig, artic, a) => `掘る度合い${dig}・言語化${artic}のとき、仕様どおりの完成率は${a.spec}%、本来の課題の解決度は約${a.solved.toFixed(0)}%。差の${a.gap.toFixed(0)}ポイントが「完成したのに解決していない」部分です。`,
+  hintScenario: (artic, a) => `「とにかくこれを実装してくれ」——仕様どおりに完成します(${a.spec}%)。しかし本来の課題の解決度は約${a.solved.toFixed(0)}%。風刺画の最終コマ(顧客が本当に必要だったもの)には、掘らないかぎりたどり着けません。`,
+  comments: [
+    "完成と解決が大きく乖離しています。納品日に「思っていたのと違う」が待っている状態です。",
+    "仕様の言葉どおりには作れていますが、課題の半分以上が手つかずです。",
+    "課題の輪郭が見え始めています。あと数回の「なぜ」で、仕様の要・不要が仕分けられます。",
+    "課題ベースの要求整理が機能しています。仕様変更が「後出し」ではなく「前倒し」で起きています。",
+    "課題に最短の解を出せる状態です。ときには「この開発、不要です」と言える——それが最高の要求分析です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象の厄介なところは、誰も間違っていないのに起きることです。顧客は真剣に考えた仕様を持ち込み、開発は誠実にそのとおり作る——それでも最終コマ(顧客が本当に必要だったもの)にはたどり着きません。課題と解決策の翻訳はそもそも難しく(風刺画で全職種が誤解するのはそのためです)、顧客の言語化力の問題ではありません。だからこそ、要求を受け取る側に「課題まで一度戻る」工程を組み込む価値があります。なお、XY問題(社内の質問の場面)と構図は同じですが、こちらは顧客要求の場面——金額も手戻りも桁が違います。掘る数分と、作り直す数か月の交換です。",
+  adviceItems: [
+    "仕様を受け取ったら「この仕様で解決したい課題」を一度だけ確認する。掘るのは数分、作り直しは数か月",
+    "要求は「課題→制約→解決策案」の順に文書化し直し、解決策の位置に顧客案を置く(捨てるのではなく候補の一つにする)",
+    "「開発しない」を常に選択肢に含める。既存機能・運用変更・買う、で済むなら最短の解",
+    "デモは早く小さく。風刺画のコマ間のズレは、動くものを見せた瞬間に一番安く発見できる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "CUSTOMER JOBS", title: "ジョブ理論", desc: "クレイトン・クリステンセン著。顧客は商品ではなく「片付けたいジョブ」を買っている——要求の裏の課題を掘るための代表的なフレームワーク。", link: "Amazonで見る →", url: "https://amzn.to/4vsbWfF" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "仕様どおり完成したのに、なぜ喜ばれない? | タイヤのブランコ・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Built exactly to spec — so why is nobody happy? | Tire Swing Simulator",
+  heroTitle: "Built exactly to spec —<br>so why is nobody happy?",
+  heroLead: "\"How the customer explained it.\" \"How sales sold it.\" \"How it was designed.\" \"How it was built.\" Every panel shows a different, wrong tree swing — and the final panel, \"what the customer really needed,\" shows a simple tire hanging from a rope. Every developer has seen that cartoon (its oldest documented appearance is a University of London Computing Centre newsletter from March 1973; author unknown, and it has survived half a century of training decks worldwide). Brooks wrote in \"No Silver Bullet\" (1987): \"The hardest single part of building a software system is deciding precisely what to build.\" When a customer arrives saying \"just build exactly this,\" that spec is the customer's best attempt at a solution — not the underlying problem itself. Dig back to the problem, and a better answer may exist — sometimes including \"don't build anything.\" Move the \"digging into the underlying problem\" dial to see how spec completion and actual problem-solving drift apart.",
+  consoleLabel: "REQUIREMENTS CONSOLE",
+  sumLabel: "Real problem actually solved",
+  scoreLabel: "Problem-solving score",
+  digName: "Digging into the underlying problem", digSub: "0 = take the spec and start building, 100 = start from \"what are you actually struggling with?\"",
+  articName: "How well the customer articulated the problem", articSub: "How much of the underlying problem the submitted spec actually captures",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: \"just build exactly this\"",
+  chartCaption: "The dashed green line is spec completion — dig or don't dig, the thing described in the spec gets built (flat at 95%). The red line is how much of the real problem gets solved — it rises with digging. Completion and solution are different things: that's the entire chart.",
+  chartNote: "An original, simplified model showing the direction — not empirical numbers. The tree-swing cartoon is an author-unknown parable first documented in 1973; the Brooks quote is verbatim from the 1987 paper.",
+  tsYTitle: "Achievement (%)", tsXTitle: "Digging into the underlying problem",
+  tsSpecTag: "It does get built",
+  legendSpec: "Spec completion rate",
+  legendSolved: "Real problem solved",
+  scenarioBoxTitle: "What requirements analysis looks like right now",
+  scenarios: [
+    "Spec received; implementation started as-is. The only question asked was about the deadline.",
+    "Only the ambiguous parts of the spec get questioned. \"Why is this feature needed?\" hasn't been asked.",
+    "\"What do you want this feature to achieve?\" is being asked. About half the background is coming into view.",
+    "Requirements are being reorganized problem-first. Parts of the spec are turning out to be unnecessary.",
+    "Analysis starts from \"what are you actually struggling with?\" The shortest path to the problem — including not building — can be proposed.",
+  ],
+  specCardLabel: "Spec completion rate",
+  solvedCardLabel: "Real problem solved",
+  hint: (dig, artic, a) => `At digging ${dig} and articulation ${artic}, spec completion is ${a.spec}% while the real problem is about ${a.solved.toFixed(0)}% solved. The ${a.gap.toFixed(0)}-point gap is the part that's finished but not fixed.`,
+  hintScenario: (artic, a) => `\"Just build exactly this\" — and exactly this gets built (${a.spec}%). But the real problem ends up only about ${a.solved.toFixed(0)}% solved. The cartoon's final panel — \"what the customer really needed\" — is only reachable by digging.`,
+  comments: [
+    "Completion and solution have split wide apart. \"This isn't what I meant\" is waiting on delivery day.",
+    "The spec's words are being built faithfully, but more than half the problem remains untouched.",
+    "The problem's outline is emerging. A few more whys will sort the spec into needed and not.",
+    "Problem-first requirements are working. Spec changes now happen up front instead of after delivery.",
+    "The shortest path to the problem is on the table — including, sometimes, \"you don't need this built.\" That's requirements analysis at its best.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "What makes this insidious is that it happens with nobody at fault. The customer brings a seriously considered spec; the team faithfully builds it — and the final panel — \"what the customer really needed\" — still isn't reached. Translating problems into solutions is intrinsically hard (that's why every role in the cartoon gets it wrong), not a defect of the customer's articulation. That's exactly why it pays to build a \"return to the problem once\" step into how requirements are received. The structure mirrors the XY problem (which covers internal Q&A), but here the stakes are customer-sized: minutes of digging traded against months of rebuilding.",
+  adviceItems: [
+    "When a spec arrives, confirm once: \"what problem is this spec meant to solve?\" Digging costs minutes; rebuilding costs months",
+    "Re-document requirements as problem → constraints → candidate solutions, and place the customer's spec among the candidates (not discarded — one option)",
+    "Keep \"don't build it\" on the table — an existing feature, a process change, or buying something may be the shortest path",
+    "Demo early and small: the drift between the cartoon's panels is cheapest to catch the moment something runnable is shown",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "CUSTOMER JOBS", title: "The Mom Test", desc: "Rob Fitzpatrick. The developer-favorite handbook on asking customers questions that uncover the real problem — even when they've already decided on a solution.", link: "View on Amazon →", url: "https://amzn.to/3SWiRAg" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Built exactly to spec — so why is nobody happy? — Tire Swing Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (dig, artic, a) => `掘り度${dig}。解決度${a.solved.toFixed(0)}%。検収は通った。ユーザーは使っていない。ログイン数、先月比±0(先月はゼロ)。`,
+  hintScenario: (artic, a) => `「Excelでできてることを、そのままWebにしてくれ」。そのまま作った。今、全員がWebからExcelにエクスポートして使っている。解決度${a.solved.toFixed(0)}%。`,
+  comments: [
+    "納品完了。要件定義書との一致率100%。課題との一致率は測定していない。",
+    "「言われたとおりに作りました」は、開発側の免罪符であって、顧客の満足ではない。",
+    "「なぜこの機能が?」と聞いたら「前の担当者が決めた」と言われた。前の担当者はもういない。",
+    "ヒアリングで仕様の3割が消えた。顧客が一番驚いていた。「たしかに、要らないですねこれ」。",
+    "提案: 「これ、開発しなくても既存機能の設定変更でできます」。受注額はゼロ、信頼は無限大。",
+  ],
+},
+en: {
+  hint: (dig, artic, a) => `Digging ${dig}. Solved ${a.solved.toFixed(0)}%. Acceptance passed. Nobody uses it. Logins vs last month: ±0 (last month was zero).`,
+  hintScenario: (artic, a) => `"Just make the web version of what we do in Excel." So we did. Everyone now exports from the web back to Excel. Solved: ${a.solved.toFixed(0)}%.`,
+  comments: [
+    "Delivered. Match rate with the requirements doc: 100%. Match rate with the problem: unmeasured.",
+    "\"We built what you asked for\" is the vendor's alibi, not the customer's satisfaction.",
+    "Asked why the feature exists. \"The previous manager decided.\" The previous manager is gone.",
+    "One interview deleted 30% of the spec. The customer was the most surprised: \"you're right, we don't need this.\"",
+    "The proposal: \"no development needed — a settings change covers this.\" Deal size: zero. Trust: infinite.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let dig = 30;
+let artic = 50;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - DIG_MIN) / (DIG_MAX - DIG_MIN)) * (PW - PAD_L - PAD_R);
+const gOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = DIG_MIN + frac * (DIG_MAX - DIG_MIN);
+  return Math.min(DIG_MAX, Math.max(DIG_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("tsGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "ts-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "ts-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = DIG_MIN; v <= DIG_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "ts-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "ts-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === DIG_MIN ? "start" : v === DIG_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "ts-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.tsYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "ts-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.tsXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const specY = yOf(SPEC_DONE);
+  document.getElementById("tsLineSpec").setAttribute("d", `M ${PAD_L} ${specY} L ${PW - PAD_R} ${specY}`);
+  const specLabel = document.getElementById("tsSpecLabel");
+  specLabel.setAttribute("x", PAD_L + 4);
+  specLabel.setAttribute("y", specY - 6);
+  specLabel.textContent = t.tsSpecTag;
+
+  const solvedPts = [];
+  for (let v = DIG_MIN; v <= DIG_MAX; v += 2) {
+    solvedPts.push(`${xOf(v)},${yOf(solvedOf(v, artic))}`);
+  }
+  document.getElementById("tsLineSolved").setAttribute("d", "M " + solvedPts.join(" L "));
+
+  const dotsLayer = document.getElementById("tsDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = DIG_MIN; v <= DIG_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "ts-dot", cx: xOf(v), cy: yOf(solvedOf(v, artic)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(dig);
+  const marker = document.getElementById("tsMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const py = yOf(solvedOf(dig, artic));
+  document.getElementById("tsPointSolved").setAttribute("cx", mx);
+  document.getElementById("tsPointSolved").setAttribute("cy", py);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const labelEl = document.getElementById("tsLabelSolved");
+  labelEl.setAttribute("x", mx + labelDx);
+  labelEl.setAttribute("y", Math.max(PAD_T + 10, py + 20));
+  labelEl.setAttribute("text-anchor", labelAnchor);
+  labelEl.textContent = Math.round(solvedOf(dig, artic)) + "%";
+
+  const hit = document.getElementById("tsMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(dig, artic);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${Math.round(a.solved)}%`;
+  document.getElementById("specCardVal").textContent = `${a.spec}%`;
+  document.getElementById("solvedCardVal").textContent = `${Math.round(a.solved)}%`;
+  document.getElementById("hint").textContent = t.hint(dig, artic, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.box];
+
+  document.getElementById("digReadout").textContent = dig;
+  document.getElementById("articReadout").textContent = artic;
+  if (document.activeElement !== document.getElementById("digSlider")) document.getElementById("digSlider").value = dig;
+  if (document.activeElement !== document.getElementById("digNum")) document.getElementById("digNum").value = dig;
+  if (document.activeElement !== document.getElementById("articSlider")) document.getElementById("articSlider").value = artic;
+  if (document.activeElement !== document.getElementById("articNum")) document.getElementById("articNum").value = artic;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 50 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/tire-swing/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("digName").textContent = t.digName;
+  document.getElementById("digSub").textContent = t.digSub;
+  document.getElementById("articName").textContent = t.articName;
+  document.getElementById("articSub").textContent = t.articSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("digSlider").setAttribute("aria-label", t.digName);
+  document.getElementById("articSlider").setAttribute("aria-label", t.articName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.digName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.articName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendSpec").textContent = t.legendSpec;
+  document.getElementById("legendSolved").textContent = t.legendSolved;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("specCardLabel").textContent = t.specCardLabel;
+  document.getElementById("solvedCardLabel").textContent = t.solvedCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "tire-swing" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("digSlider").addEventListener("input", (e) => { dig = +e.target.value; render(); });
+document.getElementById("digNum").addEventListener("change", (e) => {
+  dig = Math.min(DIG_MAX, Math.max(DIG_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("articSlider").addEventListener("input", (e) => { artic = +e.target.value; render(); });
+document.getElementById("articNum").addEventListener("change", (e) => {
+  artic = Math.min(ARTIC_MAX, Math.max(ARTIC_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  dig = 30; artic = 50;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  dig = 0;
+  render();
+  const a = assess(dig, artic);
+  document.getElementById("hint").textContent = T().hintScenario(artic, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const tsChart = document.getElementById("tsChart");
+function svgPoint(evt) {
+  const pt = tsChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(tsChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  tsChart.setPointerCapture(evt.pointerId);
+  document.getElementById("tsMarker").classList.add("dragging");
+  document.getElementById("tsMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  dig = gOfX(p.x);
+  render();
+}
+document.getElementById("tsMarkerHit").addEventListener("pointerdown", startDrag);
+tsChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => tsChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("tsMarker").classList.remove("dragging");
+  document.getElementById("tsMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

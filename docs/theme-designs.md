@@ -12,6 +12,8 @@
 
 ## No.27 定量化の罠 (slug: `quantification-trap`, cat: `team`)
 
+✅ 出荷済み (c4c8d46)
+
 **タイトル**: JA「数字で見えるものだけを、見ていない?」 / EN "Are you only seeing what the numbers show?"
 **名前**: 定量化の罠シミュレーター / Quantification Trap Simulator
 **タグ**: ja:["定量化の罠","指標"] en:["Quantification trap","Metrics"]
@@ -41,6 +43,8 @@
 ---
 
 ## No.28 顧客が本当に必要だったもの (slug: `tire-swing`, cat: `cognition`)
+
+✅ 出荷済み (次コミット参照。ユーザー指摘により「最終コマ」には(顧客が本当に必要だったもの)の補足を付ける規約)
 
 **タイトル**: JA「仕様どおり完成したのに、なぜ喜ばれない?」 / EN "Built exactly to spec — so why is nobody happy?"
 **名前**: タイヤのブランコ・シミュレーター / Tire Swing Simulator

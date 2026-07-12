@@ -262,6 +262,12 @@ window.DevSimLab = (function () {
       ja: { name: "定量化の罠シミュレーター", title: "数字で見えるものだけを、見ていない?", desc: "定量指標への依存度を上げると、数字上の見かけの成果と実際の総合成果がどう乖離するかを、マクナマラの誤謬をもとに可視化するシミュレーター。" },
       en: { name: "Quantification Trap Simulator", title: "Are you only seeing what the numbers show?", desc: "A simulator visualizing how growing dependence on metrics splits apparent performance from actual outcomes, based on the McNamara fallacy." },
     },
+    {
+      id: "tire-swing", href: "tire-swing/", status: "live", cat: "cognition",
+      tags: { ja: ["要求分析", "顧客"], en: ["Requirements", "Customer"] },
+      ja: { name: "タイヤのブランコ・シミュレーター", title: "仕様どおり完成したのに、なぜ喜ばれない?", desc: "顧客の言う仕様をそのまま実装しても本来の課題は解決しないことがある——「木のブランコ」風刺画の現象を、課題を掘る度合いで可視化するシミュレーター。" },
+      en: { name: "Tire Swing Simulator", title: "Built exactly to spec — so why is nobody happy?", desc: "A simulator of the famous tree-swing cartoon: building exactly what was asked versus digging back to the problem the customer actually needs solved." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -383,12 +389,13 @@ window.DevSimLab = (function () {
     "bikeshedding": ["code-review", "yak-shaving", "speak-up-cost"],
     "yak-shaving": ["pause-cost", "context-switch", "bikeshedding"],
     "rubber-duck": ["xy-problem", "curse-of-knowledge", "pause-cost"],
-    "xy-problem": ["curse-of-knowledge", "rubber-duck", "speak-up-cost"],
+    "xy-problem": ["curse-of-knowledge", "rubber-duck", "tire-swing"],
     "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
     "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
     "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
     "who-says-it": ["speak-up-cost", "psychological-safety", "confirmation-bias"],
     "quantification-trap": ["survivorship-bias", "confirmation-bias", "utilization-trap"],
+    "tire-swing": ["xy-problem", "curse-of-knowledge", "qcd-tradeoff"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */
