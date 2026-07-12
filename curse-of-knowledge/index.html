@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自分がわかっていることは、相手にも伝わっている? | 知識の呪縛シミュレーター</title>
+<meta name="description" content="「自分が知っていることは相手も知っているはず」という思い込み(知識の呪縛)による理解度のギャップを、有名な実験データにもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/curse-of-knowledge/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/curse-of-knowledge/">
+<meta property="og:title" content="自分がわかっていることは、相手にも伝わっている? | 知識の呪縛シミュレーター">
+<meta property="og:description" content="「自分が知っていることは相手も知っているはず」という思い込みによる理解度のギャップを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/curse-of-knowledge.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "知識の呪縛シミュレーター",
+  "alternateName": "Curse of Knowledge Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/curse-of-knowledge/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "知識の呪縛による送り手と受け手の理解度ギャップを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-curve chart ---- */
+.ck-wrap{margin-top:14px}
+.ck-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.ck-grid{stroke:var(--line);stroke-width:1}
+.ck-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.ck-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.ck-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.ck-gap{fill:var(--alert);opacity:.12}
+.ck-line-sender{fill:none;stroke:var(--d);stroke-width:2.2}
+.ck-line-receiver{fill:none;stroke:var(--alert);stroke-width:2.2}
+.ck-dot{r:3.5}
+.ck-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.ck-marker.dragging{cursor:grabbing}
+.ck-marker-hit{fill:transparent;cursor:grab}
+.ck-marker-hit.dragging{cursor:grabbing}
+.ck-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.ck-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.ck-legend .sw.sender{background:var(--d)}
+.ck-legend .sw.receiver{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.sender-card{border-left:4px solid var(--d)}
+.tier-card.receiver-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">47.5pt</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="ck-wrap">
+    <svg class="ck-svg" id="ckChart" viewBox="0 0 640 240" role="img" aria-label="Assumed understanding vs actual understanding by information specificity">
+      <g id="ckGridLayer"></g>
+      <path id="ckGap" class="ck-gap"></path>
+      <path id="ckLineSender" class="ck-line-sender"></path>
+      <path id="ckLineReceiver" class="ck-line-receiver"></path>
+      <g id="ckDotsLayer"></g>
+      <line id="ckMarker" class="ck-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="ckMarkerHit" class="ck-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="ck-legend">
+    <span><span class="sw sender"></span><span id="legendSender"></span></span>
+    <span><span class="sw receiver"></span><span id="legendReceiver"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card sender-card">
+      <div class="k" id="senderCardLabel"></div>
+      <div class="v" id="senderCardVal">50%</div>
+    </div>
+    <div class="tier-card receiver-card">
+      <div class="k" id="receiverCardLabel"></div>
+      <div class="v" id="receiverCardVal">2.5%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">53</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="specName"></span><small id="specSub"></small></div>
+      <div class="readout mono" id="specReadout">0%</div>
+      <input type="range" id="specSlider" min="0" max="100" step="5" value="0">
+      <div class="num-row">
+        <label for="specNum" id="numLabel1"></label>
+        <input type="number" id="specNum" min="0" max="100" step="5" value="0">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="effortName"></span><small id="effortSub"></small></div>
+      <div class="readout mono" id="effortReadout">0%</div>
+      <input type="range" id="effortSlider" min="0" max="100" step="5" value="0">
+      <div class="num-row">
+        <label for="effortNum" id="numLabel2"></label>
+        <input type="number" id="effortNum" min="0" max="100" step="5" value="0">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「知識の呪縛(Curse of Knowledge)」を、Elizabeth Newton(1990)の有名な実験
+   (曲のリズムを指でテーブルを叩いて伝える「タッパー」と、それを聞く「リスナー」)
+   を起点にモデル化したもの。タッパーは「50%くらいは当ててくれるはず」と予測したが、
+   実際に正解できたリスナーはわずか2.5%だった。
+   デフォルト値(専門性0%・工夫0%)はこの実験の数値(想定50% / 実際2.5%)そのものに
+   一致させている。専門性(specificity)が上がるほど、送り手の想定(sender)はむしろ
+   楽観的になり(専門家ほど「これくらい常識」と感じやすいため)、受け手の実際の理解
+   (receiver)はより大きく下がる。伝え方への工夫(effort)は受け手側の理解を押し上げる。
+   これは特定の実証研究の数値をそのまま外挿したものではなく、方向性を示す簡易モデル。
+*/
+const SPEC_MIN = 0, SPEC_MAX = 100;
+const EFFORT_MIN = 0, EFFORT_MAX = 100;
+
+function senderAssumedOf(spec) { return 50 + spec * 0.2; }
+function receiverActualOf(spec, effort) {
+  return Math.max(0, Math.min(100, 2.5 - spec * 0.15 + effort * 0.6));
+}
+function gapOf(spec, effort) { return senderAssumedOf(spec) - receiverActualOf(spec, effort); }
+function scoreOf(spec, effort) {
+  const gap = Math.max(0, gapOf(spec, effort));
+  return Math.max(0, Math.min(100, Math.round(100 - gap)));
+}
+function assess(spec, effort) {
+  const sender = senderAssumedOf(spec);
+  const receiver = receiverActualOf(spec, effort);
+  const gap = gapOf(spec, effort);
+  const score = scoreOf(spec, effort);
+  const band = score >= 85 ? 0 : score >= 65 ? 1 : score >= 45 ? 2 : score >= 25 ? 3 : 4;
+  return { sender, receiver, gap, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "自分がわかっていることは、相手にも伝わっている? | 知識の呪縛シミュレーター",
+  heroTitle: "自分がわかっていることは、<br>相手にも伝わっている?",
+  heroLead: "顧客はその業務を知っている、PM/PLはプロジェクト全体を知っている、メンバーは自分の担当を知っている——それぞれ「自分が知っていることは、相手も当然知っているはず」と思い込みがちです。心理学ではこれを「知識の呪縛」と呼びます。有名な実験では、曲のリズムを指で叩いて伝えた人は「50%は当ててくれるはず」と予測しましたが、実際に当てられたのはわずか2.5%でした。情報の専門性と、伝え方への工夫を動かして、そのギャップを確認してください。",
+  consoleLabel: "COMMUNICATION CONSOLE",
+  sumLabel: "気づかれないギャップ",
+  scoreLabel: "伝達の健全度スコア",
+  specName: "情報の専門性・粒度", specSub: "誰にでもわかる話か、専門家にしかわからない話か",
+  effortName: "伝え方への工夫", effortSub: "具体例・言い換えなどにどれだけ投資したか",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 専門的な話を、工夫なしでそのまま伝えた",
+  chartCaption: "青線は送り手が思う理解度、赤線は受け手が実際に理解している度合いです。専門的な話になるほど、送り手はむしろ楽観的になり、ギャップが広がります。",
+  chartNote: "Newton(1990)の実験結果(想定50%/実際2.5%)を起点にした簡易モデルです。個々の場面の正確な数値を予測するものではありません。",
+  ckYTitle: "理解度(%)", ckXTitle: "情報の専門性・粒度",
+  legendSender: "送り手が思う理解度",
+  legendReceiver: "受け手が実際の理解度",
+  senderCardLabel: "送り手が思う理解度",
+  receiverCardLabel: "受け手が実際の理解度",
+  hint: (spec, effort, a) => `専門性${spec}%・伝え方の工夫${effort}%のとき、送り手は${a.sender.toFixed(1)}%くらい伝わっていると思っていますが、受け手が実際に理解できているのは${a.receiver.toFixed(1)}%程度です。気づかれないギャップは${Math.max(0, a.gap).toFixed(1)}ポイントです。`,
+  hintScenario: (a) => `専門的な話を、具体例も言い換えもなくそのまま伝えました。送り手は${a.sender.toFixed(1)}%伝わったと思っていますが、受け手の実際の理解度はわずか${a.receiver.toFixed(1)}%。${Math.max(0, a.gap).toFixed(1)}ポイントのギャップに、送り手はまだ気づいていません。`,
+  comments: [
+    "ギャップがほとんどありません。工夫が実際に伝達度を押し上げています。",
+    "多少のギャップはありますが、致命的ではありません。",
+    "無視できないギャップです。「伝えたつもり」になっている可能性があります。",
+    "送り手の自己評価と、受け手の実態が大きく乖離しています。",
+    "Newtonの実験そのものに近い状態です。送り手はほぼ気づかないまま、ほとんど伝わっていません。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象は認知心理学で「知識の呪縛(Curse of Knowledge)」と呼ばれます。Elizabeth Newton(1990年)の実験では、曲のリズムを指でテーブルを叩いて伝えた「タッパー」は、リスナーの正答率を50%程度と予測しましたが、実際の正答率はわずか2.5%でした。一度知ってしまうと、知らない状態を想像するのが極めて難しくなるためです。この現象はChip & Dan Heathの著書『アイデアのちから』で広く紹介され、ビジネスコミュニケーションの文脈でも頻繁に引用されます。また、顧客と開発チームのような依頼主・代理人関係における知識の偏りは、経済学の「情報の非対称性」(Akerlof, 1970年)としても研究されています。厄介なのは、送り手側は自分の理解度の高さゆえに、このギャップに自分では気づけない点です。",
+  adviceItems: [
+    "「伝えたか」ではなく「相手が自分の言葉で説明できるか」を確認する(復唱・要約してもらう)",
+    "抽象的な説明だけでなく、具体例・たとえ話を添える(Heath兄弟が提唱する対策そのもの)",
+    "「これくらい常識」と感じた瞬間こそ、説明を省略しないよう意識する",
+    "議事録・仕様書など、記録に残る形で認識をすり合わせる(「言った」ではなく「書いて確認された」を基準にする)",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "COMMUNICATION", title: "アイデアのちから", desc: "チップ・ハース、ダン・ハース著。本シミュレーターの元になったタッパー/リスナー実験を紹介し、知識の呪縛を克服する具体的な方法を解説する一冊。", link: "Amazonで見る →", url: "https://amzn.to/4bDpq0V" },
+    { tag: "COMMUNICATION", title: "頭のいい人が話す前に考えていること", desc: "安達裕哉著、2023〜2024年2年連続ビジネス書年間1位。タッパー/リスナー実験そのものは扱っていないが、「話す前に、相手にどう伝わるかを考える」という、知識の呪縛への向き合い方を上位テーマとして扱う一冊。", link: "Amazonで見る →", url: "https://amzn.to/4bB2mjm" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "自分がわかっていることは、相手にも伝わっている? | 知識の呪縛シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If you understand something, does the other person understand it too? | Curse of Knowledge Simulator",
+  heroTitle: "If you understand something,<br>does the other person understand it too?",
+  heroLead: "The client knows their business, the PM knows the whole project, each engineer knows their own piece — and each tends to assume \"if I know this, surely they do too.\" Psychologists call this the Curse of Knowledge. In a famous experiment, people who tapped out a song's rhythm on a table predicted about 50% of listeners would guess the tune. The actual success rate was 2.5%. Move the information's specificity and how much effort went into explaining it, and watch the gap.",
+  consoleLabel: "COMMUNICATION CONSOLE",
+  sumLabel: "Unnoticed gap",
+  scoreLabel: "Communication health score",
+  specName: "Information specificity", specSub: "Something anyone would get, or something only an expert would",
+  effortName: "Effort put into explaining", effortSub: "How much was invested in examples, rephrasing, etc.",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: technical info, delivered with zero effort to translate it",
+  chartCaption: "The blue line is the sender's assumed understanding; the red line is the receiver's actual understanding. As the topic gets more specialized, the sender actually grows more confident, widening the gap.",
+  chartNote: "A simplified model anchored to Newton's (1990) experimental result (50% assumed / 2.5% actual) — not a precise predictor for any specific situation.",
+  ckYTitle: "Understanding (%)", ckXTitle: "Information specificity",
+  legendSender: "Sender's assumed understanding",
+  legendReceiver: "Receiver's actual understanding",
+  senderCardLabel: "Sender's assumed understanding",
+  receiverCardLabel: "Receiver's actual understanding",
+  hint: (spec, effort, a) => `At ${spec}% specificity and ${effort}% explanation effort, the sender assumes about ${a.sender.toFixed(1)}% got through, but the receiver actually understands roughly ${a.receiver.toFixed(1)}%. The unnoticed gap is ${Math.max(0, a.gap).toFixed(1)} points.`,
+  hintScenario: (a) => `Technical information, delivered as-is with no examples or rephrasing. The sender assumes ${a.sender.toFixed(1)}% got through, but actual understanding is only ${a.receiver.toFixed(1)}%. The sender still hasn't noticed the ${Math.max(0, a.gap).toFixed(1)}-point gap.`,
+  comments: [
+    "Barely any gap. The effort invested is actually paying off.",
+    "Some gap remains, but it's not critical.",
+    "A gap worth taking seriously — you may only think you've explained it.",
+    "The sender's self-assessment and the receiver's reality have diverged sharply.",
+    "This is close to Newton's actual experiment: the sender remains unaware, and almost nothing got through.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This is known in cognitive psychology as the \"Curse of Knowledge.\" In Elizabeth Newton's 1990 experiment, people who tapped out a song's rhythm on a table (\"tappers\") predicted listeners would guess correctly about 50% of the time; the actual rate was 2.5%. Once you know something, it becomes remarkably hard to imagine not knowing it. The effect was popularized in business contexts by Chip and Dan Heath's book \"Made to Stick\" and is frequently cited in communication research. The knowledge imbalance between a client and a delivery team also shows up in economics as \"information asymmetry\" (Akerlof, 1970). What makes this tricky is that the sender's own confidence, born from their deep understanding, is exactly what prevents them from noticing the gap.",
+  adviceItems: [
+    "Check whether the other person can explain it back in their own words, not just whether you \"said\" it",
+    "Pair abstract explanations with concrete examples and analogies — the Heath brothers' core recommendation",
+    "The moment something feels \"obvious,\" that's exactly when skipping the explanation is riskiest",
+    "Align understanding in a written, reviewable form (meeting notes, specs) — treat \"written and confirmed\" as the bar, not \"I mentioned it\"",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "COMMUNICATION", title: "Made to Stick", desc: "Chip Heath, Dan Heath. Introduces the tapper/listener experiment behind this simulator and concrete techniques for overcoming the curse of knowledge.", link: "View on Amazon →", url: "https://amzn.to/4eYl7zt" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If you understand something, does the other person understand it too? — Curse of Knowledge Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (spec, effort, a) => `専門性${spec}%。送り手は「言ったよね?」の顔で${a.sender.toFixed(1)}%伝わったつもり。受け手の脳内は${a.receiver.toFixed(1)}%、ほぼ「?」で埋まっている。`,
+  hintScenario: (a) => `専門用語をそのまま並べて説明終了。送り手「伝わりましたよね」。受け手「(わかったふりをする顔)」。実際の理解度${a.receiver.toFixed(1)}%。`,
+  comments: [
+    "珍しく本当に伝わっている。奇跡。",
+    "まあ、あとで聞き返してくれるなら大丈夫。",
+    "議事録を書いた人だけが正しく理解している状態。",
+    "「わかりました」と言われたが、目が笑っていない。",
+    "「あれ、前も説明しましたよね?」から始まる、あの不毛な会話。",
+  ],
+},
+en: {
+  hint: (spec, effort, a) => `Specificity ${spec}%. Sender's face says "I told you this already," assuming ${a.sender.toFixed(1)}% landed. Receiver's brain is at ${a.receiver.toFixed(1)}%, mostly filled with question marks.`,
+  hintScenario: (a) => `Jargon delivered straight, no translation. Sender: "that's clear, right?" Receiver: *nods while understanding none of it*. Actual understanding: ${a.receiver.toFixed(1)}%.`,
+  comments: [
+    "Rare miracle: it actually landed.",
+    "Fine, as long as they ask follow-up questions later.",
+    "Only the person who wrote the meeting notes actually understands this.",
+    "They said \"got it,\" but their eyes said otherwise.",
+    "The dreaded \"wait, didn't I already explain this?\" conversation begins.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let specificity = 0;
+let effort = 0;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (s) => PAD_L + ((s - SPEC_MIN) / (SPEC_MAX - SPEC_MIN)) * (PW - PAD_L - PAD_R);
+const sOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = SPEC_MIN + frac * (SPEC_MAX - SPEC_MIN);
+  return Math.min(SPEC_MAX, Math.max(SPEC_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("ckGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "ck-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "ck-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let s = SPEC_MIN; s <= SPEC_MAX; s += 20) {
+    const x = xOf(s);
+    gridLayer.appendChild(el("line", { class: "ck-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "ck-axis-label", x, y: PH - PAD_B + 14, "text-anchor": s === SPEC_MIN ? "start" : s === SPEC_MAX ? "end" : "middle" });
+    label.textContent = s + "%";
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "ck-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.ckYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "ck-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.ckXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const senderPts = [], receiverPts = [], gapTop = [], gapBottom = [];
+  for (let s = SPEC_MIN; s <= SPEC_MAX; s += 2) {
+    senderPts.push(`${xOf(s)},${yOf(senderAssumedOf(s))}`);
+    receiverPts.push(`${xOf(s)},${yOf(receiverActualOf(s, effort))}`);
+    gapTop.push(`${xOf(s)},${yOf(senderAssumedOf(s))}`);
+    gapBottom.unshift(`${xOf(s)},${yOf(receiverActualOf(s, effort))}`);
+  }
+  document.getElementById("ckLineSender").setAttribute("d", "M " + senderPts.join(" L "));
+  document.getElementById("ckLineReceiver").setAttribute("d", "M " + receiverPts.join(" L "));
+  document.getElementById("ckGap").setAttribute("d", "M " + gapTop.join(" L ") + " L " + gapBottom.join(" L ") + " Z");
+
+  const dotsLayer = document.getElementById("ckDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let s = SPEC_MIN; s <= SPEC_MAX; s += 20) {
+    dotsLayer.appendChild(el("circle", { class: "ck-dot", cx: xOf(s), cy: yOf(senderAssumedOf(s)), fill: "var(--d)" }));
+    dotsLayer.appendChild(el("circle", { class: "ck-dot", cx: xOf(s), cy: yOf(receiverActualOf(s, effort)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(specificity);
+  const marker = document.getElementById("ckMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("ckMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(specificity, effort);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${Math.max(0, a.gap).toFixed(1)}pt`;
+  document.getElementById("senderCardVal").textContent = `${a.sender.toFixed(1)}%`;
+  document.getElementById("receiverCardVal").textContent = `${a.receiver.toFixed(1)}%`;
+  document.getElementById("hint").textContent = t.hint(specificity, effort, a);
+
+  document.getElementById("specReadout").textContent = specificity + "%";
+  document.getElementById("effortReadout").textContent = effort + "%";
+  if (document.activeElement !== document.getElementById("specSlider")) document.getElementById("specSlider").value = specificity;
+  if (document.activeElement !== document.getElementById("specNum")) document.getElementById("specNum").value = specificity;
+  if (document.activeElement !== document.getElementById("effortSlider")) document.getElementById("effortSlider").value = effort;
+  if (document.activeElement !== document.getElementById("effortNum")) document.getElementById("effortNum").value = effort;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/curse-of-knowledge/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("specName").textContent = t.specName;
+  document.getElementById("specSub").textContent = t.specSub;
+  document.getElementById("effortName").textContent = t.effortName;
+  document.getElementById("effortSub").textContent = t.effortSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("specSlider").setAttribute("aria-label", t.specName);
+  document.getElementById("effortSlider").setAttribute("aria-label", t.effortName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.specName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.effortName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendSender").textContent = t.legendSender;
+  document.getElementById("legendReceiver").textContent = t.legendReceiver;
+  document.getElementById("senderCardLabel").textContent = t.senderCardLabel;
+  document.getElementById("receiverCardLabel").textContent = t.receiverCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "curse-of-knowledge" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("specSlider").addEventListener("input", (e) => { specificity = +e.target.value; render(); });
+document.getElementById("specNum").addEventListener("change", (e) => {
+  specificity = Math.min(SPEC_MAX, Math.max(SPEC_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("effortSlider").addEventListener("input", (e) => { effort = +e.target.value; render(); });
+document.getElementById("effortNum").addEventListener("change", (e) => {
+  effort = Math.min(EFFORT_MAX, Math.max(EFFORT_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  specificity = 0; effort = 0;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  specificity = 100; effort = 0;
+  render();
+  const a = assess(specificity, effort);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const ckChart = document.getElementById("ckChart");
+function svgPoint(evt) {
+  const pt = ckChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(ckChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  ckChart.setPointerCapture(evt.pointerId);
+  document.getElementById("ckMarker").classList.add("dragging");
+  document.getElementById("ckMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  specificity = sOfX(p.x);
+  render();
+}
+document.getElementById("ckMarkerHit").addEventListener("pointerdown", startDrag);
+ckChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => ckChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("ckMarker").classList.remove("dragging");
+  document.getElementById("ckMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

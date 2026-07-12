@@ -149,6 +149,12 @@ window.DevSimLab = (function () {
       ja: { name: "バグゼロ・コストシミュレーター", title: "バグゼロのシステムは、目指せば作れる?", desc: "信頼性を100%に近づけようとするほどコストが指数的に増えていく様子をSREの考え方で可視化するシミュレーター。" },
       en: { name: "Zero Bugs Cost Simulator", title: "Can you actually build a zero-bug system if you aim for it?", desc: "A simulator visualizing how cost grows exponentially as target reliability approaches 100%, based on SRE practice." },
     },
+    {
+      id: "curse-of-knowledge", href: "curse-of-knowledge/", status: "live",
+      tags: { ja: ["知識の呪縛", "コミュニケーション"], en: ["Curse of knowledge", "Communication"] },
+      ja: { name: "知識の呪縛シミュレーター", title: "自分がわかっていることは、相手にも伝わっている?", desc: "送り手が思う理解度と受け手が実際に理解している度合いのギャップを、有名な実験にもとづいて可視化するシミュレーター。" },
+      en: { name: "Curse of Knowledge Simulator", title: "If you understand something, does the other person understand it too?", desc: "A simulator visualizing the gap between a sender's assumed understanding and a receiver's actual understanding, based on a famous experiment." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
