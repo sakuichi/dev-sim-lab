@@ -131,6 +131,12 @@ window.DevSimLab = (function () {
       ja: { name: "修正コスト・シミュレーター", title: "バグは、後工程で見つかるほど直すコストが跳ね上がる?", desc: "「後工程ほど修正コストが跳ね上がる」という通説と、実証研究の結果を比較できるシミュレーター。" },
       en: { name: "Cost of Change Simulator", title: "Does a bug cost dramatically more to fix the later it's found?", desc: "A simulator comparing the widely-cited claim that late-found bugs cost dramatically more against what empirical research actually found." },
     },
+    {
+      id: "wip-lead-time", href: "wip-lead-time/", status: "live",
+      tags: { ja: ["WIP", "リードタイム"], en: ["WIP", "Lead time"] },
+      ja: { name: "WIP・リードタイム シミュレーター", title: "仕掛かり(WIP)を増やせば、もっと早く終わる?", desc: "リトルの法則にもとづき、仕掛かり件数を増やすほどリードタイムが伸びていく様子を可視化するシミュレーター。" },
+      en: { name: "WIP & Lead Time Simulator", title: "If we take on more work in parallel, will it finish faster?", desc: "A simulator visualizing how lead time grows as work in progress increases, based on Little's Law." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -241,7 +247,9 @@ window.DevSimLab = (function () {
       const a = document.createElement("a");
       a.className = "sim-card";
       a.href = "../" + s.href;
-      a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>`;
+      const tags = (s.tags && s.tags[LANG]) || [];
+      a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>
+        <div class="sim-tags">${tags.map((tag) => `<span>${tag}</span>`).join("")}</div>`;
       container.appendChild(a);
     });
   }

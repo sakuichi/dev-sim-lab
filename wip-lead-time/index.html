@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕掛かり(WIP)を増やせば、もっと早く終わる? | WIP・リードタイム シミュレーター</title>
+<meta name="description" content="仕掛かり件数(WIP)を増やすほど、リードタイムがどう変化するかをリトルの法則(Little's Law)にもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/wip-lead-time/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/wip-lead-time/">
+<meta property="og:title" content="仕掛かり(WIP)を増やせば、もっと早く終わる? | WIP・リードタイム シミュレーター">
+<meta property="og:description" content="仕掛かり件数(WIP)を増やすほど、リードタイムがどう変化するかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/wip-lead-time.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "WIP・リードタイム シミュレーター",
+  "alternateName": "WIP and Lead Time Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/wip-lead-time/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "仕掛かり件数(WIP)とリードタイムの関係をリトルの法則にもとづいて可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- lead-time line chart ---- */
+.wl-wrap{margin-top:14px}
+.wl-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.wl-grid{stroke:var(--line);stroke-width:1}
+.wl-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.wl-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.wl-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.wl-area{fill:var(--d);opacity:.12}
+.wl-line{fill:none;stroke:var(--ink);stroke-width:2.2}
+.wl-marker{stroke:var(--d);stroke-width:3;stroke-linecap:round;cursor:grab}
+.wl-marker.dragging{cursor:grabbing}
+.wl-marker-hit{fill:transparent;cursor:grab}
+.wl-marker-hit.dragging{cursor:grabbing}
+.wl-point{fill:var(--surface);stroke:var(--d);stroke-width:2}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- WIP item dot grid ---- */
+.wip-row{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wip-wrap{flex:1;display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-height:32px;padding:10px;border:1px dashed var(--line);border-radius:8px;background:#FDFDFC}
+.wip-dot{width:14px;height:14px;border-radius:3px;flex:none;background:var(--d);animation:dotIn .2s ease-out}
+@keyframes dotIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.wip-dot{animation:none}}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.wip-card{border-left:4px solid var(--d)}
+.tier-card.tp-card{border-left:4px solid var(--q)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">14日</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="wl-wrap">
+    <svg class="wl-svg" id="wlChart" viewBox="0 0 640 240" role="img" aria-label="Lead time vs work in progress">
+      <g id="wlGridLayer"></g>
+      <path id="wlArea" class="wl-area"></path>
+      <path id="wlLine" class="wl-line"></path>
+      <line id="wlMarker" class="wl-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="wlPoint" class="wl-point" r="5"></circle>
+      <rect id="wlMarkerHit" class="wl-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="wip-row">
+    <div class="wip-wrap" id="wipWrap" role="img" aria-label="Items currently in progress"></div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="tier-row">
+    <div class="tier-card wip-card">
+      <div class="k" id="wipCardLabel"></div>
+      <div class="v" id="wipCardVal">10件</div>
+    </div>
+    <div class="tier-card tp-card">
+      <div class="k" id="tpCardLabel"></div>
+      <div class="v" id="tpCardVal">週5件</div>
+    </div>
+  </div>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">50</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="wipName"></span><small id="wipSub"></small></div>
+      <div class="readout mono" id="wipReadout">10</div>
+      <input type="range" id="wipSlider" min="1" max="30" step="1" value="10">
+      <div class="num-row">
+        <label for="wipNum" id="numLabel1"></label>
+        <input type="number" id="wipNum" min="1" max="30" step="1" value="10">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="tpName"></span><small id="tpSub"></small></div>
+      <div class="readout mono" id="tpReadout">5</div>
+      <input type="range" id="tpSlider" min="1" max="15" step="1" value="5">
+      <div class="num-row">
+        <label for="tpNum" id="numLabel2"></label>
+        <input type="number" id="tpNum" min="1" max="15" step="1" value="5">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル (リトルの法則 / Little's Law) =================
+   L = λW という待ち行列理論の定理(John Little, 1961)を、カンバン/リーンの文脈で
+   よく使われる形に変形したもの: リードタイム = WIP ÷ スループット。
+   数学的に証明された恒等式であり、"平均着手数 ≈ 平均完了数" の定常状態を前提とする。
+   このページではスループットを固定した状態でWIPだけを動かし、
+   「多重着手そのものが持つ純粋な待ち行列効果」を切り出して示している。
+   実際の現場では、WIPを減らすとマルチタスクの切り替えコストが減り、
+   スループット自体が上がることも多い(この点は関連ページ「コンテキストスイッチ」を参照)。
+*/
+const WIP_MIN = 1, WIP_MAX = 30;
+const TP_MIN = 1, TP_MAX = 15;
+
+function leadTimeDaysOf(wip, throughput) { return (wip / throughput) * 7; }
+function scoreOf(wip, throughput) {
+  const weeks = wip / throughput;
+  return Math.max(0, Math.min(100, Math.round(100 / weeks)));
+}
+function assess(wip, throughput) {
+  const leadDays = leadTimeDaysOf(wip, throughput);
+  const score = scoreOf(wip, throughput);
+  const band = score >= 90 ? 0 : score >= 60 ? 1 : score >= 35 ? 2 : score >= 15 ? 3 : 4;
+  return { leadDays, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "仕掛かり(WIP)を増やせば、もっと早く終わる? | WIP・リードタイム シミュレーター",
+  heroTitle: "仕掛かり(WIP)を増やせば、<br>もっと早く終わる?",
+  heroLead: "手を広げて色々な作業に同時に着手すれば、全体としては早く進む気がします。しかし待ち行列理論で数学的に証明されている「リトルの法則」によれば、チームが1週間に完了させられる件数(スループット)が変わらない限り、仕掛かり件数(WIP)を増やすほど、1件あたりのリードタイムはむしろ長くなります。これは切り替えコストで効率そのものが落ちる話(→関連ページ「コンテキストスイッチ」)とは別に、たとえ効率が一切落ちなくても成り立つ、待ち行列としての効果です。WIPとスループットを動かして、その関係を確認してください。",
+  consoleLabel: "FLOW CONSOLE",
+  sumLabel: "リードタイム",
+  scoreLabel: "フロー健全度スコア",
+  wipName: "仕掛かり件数(WIP)", wipSub: "同時に着手しているタスクの数",
+  tpName: "スループット", tpSub: "チームが1週間に完了させる件数",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: WIP制限を撤廃してすべて同時着手",
+  chartCaption: "スループットを固定した場合の、WIPとリードタイムの関係です。線は右肩上がりの直線になります。",
+  chartNote: "リトルの法則(リードタイム=WIP÷スループット)にもとづく計算です。チームの着手数と完了数が釣り合っている定常状態を前提としています。",
+  wlYTitle: "リードタイム(日)", wlXTitle: "仕掛かり件数(WIP)",
+  wipCardLabel: "仕掛かり件数(WIP)",
+  tpCardLabel: "スループット",
+  hint: (wip, tp, a) => `WIP ${wip}件・スループット週${tp}件のとき、リードタイムは ${wip}÷${tp}週 ≈ 約${Math.round(a.leadDays)}日 になります。`,
+  hintScenario: (a) => `WIP制限をなくし、手元にある仕事すべてに同時着手しました。スループットは変わらないため、リードタイムは約${Math.round(a.leadDays)}日まで伸びる計算になります。`,
+  comments: [
+    "リードタイムが短く、フローが健全です。仕掛かりと完了のバランスが取れています。",
+    "概ね良好です。仕掛かりをもう少し絞ると、さらに短縮できます。",
+    "仕掛かりが増え、リードタイムが目に見えて伸び始めています。",
+    "多くの仕事が「着手済み・未完了」のまま滞留している状態です。",
+    "ほぼすべての仕事が渋滞しています。新しく着手するより、今ある仕掛かりを終わらせる方が先です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この関係は「リトルの法則」(L = λW)と呼ばれ、1961年にジョン・リトルが待ち行列理論として数学的に証明したものです。カンバン/リーンの文脈では「リードタイム = WIP ÷ スループット」という形でよく使われます。経験則ではなく証明された恒等式ですが、「チームの着手数と完了数が釣り合っている定常状態」が前提です。またこのシミュレーターはスループットを固定して、WIPだけを動かした場合の純粋な待ち行列効果を示しています。実際の現場では、WIPを減らすとマルチタスクの切り替えコストが減り、スループット自体が上がることも多く、その場合はここで示した以上にリードタイムが改善します。",
+  adviceItems: [
+    "かんばんボードの列ごとにWIP制限(WIP limit)を明示し、仕掛かり件数の上限を可視化する",
+    "新しい仕事に着手する前に、今ある仕掛かりを完了させることを優先する(「始めるより終わらせる」)",
+    "スループットを増やしたい場合、人を増やす前に、まず仕掛かりを減らして流れを整えることを検討する",
+    "この関係は定常状態の理論値であることを踏まえ、単発の遅延と構造的な滞留を区別する",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "KANBAN", title: "カンバン ソフトウェア開発の変革", desc: "David J. Anderson著。WIP制限を中心としたカンバン手法を体系的に解説した、この分野の基礎となる一冊。", link: "Amazonで見る →", url: "https://amzn.to/4ygqv8N" },
+    { tag: "KANBAN", title: "カンバン仕事術", desc: "Marcus Hammarberg, Joakim Sundén著。より実践的・具体的な内容で、現場への適用イメージがつかみやすい一冊。", link: "Amazonで見る →", url: "https://amzn.to/3Tu21c4" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "仕掛かり(WIP)を増やせば、もっと早く終わる? | WIP・リードタイム シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If we take on more work in parallel, will it finish faster? | WIP & Lead Time Simulator",
+  heroTitle: "If we take on more work<br>in parallel, will it finish faster?",
+  heroLead: "Spreading out and starting more things at once feels like it should get more done, faster. But Little's Law — a relationship proven mathematically in queueing theory — says that as long as a team's weekly completion rate (throughput) stays the same, adding more work in progress (WIP) actually makes each item's lead time longer. This is separate from the efficiency loss caused by switching costs (see the related Context Switch simulator) — it's a pure queueing effect that holds even if efficiency doesn't drop at all. Move WIP and throughput and see the relationship for yourself.",
+  consoleLabel: "FLOW CONSOLE",
+  sumLabel: "Lead time",
+  scoreLabel: "Flow health score",
+  wipName: "Work in progress (WIP)", wipSub: "Tasks currently being worked on at once",
+  tpName: "Throughput", tpSub: "Items the team completes per week",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: drop the WIP limit, start everything at once",
+  chartCaption: "The relationship between WIP and lead time when throughput is held fixed. It's a straight line — sloping steadily upward.",
+  chartNote: "Calculated from Little's Law (lead time = WIP ÷ throughput). Assumes a steady state where the team's start rate and finish rate are roughly balanced.",
+  wlYTitle: "Lead time (days)", wlXTitle: "Work in progress (WIP)",
+  wipCardLabel: "Work in progress (WIP)",
+  tpCardLabel: "Throughput",
+  hint: (wip, tp, a) => `At WIP ${wip} with throughput ${tp}/week, lead time is ${wip}÷${tp} weeks ≈ about ${Math.round(a.leadDays)} days.`,
+  hintScenario: (a) => `The WIP limit is gone — everything on the board got started at once. Since throughput hasn't changed, lead time stretches out to roughly ${Math.round(a.leadDays)} days.`,
+  comments: [
+    "Lead time is short and flow is healthy — starts and finishes are well balanced.",
+    "Broadly fine. Tightening WIP a bit further would shorten lead time even more.",
+    "WIP is climbing and lead time is visibly stretching out.",
+    "A lot of work is sitting \"started but not finished.\"",
+    "Nearly everything is jammed up. Finishing what's already in progress matters more than starting anything new.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This relationship is called Little's Law (L = λW), proven mathematically in queueing theory by John Little in 1961. In the Kanban/Lean world it's commonly written as \"lead time = WIP ÷ throughput.\" It's not a rule of thumb — it's a proven identity — but it assumes a steady state where a team's start rate and finish rate are roughly balanced. This simulator also holds throughput fixed to isolate the pure queueing effect of WIP alone. In real teams, cutting WIP often also raises throughput itself, since less multitasking means less context-switching overhead — in which case lead time improves by even more than what's shown here.",
+  adviceItems: [
+    "Set an explicit WIP limit per column on the kanban board so the cap on in-progress work is visible",
+    "Prioritize finishing what's already in progress over starting something new (\"stop starting, start finishing\")",
+    "To raise throughput, consider reducing WIP and tightening flow before adding more people",
+    "Remember this is a steady-state theoretical value — distinguish a one-off delay from structural pile-up",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "KANBAN", title: "Kanban: Successful Evolutionary Change for Your Technology Business", desc: "David J. Anderson. The foundational book on WIP limits and kanban systems for knowledge work.", link: "View on Amazon →", url: "https://amzn.to/3RrQc5E" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If we take on more work in parallel, will it finish faster? — WIP & Lead Time Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (wip, tp, a) => `WIP ${wip}件。週${tp}件しか終わらないのに。リードタイム約${Math.round(a.leadDays)}日。「進捗どうですか」と聞かれるたびに、全部「対応中です」としか言えない日々。`,
+  hintScenario: (a) => `「並行してやれば早い」と信じて全部同時着手。リードタイム約${Math.round(a.leadDays)}日。ステータスボードは全部黄色。誰も何も終わらせていない。`,
+  comments: [
+    "サクサク終わる。バーンダウンチャートが気持ちいい。",
+    "まだ大丈夫。積みタスクはまだ視界に入る量。",
+    "Slackのステータスが全部「対応中」になり始めた。",
+    "「今週中に終わる」と言った案件が、来週も再来週も「今週中」と言われ続ける。",
+    "誰の目にも、何一つ終わっていないことが明らかな状態。",
+  ],
+},
+en: {
+  hint: (wip, tp, a) => `WIP ${wip}, but only ${tp}/week actually get done. Lead time ≈ ${Math.round(a.leadDays)} days. Every "how's it going" gets the same answer: "in progress."`,
+  hintScenario: (a) => `Believed "parallel means faster" and started everything at once. Lead time ≈ ${Math.round(a.leadDays)} days. Every card on the board is yellow. Nothing is actually finishing.`,
+  comments: [
+    "Things wrap up fast. The burndown chart looks satisfying.",
+    "Still fine. The pile of tasks is still small enough to see the bottom.",
+    "Every status update starts turning into \"in progress.\"",
+    "The thing you said would be \"done this week\" is still \"done this week\" two weeks later.",
+    "It's obvious to everyone that nothing is actually getting finished.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let wip = 10;
+let throughput = 5;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 44, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const X_TICKS = [1, 5, 10, 15, 20, 25, 30];
+const Y_MAX_DAYS = 220;
+const xOf = (w) => PAD_L + ((w - WIP_MIN) / (WIP_MAX - WIP_MIN)) * (PW - PAD_L - PAD_R);
+const wOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = WIP_MIN + frac * (WIP_MAX - WIP_MIN);
+  return Math.min(WIP_MAX, Math.max(WIP_MIN, Math.round(raw)));
+};
+const yOf = (days) => PAD_T + (1 - Math.min(days, Y_MAX_DAYS) / Y_MAX_DAYS) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("wlGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 55, 110, 165, 220].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "wl-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "wl-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  });
+  X_TICKS.forEach((w) => {
+    const x = xOf(w);
+    gridLayer.appendChild(el("line", { class: "wl-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "wl-axis-label", x, y: PH - PAD_B + 14, "text-anchor": w === WIP_MIN ? "start" : w === WIP_MAX ? "end" : "middle" });
+    label.textContent = String(w);
+    gridLayer.appendChild(label);
+  });
+  const yTitle = el("text", { class: "wl-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.wlYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "wl-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.wlXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  for (let w = WIP_MIN; w <= WIP_MAX; w += 1) pts.push(`${xOf(w)},${yOf(leadTimeDaysOf(w, throughput))}`);
+  document.getElementById("wlLine").setAttribute("d", "M " + pts.join(" L "));
+  document.getElementById("wlArea").setAttribute("d", "M " + xOf(WIP_MIN) + "," + yOf(0) + " L " + pts.join(" L ") + " L " + xOf(WIP_MAX) + "," + yOf(0) + " Z");
+
+  const mx = xOf(wip), my = yOf(leadTimeDaysOf(wip, throughput));
+  const marker = document.getElementById("wlMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", my); marker.setAttribute("y2", PH - PAD_B);
+  const point = document.getElementById("wlPoint");
+  point.setAttribute("cx", mx); point.setAttribute("cy", my);
+
+  const hit = document.getElementById("wlMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+function drawWipDots() {
+  const wrap = document.getElementById("wipWrap");
+  wrap.innerHTML = "";
+  for (let i = 0; i < wip; i++) {
+    const dot = document.createElement("div");
+    dot.className = "wip-dot";
+    wrap.appendChild(dot);
+  }
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(wip, throughput);
+
+  drawChart();
+  drawWipDots();
+
+  document.getElementById("sumVal").textContent = `${Math.round(a.leadDays)}${t.htmlLang === "ja" ? "日" : "d"}`;
+  document.getElementById("hint").textContent = t.hint(wip, throughput, a);
+
+  document.getElementById("wipCardVal").textContent = t.htmlLang === "ja" ? `${wip}件` : `${wip}`;
+  document.getElementById("tpCardVal").textContent = t.htmlLang === "ja" ? `週${throughput}件` : `${throughput}/week`;
+
+  document.getElementById("wipReadout").textContent = wip;
+  document.getElementById("tpReadout").textContent = throughput;
+  if (document.activeElement !== document.getElementById("wipSlider")) document.getElementById("wipSlider").value = wip;
+  if (document.activeElement !== document.getElementById("wipNum")) document.getElementById("wipNum").value = wip;
+  if (document.activeElement !== document.getElementById("tpSlider")) document.getElementById("tpSlider").value = throughput;
+  if (document.activeElement !== document.getElementById("tpNum")) document.getElementById("tpNum").value = throughput;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 35 ? " danger" : a.score < 60 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/wip-lead-time/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("wipName").textContent = t.wipName;
+  document.getElementById("wipSub").textContent = t.wipSub;
+  document.getElementById("tpName").textContent = t.tpName;
+  document.getElementById("tpSub").textContent = t.tpSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("wipSlider").setAttribute("aria-label", t.wipName);
+  document.getElementById("tpSlider").setAttribute("aria-label", t.tpName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.wipName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.tpName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("wipCardLabel").textContent = t.wipCardLabel;
+  document.getElementById("tpCardLabel").textContent = t.tpCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "wip-lead-time" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("wipSlider").addEventListener("input", (e) => { wip = +e.target.value; render(); });
+document.getElementById("wipNum").addEventListener("change", (e) => {
+  wip = Math.min(WIP_MAX, Math.max(WIP_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("tpSlider").addEventListener("input", (e) => { throughput = +e.target.value; render(); });
+document.getElementById("tpNum").addEventListener("change", (e) => {
+  throughput = Math.min(TP_MAX, Math.max(TP_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  wip = 10; throughput = 5;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  wip = 30;
+  render();
+  const a = assess(wip, throughput);
+  document.getElementById("hint").textContent = T().hintScenario(a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const wlChart = document.getElementById("wlChart");
+function svgPoint(evt) {
+  const pt = wlChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(wlChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  wlChart.setPointerCapture(evt.pointerId);
+  document.getElementById("wlMarker").classList.add("dragging");
+  document.getElementById("wlMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  wip = wOfX(p.x);
+  render();
+}
+document.getElementById("wlMarkerHit").addEventListener("pointerdown", startDrag);
+document.getElementById("wlPoint").addEventListener("pointerdown", startDrag);
+wlChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => wlChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("wlMarker").classList.remove("dragging");
+  document.getElementById("wlMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
