@@ -185,6 +185,12 @@ window.DevSimLab = (function () {
       ja: { name: "生存者バイアス・シミュレーター", title: "生き残った人だけを見て、その指導方法は正しいと言える?", desc: "指導方法の厳しさが、方法に起因する離脱と配置段階のミスマッチにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Survivorship Bias Simulator", title: "If you only look at who stayed, was the training method actually right?", desc: "A simulator visualizing how a training method's harshness affects method-driven attrition versus baseline placement mismatch." },
     },
+    {
+      id: "bikeshedding", href: "bikeshedding/", status: "live",
+      tags: { ja: ["ビケシェッディング", "会議"], en: ["Bikeshedding", "Meetings"] },
+      ja: { name: "ビケシェッディング・シミュレーター", title: "自転車置き場の色は45分、原子炉の契約は2分で決まる?", desc: "パーキンソンの法則(1957年)にもとづき、議題の専門性が本来かけるべき時間と実際にかけられがちな時間のズレにどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Bikeshedding Simulator", title: "The bike shed color takes 45 minutes, the reactor contract takes 2?", desc: "Based on Parkinson's Law (1957), a simulator visualizing how a topic's required expertise drives a gap between ideal and actual discussion time." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */

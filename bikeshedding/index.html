@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自転車置き場の色は45分、原子炉の契約は2分で決まる? | ビケシェッディング・シミュレーター</title>
+<meta name="description" content="1957年のパーキンソンの法則が示す「議題にかける時間は金額に反比例する」現象を、議題の専門性を動かして可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/bikeshedding/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/bikeshedding/">
+<meta property="og:title" content="自転車置き場の色は45分、原子炉の契約は2分で決まる? | ビケシェッディング・シミュレーター">
+<meta property="og:description" content="1957年のパーキンソンの法則が示す「議題にかける時間は金額に反比例する」現象を、議題の専門性を動かして可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/bikeshedding.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ビケシェッディング・シミュレーター",
+  "alternateName": "Bikeshedding Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/bikeshedding/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "議題の専門性・重要度が、本来かけるべき検討時間と実際にかけられがちな時間のズレにどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-curve crossing chart ---- */
+.bs-wrap{margin-top:14px}
+.bs-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.bs-grid{stroke:var(--line);stroke-width:1}
+.bs-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.bs-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.bs-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.bs-line-ideal{fill:none;stroke:var(--q);stroke-width:2.2}
+.bs-line-actual{fill:none;stroke:var(--alert);stroke-width:2.2}
+.bs-dot{r:3.5}
+.bs-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.bs-marker.dragging{cursor:grabbing}
+.bs-marker-hit{fill:transparent;cursor:grab}
+.bs-marker-hit.dragging{cursor:grabbing}
+.bs-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.bs-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.bs-legend .sw.ideal{background:var(--q)}
+.bs-legend .sw.actual{background:var(--alert)}
+.bs-point-ideal{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.bs-point-actual{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.bs-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.bs-value-label-ideal{fill:var(--q)}
+.bs-value-label-actual{fill:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.ideal-card{border-left:4px solid var(--q)}
+.tier-card.actual-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">+30pt</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="bs-wrap">
+    <svg class="bs-svg" id="bsChart" viewBox="0 0 640 240" role="img" aria-label="Ideal discussion time share vs actual discussion time share, by topic expertise required">
+      <g id="bsGridLayer"></g>
+      <path id="bsLineIdeal" class="bs-line-ideal"></path>
+      <path id="bsLineActual" class="bs-line-actual"></path>
+      <g id="bsDotsLayer"></g>
+      <line id="bsMarker" class="bs-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="bsPointIdeal" class="bs-point-ideal" r="5"></circle>
+      <circle id="bsPointActual" class="bs-point-actual" r="5"></circle>
+      <text id="bsLabelIdeal" class="bs-value-label bs-value-label-ideal"></text>
+      <text id="bsLabelActual" class="bs-value-label bs-value-label-actual"></text>
+      <rect id="bsMarkerHit" class="bs-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="bs-legend">
+    <span><span class="sw ideal"></span><span id="legendIdeal"></span></span>
+    <span><span class="sw actual"></span><span id="legendActual"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card ideal-card">
+      <div class="k" id="idealCardLabel"></div>
+      <div class="v" id="idealCardVal">18分</div>
+    </div>
+    <div class="tier-card actual-card">
+      <div class="k" id="actualCardLabel"></div>
+      <div class="v" id="actualCardVal">18分</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">100</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="stakesName"></span><small id="stakesSub"></small></div>
+      <div class="readout mono" id="stakesReadout">50</div>
+      <input type="range" id="stakesSlider" min="0" max="100" step="5" value="50">
+      <div class="num-row">
+        <label for="stakesNum" id="numLabel1"></label>
+        <input type="number" id="stakesNum" min="0" max="100" step="5" value="50">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="totalName"></span><small id="totalSub"></small></div>
+      <div class="readout mono" id="totalReadout">60分</div>
+      <input type="range" id="totalSlider" min="15" max="180" step="15" value="60">
+      <div class="num-row">
+        <label for="totalNum" id="numLabel2"></label>
+        <input type="number" id="totalNum" min="15" max="180" step="15" value="60">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="presetReactorBtn"></button>
+    <button class="btn" id="presetShedBtn"></button>
+    <button class="btn" id="presetCoffeeBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   1957年、C・ノースコート・パーキンソンが著書『パーキンソンの法則』で示した寓話
+   ——ある財務委員会は、1000万ポンドの原子炉契約をわずか2.5分で承認する一方、
+   350ポンドの自転車置き場の色は45分、21ポンドのお茶菓子代は75分議論しても
+   結論が出なかった——にもとづく、「議題にかける時間は、それに伴う金額・専門性に
+   反比例する」という観察(俗称ビケシェッディング/Law of Triviality)を表す簡易モデル。
+   「本来かけるべき時間の目安」(ideal)は議題の専門性・重要度が増すほど増加すると仮定し、
+   「実際にかけられがちな時間」(actual)は、誰もが意見を持てる身近な議題ほど増加する
+   というパーキンソンの観察の方向性にもとづき、専門性が増すほど減少すると仮定する。
+   両曲線は厳密な実証研究の再現ではなく、観察の方向性を示す独自の簡易モデルである。
+   一方、原子炉・自転車置き場・お茶菓子代の実際の所要時間(2.5分・45分・75分)は
+   パーキンソンの著書に基づく実話(の紹介)である。
+*/
+const STAKES_MIN = 0, STAKES_MAX = 100;
+const TOTAL_MIN = 15, TOTAL_MAX = 180;
+const IDEAL_MIN = 5, IDEAL_MAX = 55;
+const ACTUAL_MAX = 60, ACTUAL_FLOOR = 2;
+const MAX_GAP = 55; // stakes=0 のときの本来値との最大乖離幅の目安(%pt)
+
+function idealShareOf(stakes) { return IDEAL_MIN + stakes * 0.5; }
+function actualShareOf(stakes) { return Math.max(ACTUAL_FLOOR, ACTUAL_MAX - stakes * 0.6); }
+function gapOf(stakes) { return actualShareOf(stakes) - idealShareOf(stakes); }
+function scoreOf(stakes) { return Math.max(0, Math.min(100, Math.round(100 - (Math.abs(gapOf(stakes)) / MAX_GAP) * 100))); }
+function tierOf(stakes) {
+  const g = gapOf(stakes);
+  if (g > 25) return 0;
+  if (g > 10) return 1;
+  if (g >= -10) return 2;
+  if (g >= -25) return 3;
+  return 4;
+}
+function assess(stakes, total) {
+  const idealShare = idealShareOf(stakes);
+  const actualShare = actualShareOf(stakes);
+  const idealMin = (idealShare / 100) * total;
+  const actualMin = (actualShare / 100) * total;
+  const gap = actualShare - idealShare;
+  const score = scoreOf(stakes);
+  const band = tierOf(stakes);
+  return { idealShare, actualShare, idealMin, actualMin, gap, score, band };
+}
+
+/* ---- 1957年の実話にもとづく3つのプリセット ---- */
+const PRESETS = {
+  reactor: { stakes: 95, total: 123, realMinutes: 2.5, realTotal: 123 },
+  shed: { stakes: 25, total: 123, realMinutes: 45, realTotal: 123 },
+  coffee: { stakes: 5, total: 123, realMinutes: 75, realTotal: 123 },
+};
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "自転車置き場の色は45分、原子炉の契約は2分で決まる? | ビケシェッディング・シミュレーター",
+  heroTitle: "自転車置き場の色は45分、<br>原子炉の契約は2分で決まる?",
+  heroLead: "1957年、イギリスの歴史学者C・ノースコート・パーキンソンは、著書『パーキンソンの法則』の中である財務委員会の寓話を紹介しました。議題は3つ——1000万ポンドの原子炉建設契約、350ポンドの自転車置き場、そして年21ポンドのお茶菓子代です。結果は直感に反するものでした。巨額の原子炉契約はわずか2分半で承認され、身近な自転車置き場の色は45分間議論され、さらに些細なお茶菓子代の話は1時間15分におよび、それでも結論が出ませんでした。パーキンソンいわく「議題にかける時間は、それに伴う金額に反比例する」。専門的すぎる議題には誰も異議を唱えられず、身近な議題には誰もが一家言を持つからです。これは後にソフトウェア開発の世界で「ビケシェッディング(自転車置き場議論)」と呼ばれるようになりました。「議題の専門性・重要度」を動かして、本来かけるべき時間の目安と、実際にかけられがちな時間がどうズレていくかを確認してください。",
+  consoleLabel: "AGENDA CONSOLE",
+  sumLabel: "本来とのズレ幅",
+  scoreLabel: "時間配分の妥当性スコア",
+  stakesName: "議題の専門性・重要度", stakesSub: "0=誰でも意見を持てる身近な話題、100=専門家しか判断できない高度な議題",
+  totalName: "会議全体の時間", totalSub: "この議題を含む会議1回あたりの合計時間",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  presetReactorBtn: "実例: 原子炉の契約(2.5分)",
+  presetShedBtn: "実例: 自転車置き場の色(45分)",
+  presetCoffeeBtn: "実例: お茶菓子代(75分)",
+  chartCaption: "緑線は本来かけるべき時間の目安、赤線は実際にかけられがちな時間です。専門性・重要度が上がるほど2本の線は開いていき、身近な議題ほど過剰に、専門的な議題ほど不足しがちになります。",
+  chartNote: "この2本の曲線は、パーキンソンの観察の方向性を示す独自の簡易モデルであり、統計的に検証された研究結果ではありません。一方、原子炉・自転車置き場・お茶菓子代の実際の所要時間(2.5分・45分・75分)は、パーキンソンの著書に基づく実話です。",
+  bsYTitle: "会議時間に占める割合(%)", bsXTitle: "議題の専門性・重要度",
+  legendIdeal: "本来かけるべき時間の目安",
+  legendActual: "実際にかけられがちな時間",
+  idealCardLabel: "本来かけるべき時間の目安",
+  actualCardLabel: "実際にかけられがちな時間",
+  hint: (stakes, total, a) => `議題の専門性・重要度${stakes}のとき、本来かけるべき時間の目安は会議全体の約${a.idealShare.toFixed(0)}%(約${a.idealMin.toFixed(0)}分)。実際にかけられがちな時間は約${a.actualShare.toFixed(0)}%(約${a.actualMin.toFixed(0)}分)です。`,
+  hintPreset: {
+    reactor: (a) => `実際の逸話では、1000万ポンドの原子炉契約はわずか2.5分で承認されました(会議全体の約2%)。専門的すぎて、誰も異議を唱えられなかったためです。このシミュレーターの物差しでは、同程度の重要度の議題に実際にかけられがちな時間は約${a.actualShare.toFixed(0)}%(約${a.actualMin.toFixed(0)}分)、本来はその倍以上、約${a.idealShare.toFixed(0)}%(約${a.idealMin.toFixed(0)}分)は必要という見立てです。`,
+    shed: (a) => `実際の逸話では、350ポンドの自転車置き場の色をめぐる議論は45分におよびました。誰もが意見を持てる身近な話題だったためです。このシミュレーターの物差しでは、同程度の議題に実際にかけられがちな時間は約${a.actualShare.toFixed(0)}%(約${a.actualMin.toFixed(0)}分)、本来必要な目安は約${a.idealShare.toFixed(0)}%(約${a.idealMin.toFixed(0)}分)です。`,
+    coffee: (a) => `実際の逸話では、年21ポンドのお茶菓子代の議論は1時間15分におよび、それでも結論が出ませんでした。金額が小さいほど誰でも口を出せてしまうためです。このシミュレーターの物差しでは、同程度の議題に実際にかけられがちな時間は約${a.actualShare.toFixed(0)}%(約${a.actualMin.toFixed(0)}分)、本来必要な目安は約${a.idealShare.toFixed(0)}%(約${a.idealMin.toFixed(0)}分)にとどまります。`,
+  },
+  comments: [
+    "典型的な「ビケシェッディング」状態です。誰もが意見を持てる身近な話題に、本来必要な時間よりも大幅に多くの時間が使われています。",
+    "身近な話題に、本来よりもやや多めの時間が使われがちな傾向があります。",
+    "本来かけるべき時間と、実際にかけられがちな時間のバランスが取れています。",
+    "専門的な話題に、本来よりもやや少ない検討時間しか使われていない可能性があります。",
+    "専門的すぎて誰も異議を唱えられず、本来必要な検討時間を大幅に下回ったまま承認されがちな、注意が必要な状態です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "パーキンソンの法則(1957年)は厳密な実証研究ではなく、イギリスの官僚組織を観察した風刺的な洞察です。しかし「誰もが意見を持てる話題ほど議論が長引き、専門性が高い話題ほど十分な検討がされないまま通ってしまう」という方向性は、多くの職場で見覚えがあるのではないでしょうか。自転車置き場の色や変数の命名規則は際限なく議論されがちな一方、技術的なアーキテクチャ選定や大口の契約は、判断できる人が少ないためにかえって十分な検討がされないまま承認されることがあります。後者は前者よりも組織にとって影響が大きい場合が多く、注意が必要です。",
+  adviceItems: [
+    "身近で誰もが意見を持てる議題には、あらかじめ時間の上限を決めて議論する(タイムボックス)",
+    "誰もが意見を持てる議題は、決定権者を明確にして会議外で処理する(持ち帰り決裁・非同期での合意形成)",
+    "専門性が高い議題こそ、事前に資料を配布し、詳しい人からの意見を会議前に集めておく",
+    "「異議が出ない」ことを「問題がない」ことと同一視しない。技術的に高度な提案ほど、意図的にレビュー役を置く",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "MEETING CULTURE", title: "トヨタの会議は30分", desc: "山本大平著。会議時間の浪費という現代的な課題に、実務の立場から向き合う一冊。「決める力」を軸にした会議運営のノウハウを解説する。", link: "Amazonで見る →", url: "https://amzn.to/4fw9KyY" },
+    { tag: "ORGANIZATIONAL BEHAVIOR", title: "Parkinson's Law", desc: "C・ノースコート・パーキンソンの原著(1957年)。自転車置き場と原子炉の寓話——このページのモデルの元になった観察——が最初に登場する一冊。", link: "Amazonで見る →", url: "https://amzn.to/4eZ0jYO" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "自転車置き場の色は45分、原子炉の契約は2分で決まる? | ビケシェッディング・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "The bike shed color takes 45 minutes, the reactor contract takes 2? | Bikeshedding Simulator",
+  heroTitle: "The bike shed color takes 45 minutes,<br>the reactor contract takes 2?",
+  heroLead: "In 1957, British historian C. Northcote Parkinson told a parable in his book Parkinson's Law about a finance committee with three agenda items: a £10 million contract to build a nuclear reactor, a £350 bicycle shed, and a £21-a-year budget for refreshments. The outcome was counterintuitive. The massive reactor contract was approved in two and a half minutes. The bike shed, something everyone felt qualified to have an opinion on, was debated for 45 minutes. And the trivial refreshments budget ran on for an hour and fifteen minutes — without even reaching a decision. As Parkinson put it, \"the time spent on any item of the agenda will be in inverse proportion to the sum involved.\" Nobody feels qualified to challenge a topic that's too technical, while everyone has an opinion on something familiar. This later became known in software engineering as \"bikeshedding.\" Move the \"expertise and stakes required by the topic\" dial to see how the ideal discussion time and the actual discussion time drift apart.",
+  consoleLabel: "AGENDA CONSOLE",
+  sumLabel: "Gap from the ideal",
+  scoreLabel: "Time-allocation soundness score",
+  stakesName: "Expertise / stakes required by the topic", stakesSub: "0 = a familiar topic anyone can weigh in on, 100 = a highly technical topic only specialists can judge",
+  totalName: "Total meeting length", totalSub: "Total length of the meeting this agenda item is part of",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  presetReactorBtn: "Real example: the reactor contract (2.5 min)",
+  presetShedBtn: "Real example: the bike shed color (45 min)",
+  presetCoffeeBtn: "Real example: the refreshments budget (75 min)",
+  chartCaption: "The green line is the ideal discussion time; the red line is the actual discussion time people tend to spend. As expertise/stakes rise, the two lines pull apart — familiar topics get over-discussed, technical ones get under-discussed.",
+  chartNote: "These two curves are an original, simplified model reflecting the direction of Parkinson's observation — not a statistically validated research finding. The real durations for the reactor, bike shed, and refreshments items (2.5, 45, and 75 minutes) are a real anecdote from Parkinson's own book.",
+  bsYTitle: "Share of meeting time (%)", bsXTitle: "Expertise / stakes required by the topic",
+  legendIdeal: "Ideal discussion time",
+  legendActual: "Actual discussion time (tends to happen)",
+  idealCardLabel: "Ideal discussion time",
+  actualCardLabel: "Actual discussion time (tends to happen)",
+  hint: (stakes, total, a) => `At an expertise/stakes level of ${stakes}, the ideal discussion time is about ${a.idealShare.toFixed(0)}% of the meeting (about ${a.idealMin.toFixed(0)} min). The actual time it tends to get is about ${a.actualShare.toFixed(0)}% (about ${a.actualMin.toFixed(0)} min).`,
+  hintPreset: {
+    reactor: (a) => `In the real anecdote, the £10 million reactor contract was approved in just 2.5 minutes (about 2% of the meeting) — too technical for anyone to feel qualified to object. On this simulator's own scale, a topic at this stakes level tends to actually get about ${a.actualShare.toFixed(0)}% (${a.actualMin.toFixed(0)} min), while roughly double that, about ${a.idealShare.toFixed(0)}% (${a.idealMin.toFixed(0)} min), would arguably be warranted.`,
+    shed: (a) => `In the real anecdote, the £350 bike shed color was debated for 45 minutes — a familiar topic everyone felt entitled to an opinion on. On this simulator's own scale, a topic at this stakes level tends to actually get about ${a.actualShare.toFixed(0)}% (${a.actualMin.toFixed(0)} min), against an ideal of about ${a.idealShare.toFixed(0)}% (${a.idealMin.toFixed(0)} min).`,
+    coffee: (a) => `In the real anecdote, the £21-a-year refreshments budget ran for an hour and fifteen minutes and still wasn't resolved — the smaller the sum, the more everyone feels free to chime in. On this simulator's own scale, a topic at this stakes level tends to actually get about ${a.actualShare.toFixed(0)}% (${a.actualMin.toFixed(0)} min), while the ideal would only be about ${a.idealShare.toFixed(0)}% (${a.idealMin.toFixed(0)} min).`,
+  },
+  comments: [
+    "A textbook case of \"bikeshedding.\" A familiar topic anyone can weigh in on is getting far more time than it warrants.",
+    "Familiar topics are getting somewhat more time than they warrant.",
+    "The ideal discussion time and the actual discussion time are roughly balanced.",
+    "A technical topic may be getting somewhat less scrutiny than it warrants.",
+    "A concerning state: the topic is too technical for anyone to object, and it tends to get approved with far less scrutiny than it warrants.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Parkinson's Law (1957) isn't a rigorous empirical study — it's a satirical observation of British bureaucracy. But the underlying pattern, that topics everyone can weigh in on drag on while highly technical topics sail through with too little scrutiny, is probably familiar from real workplaces. Bike-shed colors and variable-naming conventions can get debated endlessly, while technical architecture decisions and large contracts can get approved without enough scrutiny simply because few people feel qualified to challenge them. The latter usually matters more to the organization, and deserves attention.",
+  adviceItems: [
+    "Timebox discussion of familiar, everyone-has-an-opinion topics in advance",
+    "Move topics anyone can weigh in on out of the meeting entirely — assign a clear decision-maker and resolve them asynchronously",
+    "For highly technical topics, circulate materials in advance and gather input from experts before the meeting",
+    "Don't treat \"no objections\" as \"no problems\" — deliberately assign a reviewer for the most technically complex proposals",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "MEETING CULTURE", title: "Toyota's 30-Minute Meetings (トヨタの会議は30分)", desc: "By Daihei Yamamoto. A practitioner's take on the very modern problem of wasted meeting time, built around Toyota's culture of \"the ability to decide.\"", link: "View on Amazon →", url: "https://amzn.to/4fw9KyY" },
+    { tag: "ORGANIZATIONAL BEHAVIOR", title: "Parkinson's Law", desc: "C. Northcote Parkinson's 1957 original — the book where the bicycle-shed-and-reactor parable behind this page's model first appeared.", link: "View on Amazon →", url: "https://amzn.to/4eZ0jYO" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "The bike shed color takes 45 minutes, the reactor contract takes 2? — Bikeshedding Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (stakes, total, a) => `専門性${stakes}。実際にかけられがちな時間約${a.actualMin.toFixed(0)}分。variable名を\`data\`にするか\`items\`にするかで30分溶けたPRレビュー、心当たりありませんか。`,
+  hintPreset: {
+    reactor: (a) => `本番DBの移行スクリプト、誰もレビューできる人がいなくて「まあ動いたしヨシ!」でマージされたやつ。実際にかけられがちな時間約${a.actualMin.toFixed(0)}分。`,
+    shed: (a) => `インデントはタブかスペースか。Slackのスレッドが200件を超えたやつ。実際にかけられがちな時間約${a.actualMin.toFixed(0)}分。`,
+    coffee: (a) => `絵文字リアクションのルール制定に費やされた会議、あなたのチームにもありませんか。実際にかけられがちな時間約${a.actualMin.toFixed(0)}分、まだ結論出てません。`,
+  },
+  comments: [
+    "変数名の議論で1時間溶けた。ロジックのレビューは3分で終わった。",
+    "PRのコメント欄がリンター設定の話で盛り上がっている。本題のバグは未指摘。",
+    "たまには本題から逸れずに終わる会議もある。奇跡。",
+    "アーキテクチャ設計、詳しい人が1人しかいないので「じゃあお願いします」で終わった。",
+    "本番障害対応の設計変更、誰も止められないまま深夜にマージされた。",
+  ],
+},
+en: {
+  hint: (stakes, total, a) => `Expertise ${stakes}. Actual time it tends to get: ~${a.actualMin.toFixed(0)} min. Sound familiar if a PR review burned 30 minutes on \`data\` vs \`items\`?`,
+  hintPreset: {
+    reactor: (a) => `The prod DB migration script nobody could review, merged with a "well, it ran, ship it." Actual time it tends to get: ~${a.actualMin.toFixed(0)} min.`,
+    shed: (a) => `Tabs vs spaces. The Slack thread that hit 200 replies. Actual time it tends to get: ~${a.actualMin.toFixed(0)} min.`,
+    coffee: (a) => `The meeting spent entirely on emoji-reaction etiquette rules — sound familiar? Actual time it tends to get: ~${a.actualMin.toFixed(0)} min, and still unresolved.`,
+  },
+  comments: [
+    "An hour burned on a variable name. The actual logic review took three minutes.",
+    "The PR comments are all about linter config. Nobody flagged the actual bug.",
+    "Once in a while, a meeting actually stays on topic. A small miracle.",
+    "Only one person understands the architecture, so it ends with \"okay, you decide.\"",
+    "A production-incident fix got merged at 2am because nobody could push back.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let stakes = 50;
+let total = 60;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (s) => PAD_L + ((s - STAKES_MIN) / (STAKES_MAX - STAKES_MIN)) * (PW - PAD_L - PAD_R);
+const sOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = STAKES_MIN + frac * (STAKES_MAX - STAKES_MIN);
+  return Math.min(STAKES_MAX, Math.max(STAKES_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("bsGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "bs-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "bs-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let s = STAKES_MIN; s <= STAKES_MAX; s += 20) {
+    const x = xOf(s);
+    gridLayer.appendChild(el("line", { class: "bs-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "bs-axis-label", x, y: PH - PAD_B + 14, "text-anchor": s === STAKES_MIN ? "start" : s === STAKES_MAX ? "end" : "middle" });
+    label.textContent = s;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "bs-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.bsYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "bs-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.bsXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const idealPts = [], actualPts = [];
+  for (let s = STAKES_MIN; s <= STAKES_MAX; s += 2) {
+    idealPts.push(`${xOf(s)},${yOf(idealShareOf(s))}`);
+    actualPts.push(`${xOf(s)},${yOf(actualShareOf(s))}`);
+  }
+  document.getElementById("bsLineIdeal").setAttribute("d", "M " + idealPts.join(" L "));
+  document.getElementById("bsLineActual").setAttribute("d", "M " + actualPts.join(" L "));
+
+  const dotsLayer = document.getElementById("bsDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let s = STAKES_MIN; s <= STAKES_MAX; s += 20) {
+    dotsLayer.appendChild(el("circle", { class: "bs-dot", cx: xOf(s), cy: yOf(idealShareOf(s)), fill: "var(--q)" }));
+    dotsLayer.appendChild(el("circle", { class: "bs-dot", cx: xOf(s), cy: yOf(actualShareOf(s)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(stakes);
+  const marker = document.getElementById("bsMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const idealY = yOf(idealShareOf(stakes));
+  const actualY = yOf(actualShareOf(stakes));
+  document.getElementById("bsPointIdeal").setAttribute("cx", mx);
+  document.getElementById("bsPointIdeal").setAttribute("cy", idealY);
+  document.getElementById("bsPointActual").setAttribute("cx", mx);
+  document.getElementById("bsPointActual").setAttribute("cy", actualY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const idealIsHigher = idealY <= actualY;
+
+  const labelIdeal = document.getElementById("bsLabelIdeal");
+  labelIdeal.setAttribute("x", mx + labelDx);
+  labelIdeal.setAttribute("y", clampY(idealIsHigher ? idealY - 10 : idealY + 20));
+  labelIdeal.setAttribute("text-anchor", labelAnchor);
+  labelIdeal.textContent = Math.round(idealShareOf(stakes)) + "%";
+
+  const labelActual = document.getElementById("bsLabelActual");
+  labelActual.setAttribute("x", mx + labelDx);
+  labelActual.setAttribute("y", clampY(idealIsHigher ? actualY + 20 : actualY - 10));
+  labelActual.setAttribute("text-anchor", labelAnchor);
+  labelActual.textContent = Math.round(actualShareOf(stakes)) + "%";
+
+  const hit = document.getElementById("bsMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(stakes, total);
+
+  drawChart();
+
+  const gapLabel = (a.gap >= 0 ? "+" : "") + Math.round(a.gap) + "pt";
+  document.getElementById("sumVal").textContent = gapLabel;
+  document.getElementById("idealCardVal").textContent = t.htmlLang === "ja" ? `${a.idealMin.toFixed(0)}分` : `${a.idealMin.toFixed(0)} min`;
+  document.getElementById("actualCardVal").textContent = t.htmlLang === "ja" ? `${a.actualMin.toFixed(0)}分` : `${a.actualMin.toFixed(0)} min`;
+  document.getElementById("hint").textContent = t.hint(stakes, total, a);
+
+  document.getElementById("stakesReadout").textContent = stakes;
+  document.getElementById("totalReadout").textContent = t.htmlLang === "ja" ? `${total}分` : `${total} min`;
+  if (document.activeElement !== document.getElementById("stakesSlider")) document.getElementById("stakesSlider").value = stakes;
+  if (document.activeElement !== document.getElementById("stakesNum")) document.getElementById("stakesNum").value = stakes;
+  if (document.activeElement !== document.getElementById("totalSlider")) document.getElementById("totalSlider").value = total;
+  if (document.activeElement !== document.getElementById("totalNum")) document.getElementById("totalNum").value = total;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/bikeshedding/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("stakesName").textContent = t.stakesName;
+  document.getElementById("stakesSub").textContent = t.stakesSub;
+  document.getElementById("totalName").textContent = t.totalName;
+  document.getElementById("totalSub").textContent = t.totalSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("stakesSlider").setAttribute("aria-label", t.stakesName);
+  document.getElementById("totalSlider").setAttribute("aria-label", t.totalName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.stakesName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.totalName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("presetReactorBtn").textContent = t.presetReactorBtn;
+  document.getElementById("presetShedBtn").textContent = t.presetShedBtn;
+  document.getElementById("presetCoffeeBtn").textContent = t.presetCoffeeBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendIdeal").textContent = t.legendIdeal;
+  document.getElementById("legendActual").textContent = t.legendActual;
+  document.getElementById("idealCardLabel").textContent = t.idealCardLabel;
+  document.getElementById("actualCardLabel").textContent = t.actualCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "bikeshedding" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("stakesSlider").addEventListener("input", (e) => { stakes = +e.target.value; render(); });
+document.getElementById("stakesNum").addEventListener("change", (e) => {
+  stakes = Math.min(STAKES_MAX, Math.max(STAKES_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("totalSlider").addEventListener("input", (e) => { total = +e.target.value; render(); });
+document.getElementById("totalNum").addEventListener("change", (e) => {
+  total = Math.min(TOTAL_MAX, Math.max(TOTAL_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  stakes = 50; total = 60;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+function applyPreset(key) {
+  const p = PRESETS[key];
+  stakes = p.stakes; total = p.total;
+  render();
+  const a = assess(stakes, total);
+  document.getElementById("hint").textContent = T().hintPreset[key](a);
+}
+document.getElementById("presetReactorBtn").addEventListener("click", () => applyPreset("reactor"));
+document.getElementById("presetShedBtn").addEventListener("click", () => applyPreset("shed"));
+document.getElementById("presetCoffeeBtn").addEventListener("click", () => applyPreset("coffee"));
+
+/* ---- drag the marker directly on the chart ---- */
+const bsChart = document.getElementById("bsChart");
+function svgPoint(evt) {
+  const pt = bsChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(bsChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  bsChart.setPointerCapture(evt.pointerId);
+  document.getElementById("bsMarker").classList.add("dragging");
+  document.getElementById("bsMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  stakes = sOfX(p.x);
+  render();
+}
+document.getElementById("bsMarkerHit").addEventListener("pointerdown", startDrag);
+bsChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => bsChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("bsMarker").classList.remove("dragging");
+  document.getElementById("bsMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
