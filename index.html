@@ -43,6 +43,13 @@
 .today-share{margin-top:12px}
 .grid-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .grid-h::before{display:none}
+.cat-h{
+  display:flex;align-items:center;gap:8px;
+  font-size:14px;color:var(--ink-soft);
+  margin:22px 0 10px;
+}
+.cat-h::before{content:"";display:inline-block;width:10px;height:10px;border:3px solid var(--q);border-radius:2px;flex:none}
+.cat-h .cat-count{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -72,7 +79,7 @@
 
 <section aria-labelledby="gridH">
   <h2 class="grid-h" id="gridH"></h2>
-  <div class="sim-grid" id="simGrid"></div>
+  <div id="simSections"></div>
 </section>
 
 <div class="share">
@@ -156,7 +163,7 @@ function renderToday(lang) {
   el.href = sim.href;
   el.innerHTML = `
     <span class="sim-badge live">${t.todayBadge}</span>
-    <div class="sim-eyebrow">${sim.id}</div>
+    <div class="sim-eyebrow">${DevSimLab.numOf(sim)} · ${sim.id}</div>
     <h2>${content.title}</h2>
     <p>${content.desc}</p>
     <div class="sim-tags">${sim.tags[lang].map((tag) => `<span>${tag}</span>`).join("")}</div>
@@ -172,23 +179,34 @@ function renderToday(lang) {
 function renderCards(lang) {
   const t = PAGE_I18N[lang];
   document.getElementById("gridH").textContent = t.gridH(SIMS.filter((s) => s.status === "live").length);
-  const grid = document.getElementById("simGrid");
-  grid.innerHTML = "";
-  SIMS.forEach((sim) => {
-    const isLive = sim.status === "live";
-    const el = document.createElement(isLive ? "a" : "div");
-    el.className = "sim-card" + (isLive ? "" : " is-soon");
-    if (isLive) el.href = sim.href;
-    const badge = isLive ? t.badgeLive : t.badgeSoon;
-    const content = sim[lang];
-    el.innerHTML = `
-      <span class="sim-badge${isLive ? " live" : ""}">${badge}</span>
-      <div class="sim-eyebrow">${sim.id}</div>
-      <h2>${content.title}</h2>
-      <p>${content.desc}</p>
-      <div class="sim-tags">${sim.tags[lang].map((tag) => `<span>${tag}</span>`).join("")}</div>
-    `;
-    grid.appendChild(el);
+  const sections = document.getElementById("simSections");
+  sections.innerHTML = "";
+  DevSimLab.CATEGORIES.forEach((cat) => {
+    const sims = SIMS.filter((s) => s.cat === cat.id);
+    if (sims.length === 0) return;
+    const h = document.createElement("h3");
+    h.className = "cat-h";
+    h.innerHTML = `${cat[lang]} <span class="cat-count">(${sims.length})</span>`;
+    sections.appendChild(h);
+    const grid = document.createElement("div");
+    grid.className = "sim-grid";
+    sims.forEach((sim) => {
+      const isLive = sim.status === "live";
+      const el = document.createElement(isLive ? "a" : "div");
+      el.className = "sim-card" + (isLive ? "" : " is-soon");
+      if (isLive) el.href = sim.href;
+      const badge = isLive ? t.badgeLive : t.badgeSoon;
+      const content = sim[lang];
+      el.innerHTML = `
+        <span class="sim-badge${isLive ? " live" : ""}">${badge}</span>
+        <div class="sim-eyebrow">${DevSimLab.numOf(sim)} · ${sim.id}</div>
+        <h2>${content.title}</h2>
+        <p>${content.desc}</p>
+        <div class="sim-tags">${sim.tags[lang].map((tag) => `<span>${tag}</span>`).join("")}</div>
+      `;
+      grid.appendChild(el);
+    });
+    sections.appendChild(grid);
   });
 }
 

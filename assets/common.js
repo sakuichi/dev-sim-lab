@@ -19,6 +19,8 @@ window.DevSimLab = (function () {
 
   let LANG = detectLang();
   let TONE = "std"; // "std" | "dev"
+  const BIG_KEY = "devsimlab_bigtext";
+  let BIGTEXT = localStorage.getItem(BIG_KEY) === "1";
   const listeners = [];
 
   function setLang(lang) {
@@ -29,6 +31,11 @@ window.DevSimLab = (function () {
   }
   function toggleTone() {
     TONE = TONE === "dev" ? "std" : "dev";
+    notify();
+  }
+  function toggleBigText() {
+    BIGTEXT = !BIGTEXT;
+    localStorage.setItem(BIG_KEY, BIGTEXT ? "1" : "0");
     notify();
   }
   function onChange(fn) {
@@ -43,6 +50,8 @@ window.DevSimLab = (function () {
     ja: {
       brand: "開発あるある図鑑",
       brandEyebrow: "開発あるある図鑑",
+      bigTextBtn: "Aa デカ文字",
+      bigTextLabel: "文字を大きく表示する",
       toneBtn: "🔥 開発者モード",
       toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
       shareLabel: "SHARE",
@@ -59,6 +68,8 @@ window.DevSimLab = (function () {
     en: {
       brand: "Dev Sim Lab",
       brandEyebrow: "Dev Sim Lab",
+      bigTextBtn: "Aa Big text",
+      bigTextLabel: "Display larger text",
       toneBtn: "🔥 Developer mode",
       toneNote: "* Joke mode. Switch back to standard before client meetings.",
       shareLabel: "SHARE",
@@ -74,155 +85,167 @@ window.DevSimLab = (function () {
     },
   };
 
+  /* ---- categories: each sim belongs to exactly ONE primary category (cat).
+     Secondary aspects are expressed via tags. Landing page groups cards by
+     these, in this order. ---- */
+  const CATEGORIES = [
+    { id: "planning", ja: "計画・見積もり", en: "Planning & Estimation" },
+    { id: "time", ja: "時間・生産性", en: "Time & Productivity" },
+    { id: "quality", ja: "品質・コード", en: "Quality & Code" },
+    { id: "team", ja: "チーム・組織", en: "Team & Organization" },
+    { id: "cognition", ja: "認知・コミュニケーション", en: "Cognition & Communication" },
+  ];
+
   /* ---- registry of every simulator page (single source of truth for the
-     landing-page card grid and every page's "related problems" section) ---- */
+     landing-page card grid and every page's "related problems" section).
+     Array order = publication order = 図鑑No. (index + 1, never renumbered). ---- */
   const SIMS = [
     {
-      id: "qcd-tradeoff", href: "qcd-tradeoff/", status: "live",
+      id: "qcd-tradeoff", href: "qcd-tradeoff/", status: "live", cat: "planning",
       tags: { ja: ["品質", "コスト", "納期"], en: ["Quality", "Cost", "Delivery"] },
       ja: { name: "QCDトレードオフ・シミュレーター", title: "品質・コスト・納期のトレードオフを、見える形に。", desc: "品質(Q)・コスト(C)・納期(D)は互いにトレードオフの関係にあります。ドラッグ操作でバランスを体感できるシミュレーター。" },
       en: { name: "QCD Trade-off Simulator", title: "Make the quality-cost-delivery trade-off visible.", desc: "Quality, cost and delivery are always in tension. Drag the chart to feel the trade-off for yourself." },
     },
     {
-      id: "brooks-law", href: "brooks-law/", status: "live",
+      id: "brooks-law", href: "brooks-law/", status: "live", cat: "team",
       tags: { ja: ["人員計画", "コミュニケーション"], en: ["Staffing", "Communication"] },
       ja: { name: "ブルックスの法則シミュレーター", title: "人が増えれば、早く終わる?", desc: "増員によるコミュニケーションコストの増加を可視化するシミュレーター。" },
       en: { name: "Brooks's Law Simulator", title: "Will adding people make it faster?", desc: "A simulator visualizing how communication overhead grows with team size." },
     },
     {
-      id: "utilization-trap", href: "utilization-trap/", status: "live",
+      id: "utilization-trap", href: "utilization-trap/", status: "live", cat: "time",
       tags: { ja: ["稼働率", "待ち時間"], en: ["Utilization", "Wait time"] },
       ja: { name: "稼働率100%の罠シミュレーター", title: "全員が常に忙しい = 効率的?", desc: "稼働率が高まるほど待ち時間が急増する様子を可視化するシミュレーター。" },
       en: { name: "Utilization Trap Simulator", title: "Is everyone being 100% busy actually efficient?", desc: "A simulator showing how wait times explode as utilization approaches 100%." },
     },
     {
-      id: "context-switch", href: "context-switch/", status: "live",
+      id: "context-switch", href: "context-switch/", status: "live", cat: "time",
       tags: { ja: ["マルチタスク", "生産性"], en: ["Multitasking", "Productivity"] },
       ja: { name: "コンテキストスイッチ・シミュレーター", title: "3案件並行なら、1/3ずつ進む?", desc: "並行案件数が増えるほど実効作業時間が失われる様子を可視化するシミュレーター。" },
       en: { name: "Context Switch Simulator", title: "Three projects at once — does each move at 1/3 speed?", desc: "A simulator visualizing how context-switching erodes effective work time." },
     },
     {
-      id: "estimation-uncertainty", href: "estimation-uncertainty/", status: "live",
+      id: "estimation-uncertainty", href: "estimation-uncertainty/", status: "live", cat: "planning",
       tags: { ja: ["見積もり", "計画"], en: ["Estimation", "Planning"] },
       ja: { name: "見積もりの不確実性シミュレーター", title: "最初の見積もりは、そのまま信じていい?", desc: "プロジェクトの進行段階に応じて見積もりの誤差幅が狭まっていく「不確実性のコーン」を可視化するシミュレーター。" },
       en: { name: "Estimation Uncertainty Simulator", title: "Can you trust the first estimate?", desc: "A simulator visualizing the Cone of Uncertainty — how estimate accuracy narrows as a project progresses." },
     },
     {
-      id: "technical-debt", href: "technical-debt/", status: "live",
+      id: "technical-debt", href: "technical-debt/", status: "live", cat: "quality",
       tags: { ja: ["技術的負債", "リファクタリング"], en: ["Technical debt", "Refactoring"] },
       ja: { name: "技術的負債シミュレーター", title: "技術的負債は、あとでまとめて返せばいい?", desc: "放置している間も借金の利息のように対応コストが複利で膨らんでいく様子を可視化するシミュレーター。" },
       en: { name: "Technical Debt Simulator", title: "Can you just pay off tech debt later?", desc: "A simulator visualizing how the cost of unaddressed technical debt compounds like interest over time." },
     },
     {
-      id: "code-review", href: "code-review/", status: "live",
+      id: "code-review", href: "code-review/", status: "live", cat: "quality",
       tags: { ja: ["コードレビュー", "品質"], en: ["Code review", "Quality"] },
       ja: { name: "コードレビュー係数シミュレーター", title: "レビューは、早く終わらせた方がいい?", desc: "レビュー速度が上がるほど欠陥の検出率が下がっていく様子を可視化するシミュレーター。" },
       en: { name: "Code Review Coefficient Simulator", title: "Is it better to finish reviews quickly?", desc: "A simulator visualizing how defect detection rate drops as code review speed increases." },
     },
     {
-      id: "release-frequency", href: "release-frequency/", status: "live",
+      id: "release-frequency", href: "release-frequency/", status: "live", cat: "planning",
       tags: { ja: ["リリース頻度", "DevOps"], en: ["Release frequency", "DevOps"] },
       ja: { name: "リリース頻度シミュレーター", title: "リリースは、まとめて少ない回数でやった方が安全?", desc: "リリース頻度が下がるほど変更失敗率・復旧時間が悪化していく様子をDORAの調査データで可視化するシミュレーター。" },
       en: { name: "Release Frequency Simulator", title: "Is it safer to release less often, in bigger batches?", desc: "A simulator visualizing how change failure rate and recovery time worsen as release frequency drops, based on DORA's research." },
     },
     {
-      id: "cost-of-change", href: "cost-of-change/", status: "live",
+      id: "cost-of-change", href: "cost-of-change/", status: "live", cat: "planning",
       tags: { ja: ["修正コスト", "品質"], en: ["Cost of change", "Quality"] },
       ja: { name: "修正コスト・シミュレーター", title: "バグは、後工程で見つかるほど直すコストが跳ね上がる?", desc: "「後工程ほど修正コストが跳ね上がる」という通説と、実証研究の結果を比較できるシミュレーター。" },
       en: { name: "Cost of Change Simulator", title: "Does a bug cost dramatically more to fix the later it's found?", desc: "A simulator comparing the widely-cited claim that late-found bugs cost dramatically more against what empirical research actually found." },
     },
     {
-      id: "wip-lead-time", href: "wip-lead-time/", status: "live",
+      id: "wip-lead-time", href: "wip-lead-time/", status: "live", cat: "time",
       tags: { ja: ["WIP", "リードタイム"], en: ["WIP", "Lead time"] },
       ja: { name: "WIP・リードタイム シミュレーター", title: "仕掛かり(WIP)を増やせば、もっと早く終わる?", desc: "リトルの法則にもとづき、仕掛かり件数を増やすほどリードタイムが伸びていく様子を可視化するシミュレーター。" },
       en: { name: "WIP & Lead Time Simulator", title: "If we take on more work in parallel, will it finish faster?", desc: "A simulator visualizing how lead time grows as work in progress increases, based on Little's Law." },
     },
     {
-      id: "pause-cost", href: "pause-cost/", status: "live",
+      id: "pause-cost", href: "pause-cost/", status: "live", cat: "time",
       tags: { ja: ["中断コスト", "ナレッジ管理"], en: ["Pause cost", "Knowledge management"] },
       ja: { name: "中断コスト・シミュレーター", title: "作業を止めても、コストは増え続ける?", desc: "長期間中断した作業を再開するときの思い出し工数と作業漏れリスクを可視化するシミュレーター。" },
       en: { name: "Pause Cost Simulator", title: "If you pause the work, does the cost keep climbing?", desc: "A simulator visualizing the reacquisition cost and omission risk of resuming work after a long pause." },
     },
     {
-      id: "zero-bugs", href: "zero-bugs/", status: "live",
+      id: "zero-bugs", href: "zero-bugs/", status: "live", cat: "quality",
       tags: { ja: ["信頼性", "SRE"], en: ["Reliability", "SRE"] },
       ja: { name: "バグゼロ・コストシミュレーター", title: "バグゼロのシステムは、目指せば作れる?", desc: "信頼性を100%に近づけようとするほどコストが指数的に増えていく様子をSREの考え方で可視化するシミュレーター。" },
       en: { name: "Zero Bugs Cost Simulator", title: "Can you actually build a zero-bug system if you aim for it?", desc: "A simulator visualizing how cost grows exponentially as target reliability approaches 100%, based on SRE practice." },
     },
     {
-      id: "curse-of-knowledge", href: "curse-of-knowledge/", status: "live",
+      id: "curse-of-knowledge", href: "curse-of-knowledge/", status: "live", cat: "cognition",
       tags: { ja: ["知識の呪縛", "コミュニケーション"], en: ["Curse of knowledge", "Communication"] },
       ja: { name: "知識の呪縛シミュレーター", title: "自分がわかっていることは、相手にも伝わっている?", desc: "送り手が思う理解度と受け手が実際に理解している度合いのギャップを、有名な実験にもとづいて可視化するシミュレーター。" },
       en: { name: "Curse of Knowledge Simulator", title: "If you understand something, does the other person understand it too?", desc: "A simulator visualizing the gap between a sender's assumed understanding and a receiver's actual understanding, based on a famous experiment." },
     },
     {
-      id: "onboarding-ramp", href: "onboarding-ramp/", status: "live",
+      id: "onboarding-ramp", href: "onboarding-ramp/", status: "live", cat: "team",
       tags: { ja: ["オンボーディング", "生産性"], en: ["Onboarding", "Productivity"] },
       ja: { name: "オンボーディング立ち上がりシミュレーター", title: "新しく加わった人は、初日から「1人月」分働ける?", desc: "新しく加わったメンバーの生産性が時間をかけて立ち上がっていく様子を、業界調査データにもとづいて可視化するシミュレーター。" },
       en: { name: "Onboarding Ramp-Up Simulator", title: "Can a new team member contribute a full \"person-month\" from day one?", desc: "A simulator visualizing how a new team member's productivity ramps up over time, based on industry survey data." },
     },
     {
-      id: "skill-variance", href: "skill-variance/", status: "live",
+      id: "skill-variance", href: "skill-variance/", status: "live", cat: "team",
       tags: { ja: ["生産性", "見積もり"], en: ["Productivity", "Estimation"] },
       ja: { name: "生産性ばらつきシミュレーター", title: "見積もりの「1人日」は、誰が担当しても同じ?", desc: "開発者間の生産性のばらつき(いわゆる「10倍プログラマ」)が見積もりとの乖離にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Developer Productivity Variance Simulator", title: "Is a \"person-day\" the same no matter who's assigned?", desc: "A simulator visualizing how developer productivity variance (the \"10x programmer\" debate) affects deviation from estimates." },
     },
     {
-      id: "speak-up-cost", href: "speak-up-cost/", status: "live",
+      id: "speak-up-cost", href: "speak-up-cost/", status: "live", cat: "team",
       tags: { ja: ["心理的安全性", "組織"], en: ["Psychological safety", "Organization"] },
       ja: { name: "発言コスト・シミュレーター", title: "その意見、言ったら自分の仕事になる?", desc: "「発言するとタスクを負わされる」という構造が発言意欲とリスクの見逃しにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Speak-Up Cost Simulator", title: "If you say that, does it become your job?", desc: "A simulator visualizing how a \"speaking up means you own the task\" structure affects willingness to speak up and the risk of issues being missed." },
     },
     {
-      id: "psychological-safety", href: "psychological-safety/", status: "live",
+      id: "psychological-safety", href: "psychological-safety/", status: "live", cat: "team",
       tags: { ja: ["心理的安全性", "組織"], en: ["Psychological safety", "Organization"] },
       ja: { name: "心理的安全性シミュレーター", title: "ミスの報告が少ないチームは、優れたチーム?", desc: "心理的安全性の水準が、報告される問題と隠れた問題の割合にどう影響するかをEdmondsonの研究にもとづいて可視化するシミュレーター。" },
       en: { name: "Psychological Safety Simulator", title: "Is a team with fewer reported mistakes the better team?", desc: "A simulator visualizing how psychological safety level affects the split between reported and hidden problems, based on Edmondson's research." },
     },
     {
-      id: "survivorship-bias", href: "survivorship-bias/", status: "live",
+      id: "survivorship-bias", href: "survivorship-bias/", status: "live", cat: "team",
       tags: { ja: ["生存者バイアス", "組織"], en: ["Survivorship bias", "Organization"] },
       ja: { name: "生存者バイアス・シミュレーター", title: "生き残った人だけを見て、その指導方法は正しいと言える?", desc: "指導方法の厳しさが、方法に起因する離脱と配置段階のミスマッチにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Survivorship Bias Simulator", title: "If you only look at who stayed, was the training method actually right?", desc: "A simulator visualizing how a training method's harshness affects method-driven attrition versus baseline placement mismatch." },
     },
     {
-      id: "bikeshedding", href: "bikeshedding/", status: "live",
+      id: "bikeshedding", href: "bikeshedding/", status: "live", cat: "cognition",
       tags: { ja: ["ビケシェッディング", "会議"], en: ["Bikeshedding", "Meetings"] },
       ja: { name: "ビケシェッディング・シミュレーター", title: "自転車置き場の色は45分、原子炉の契約は2分で決まる?", desc: "パーキンソンの法則(1957年)にもとづき、議題の専門性が本来かけるべき時間と実際にかけられがちな時間のズレにどう影響するかを可視化するシミュレーター。" },
       en: { name: "Bikeshedding Simulator", title: "The bike shed color takes 45 minutes, the reactor contract takes 2?", desc: "Based on Parkinson's Law (1957), a simulator visualizing how a topic's required expertise drives a gap between ideal and actual discussion time." },
     },
     {
-      id: "yak-shaving", href: "yak-shaving/", status: "live",
+      id: "yak-shaving", href: "yak-shaving/", status: "live", cat: "time",
       tags: { ja: ["ヤク剃り", "集中"], en: ["Yak shaving", "Focus"] },
       ja: { name: "ヤク剃り・シミュレーター", title: "その作業、本題とどうつながってるんだっけ?", desc: "「先にアレが必要」の連鎖(ヤク剃り)の深さが、本題に着手できる時刻と1日の残り時間にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Yak Shaving Simulator", title: "Wait — how is this task connected to what I was doing?", desc: "A simulator visualizing how the depth of a \"but first I need...\" chain pushes back the real task's start time and eats the workday." },
     },
     {
-      id: "rubber-duck", href: "rubber-duck/", status: "live",
+      id: "rubber-duck", href: "rubber-duck/", status: "live", cat: "cognition",
       tags: { ja: ["ラバーダック", "デバッグ"], en: ["Rubber duck", "Debugging"] },
       ja: { name: "ラバーダック・デバッグ・シミュレーター", title: "誰かに説明した瞬間、答えに気づくのはなぜ?", desc: "説明の丁寧さが「説明の途中で自分で答えに気づく確率」にどう効くかを、自己説明効果の研究を背景に可視化するシミュレーター。" },
       en: { name: "Rubber Duck Debugging Simulator", title: "Why do you find the answer the moment you explain it to someone?", desc: "A simulator visualizing how thoroughness of explanation drives the chance of solving your own problem mid-explanation, grounded in self-explanation research." },
     },
     {
-      id: "xy-problem", href: "xy-problem/", status: "live",
+      id: "xy-problem", href: "xy-problem/", status: "live", cat: "cognition",
       tags: { ja: ["XY問題", "コミュニケーション"], en: ["XY problem", "Communication"] },
       ja: { name: "XY問題シミュレーター", title: "聞かれたことに答えたのに、なぜ解決しない?", desc: "質問時の背景・目的の共有度が、解決までの往復回数と所要時間にどう影響するかを可視化するシミュレーター。" },
       en: { name: "XY Problem Simulator", title: "You answered exactly what was asked — so why is nothing solved?", desc: "A simulator visualizing how the context shared when asking a question drives the round trips and time needed to reach a real solution." },
     },
     {
-      id: "confirmation-bias", href: "confirmation-bias/", status: "live",
+      id: "confirmation-bias", href: "confirmation-bias/", status: "live", cat: "cognition",
       tags: { ja: ["確証バイアス", "生成AI"], en: ["Confirmation bias", "Generative AI"] },
       ja: { name: "確証バイアス・シミュレーター", title: "賛成してくれる相手にだけ聞いていると、何が起きる?", desc: "反証を探す努力と相談相手の追従度(追従的な生成AIを含む)が、誤った仮説に気づける確率にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Confirmation Bias Simulator", title: "What happens when you only consult people who agree with you?", desc: "A simulator visualizing how disconfirmation effort and a consultation partner's sycophancy (AI included) drive the chance of catching a wrong hypothesis." },
     },
     {
-      id: "hofstadters-law", href: "hofstadters-law/", status: "live",
+      id: "hofstadters-law", href: "hofstadters-law/", status: "live", cat: "planning",
       tags: { ja: ["見積もり", "計画錯誤"], en: ["Estimation", "Planning fallacy"] },
       ja: { name: "ホフスタッターの法則シミュレーター", title: "多めに見積もったのに、なぜまた遅れる?", desc: "バッファをどれだけ積んでも実際の所要時間がその先を行く、自己言及的な見積もりの法則と計画錯誤の研究を体験できるシミュレーター。" },
       en: { name: "Hofstadter's Law Simulator", title: "You padded the estimate — so why is it late again?", desc: "A simulator of the self-referential estimation law and the planning fallacy: however much buffer you stack, the actual duration stays ahead." },
     },
     {
-      id: "chestertons-fence", href: "chestertons-fence/", status: "live",
+      id: "chestertons-fence", href: "chestertons-fence/", status: "live", cat: "quality",
       tags: { ja: ["チェスタトンのフェンス", "リファクタリング"], en: ["Chesterton's fence", "Refactoring"] },
       ja: { name: "チェスタトンのフェンス・シミュレーター", title: "誰も理由を知らないコードは、消してもいい?", desc: "撤去前の調査努力が、謎コードの用途に気づける確率と削除が障害につながる確率にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Chesterton's Fence Simulator", title: "Nobody knows why this code exists — safe to delete?", desc: "A simulator visualizing how pre-removal investigation drives the chance of discovering a mystery code's purpose versus causing an incident." },
@@ -354,6 +377,12 @@ window.DevSimLab = (function () {
     "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
   };
 
+  /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */
+  function numOf(sim) {
+    const i = SIMS.indexOf(sim);
+    return i < 0 ? "" : "No." + String(i + 1).padStart(2, "0");
+  }
+
   function renderRelated(container, opts) {
     if (!container) return;
     opts = opts || {};
@@ -374,7 +403,8 @@ window.DevSimLab = (function () {
         a.className = "sim-card";
         a.href = "../" + s.href;
         const tags = (s.tags && s.tags[LANG]) || [];
-        a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>
+        a.innerHTML = `<div class="sim-eyebrow">${numOf(s)} · ${s.id}</div>
+          <h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>
           <div class="sim-tags">${tags.map((tag) => `<span>${tag}</span>`).join("")}</div>`;
         container.appendChild(a);
       });
@@ -395,6 +425,23 @@ window.DevSimLab = (function () {
     const toneBtn = document.querySelector("[data-tone-btn]");
     if (toneBtn) toneBtn.addEventListener("click", toggleTone);
 
+    /* デカ文字トグル: 全ページのHTMLを編集せずに済むよう、
+       common.jsが言語スイッチの隣にボタンを注入する */
+    let bigBtn = null;
+    const langSwitch = document.querySelector("[data-lang-switch]");
+    if (langSwitch) {
+      bigBtn = document.createElement("button");
+      bigBtn.className = "bigtext-btn";
+      bigBtn.setAttribute("aria-pressed", BIGTEXT);
+      bigBtn.addEventListener("click", toggleBigText);
+      /* 言語スイッチと同じ右側グループにまとめる */
+      const ctrl = document.createElement("div");
+      ctrl.className = "header-ctrl";
+      langSwitch.parentNode.insertBefore(ctrl, langSwitch);
+      ctrl.appendChild(bigBtn);
+      ctrl.appendChild(langSwitch);
+    }
+
     function render() {
       const t = CHROME[LANG];
       document.documentElement.lang = LANG;
@@ -406,6 +453,12 @@ window.DevSimLab = (function () {
         toneBtn.textContent = t.toneBtn;
         toneBtn.setAttribute("aria-pressed", TONE === "dev");
       }
+      if (bigBtn) {
+        bigBtn.textContent = t.bigTextBtn;
+        bigBtn.setAttribute("aria-pressed", BIGTEXT);
+        bigBtn.setAttribute("aria-label", t.bigTextLabel);
+      }
+      document.documentElement.toggleAttribute("data-bigtext", BIGTEXT);
       const toneNote = document.querySelector("[data-tone-note]");
       if (toneNote) {
         toneNote.textContent = t.toneNote;
@@ -434,5 +487,7 @@ window.DevSimLab = (function () {
     initChrome,
     CHROME,
     SIMS,
+    CATEGORIES,
+    numOf,
   };
 })();
