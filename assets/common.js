@@ -310,6 +310,36 @@ window.DevSimLab = (function () {
   }
 
   // container: element to fill. opts: {exclude: id of the current page's own sim}
+  /* ---- curated related-page map (page id -> ids of genuinely related pages).
+     Each page shows only these (plus the home card) in its related section,
+     so the section stays a curated shortlist instead of mirroring the
+     landing-page grid. ---- */
+  const RELATED = {
+    "qcd-tradeoff": ["estimation-uncertainty", "cost-of-change", "release-frequency"],
+    "brooks-law": ["onboarding-ramp", "utilization-trap", "wip-lead-time"],
+    "utilization-trap": ["wip-lead-time", "context-switch", "brooks-law"],
+    "context-switch": ["pause-cost", "wip-lead-time", "utilization-trap"],
+    "estimation-uncertainty": ["skill-variance", "qcd-tradeoff", "cost-of-change"],
+    "technical-debt": ["cost-of-change", "zero-bugs", "code-review"],
+    "code-review": ["bikeshedding", "technical-debt", "speak-up-cost"],
+    "release-frequency": ["wip-lead-time", "qcd-tradeoff", "technical-debt"],
+    "cost-of-change": ["technical-debt", "estimation-uncertainty", "zero-bugs"],
+    "wip-lead-time": ["utilization-trap", "context-switch", "release-frequency"],
+    "pause-cost": ["context-switch", "yak-shaving", "wip-lead-time"],
+    "zero-bugs": ["technical-debt", "cost-of-change", "release-frequency"],
+    "curse-of-knowledge": ["xy-problem", "rubber-duck", "onboarding-ramp"],
+    "onboarding-ramp": ["brooks-law", "skill-variance", "curse-of-knowledge"],
+    "skill-variance": ["onboarding-ramp", "estimation-uncertainty", "survivorship-bias"],
+    "speak-up-cost": ["psychological-safety", "code-review", "xy-problem"],
+    "psychological-safety": ["speak-up-cost", "survivorship-bias", "confirmation-bias"],
+    "survivorship-bias": ["confirmation-bias", "psychological-safety", "skill-variance"],
+    "bikeshedding": ["code-review", "yak-shaving", "speak-up-cost"],
+    "yak-shaving": ["pause-cost", "context-switch", "bikeshedding"],
+    "rubber-duck": ["xy-problem", "curse-of-knowledge", "pause-cost"],
+    "xy-problem": ["curse-of-knowledge", "rubber-duck", "speak-up-cost"],
+    "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
+  };
+
   function renderRelated(container, opts) {
     if (!container) return;
     opts = opts || {};
@@ -320,16 +350,20 @@ window.DevSimLab = (function () {
     home.href = "../";
     home.innerHTML = `<h2>${t.homeCardTitle}</h2><p>${t.homeCardDesc}</p>`;
     container.appendChild(home);
-    SIMS.filter((s) => s.id !== opts.exclude).forEach((s) => {
-      const c = s[LANG];
-      const a = document.createElement("a");
-      a.className = "sim-card";
-      a.href = "../" + s.href;
-      const tags = (s.tags && s.tags[LANG]) || [];
-      a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>
-        <div class="sim-tags">${tags.map((tag) => `<span>${tag}</span>`).join("")}</div>`;
-      container.appendChild(a);
-    });
+    const relIds = RELATED[opts.exclude] || [];
+    relIds
+      .map((id) => SIMS.find((s) => s.id === id))
+      .filter((s) => s && s.status === "live")
+      .forEach((s) => {
+        const c = s[LANG];
+        const a = document.createElement("a");
+        a.className = "sim-card";
+        a.href = "../" + s.href;
+        const tags = (s.tags && s.tags[LANG]) || [];
+        a.innerHTML = `<h2>${c.title} | ${c.name}</h2><p>${c.desc}</p>
+          <div class="sim-tags">${tags.map((tag) => `<span>${tag}</span>`).join("")}</div>`;
+        container.appendChild(a);
+      });
   }
 
   /* ---- header/footer wiring via data-* attributes ----

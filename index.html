@@ -33,6 +33,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/common.css">
+<style>
+/* ---- 今日のあるある (daily pick) ---- */
+.today{margin-bottom:34px;padding-bottom:28px;border-bottom:1px dashed var(--line)}
+.today-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.today-h::before{display:none}
+.today .sim-card{border-left:4px solid var(--q);background:#FDFDFC}
+.today .sim-badge{background:var(--q);color:#fff}
+.today-share{margin-top:12px}
+.grid-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.grid-h::before{display:none}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -50,7 +61,17 @@
 </header>
 
 <main>
-<section aria-labelledby="heroTitle">
+<section class="today" aria-labelledby="todayH">
+  <h2 class="today-h" id="todayH"></h2>
+  <div id="todayCard"></div>
+  <div class="share today-share">
+    <span class="share-label" data-share-label></span>
+    <div class="share-btns" id="todayShareBtns"></div>
+  </div>
+</section>
+
+<section aria-labelledby="gridH">
+  <h2 class="grid-h" id="gridH"></h2>
   <div class="sim-grid" id="simGrid"></div>
 </section>
 
@@ -85,6 +106,10 @@ const PAGE_I18N = {
     heroLead: "ソフトウェア開発の現場ではよく知られているのに、経営層やステークホルダーには伝わりにくい「あるある」を、インタラクティブなシミュレーターで体験できるシリーズです。1つの問い、1つのシミュレーター。気になるテーマから触ってみてください。",
     badgeLive: "公開中",
     badgeSoon: "準備中",
+    todayH: "📅 今日のあるある",
+    todayBadge: "TODAY",
+    todayShare: (title) => `今日のあるあるは「${title}」です。今日もこれに気をつけていきましょう!`,
+    gridH: (n) => `📖 開発あるある図鑑(全${n}テーマ)`,
     shareText: "開発あるある図鑑 | ソフトウェア開発の「あるある」を体験できるシミュレーターシリーズ",
     shareHashtags: "開発あるある図鑑",
   },
@@ -95,6 +120,10 @@ const PAGE_I18N = {
     heroLead: "Software teams know these patterns by heart, but they rarely land with management or stakeholders. This series turns each misconception into a hands-on simulator: one question, one simulator. Pick a topic and try it yourself.",
     badgeLive: "Live",
     badgeSoon: "Coming soon",
+    todayH: "📅 Today's あるある",
+    todayBadge: "TODAY",
+    todayShare: (title) => `Today's あるある is "${title}" — one to watch out for today!`,
+    gridH: (n) => `📖 The full encyclopedia (all ${n} topics)`,
     shareText: "Dev Sim Lab — an interactive simulator series for common software development misconceptions",
     shareHashtags: "DevSimLab",
   },
@@ -102,8 +131,47 @@ const PAGE_I18N = {
 
 const SITE_URL = "https://sakuichi.github.io/dev-sim-lab/";
 
+/* ---- 今日のあるある: 日付(YYYYMMDD)をシードにした決定的な日替わり選択。
+   同じ日は誰が見ても同じカードになる。乗算ハッシュで、連続する日付が
+   隣接エントリに偏らないよう散らしている。 ---- */
+function todaysSim() {
+  const live = SIMS.filter((s) => s.status === "live");
+  if (live.length === 0) return null;
+  const d = new Date();
+  const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const h = (seed * 48271) % 2147483647;
+  return live[h % live.length];
+}
+
+function renderToday(lang) {
+  const t = PAGE_I18N[lang];
+  document.getElementById("todayH").textContent = t.todayH;
+  const wrap = document.getElementById("todayCard");
+  wrap.innerHTML = "";
+  const sim = todaysSim();
+  if (!sim) return;
+  const content = sim[lang];
+  const el = document.createElement("a");
+  el.className = "sim-card";
+  el.href = sim.href;
+  el.innerHTML = `
+    <span class="sim-badge live">${t.todayBadge}</span>
+    <div class="sim-eyebrow">${sim.id}</div>
+    <h2>${content.title}</h2>
+    <p>${content.desc}</p>
+    <div class="sim-tags">${sim.tags[lang].map((tag) => `<span>${tag}</span>`).join("")}</div>
+  `;
+  wrap.appendChild(el);
+  DevSimLab.renderShare(document.getElementById("todayShareBtns"), {
+    url: SITE_URL + sim.href,
+    shareText: t.todayShare(content.title),
+    shareHashtags: t.shareHashtags,
+  });
+}
+
 function renderCards(lang) {
   const t = PAGE_I18N[lang];
+  document.getElementById("gridH").textContent = t.gridH(SIMS.filter((s) => s.status === "live").length);
   const grid = document.getElementById("simGrid");
   grid.innerHTML = "";
   SIMS.forEach((sim) => {
@@ -130,6 +198,7 @@ function render(lang) {
   document.querySelector('meta[name="description"]').setAttribute("content", t.description);
   document.getElementById("heroTitle").textContent = t.heroTitle;
   document.getElementById("heroLead").textContent = t.heroLead;
+  renderToday(lang);
   renderCards(lang);
   DevSimLab.renderShare(document.getElementById("shareBtns"), {
     url: SITE_URL,
