@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>その意見、言ったら自分の仕事になる? | 発言コスト・シミュレーター</title>
+<meta name="description" content="「発言するとタスクを負わされる」という構造が、リスク報告の意欲をどう下げるかを、ボランティアのジレンマなどの研究にもとづいて可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/speak-up-cost/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/speak-up-cost/">
+<meta property="og:title" content="その意見、言ったら自分の仕事になる? | 発言コスト・シミュレーター">
+<meta property="og:description" content="「発言するとタスクを負わされる」という構造が、リスク報告の意欲をどう下げるかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/speak-up-cost.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "発言コスト・シミュレーター",
+  "alternateName": "Speak-Up Cost Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/speak-up-cost/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "発言がタスク化される構造が、リスク報告の意欲と見逃しリスクにどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-curve crossing chart ---- */
+.su-wrap{margin-top:14px}
+.su-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.su-grid{stroke:var(--line);stroke-width:1}
+.su-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.su-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.su-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.su-line-speak{fill:none;stroke:var(--q);stroke-width:2.2}
+.su-line-miss{fill:none;stroke:var(--alert);stroke-width:2.2}
+.su-dot{r:3.5}
+.su-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.su-marker.dragging{cursor:grabbing}
+.su-marker-hit{fill:transparent;cursor:grab}
+.su-marker-hit.dragging{cursor:grabbing}
+.su-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.su-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.su-legend .sw.speak{background:var(--q)}
+.su-legend .sw.miss{background:var(--alert)}
+.su-point-speak{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.su-point-miss{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.su-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.su-value-label-speak{fill:var(--q)}
+.su-value-label-miss{fill:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.speak-card{border-left:4px solid var(--q)}
+.tier-card.loss-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">60%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="su-wrap">
+    <svg class="su-svg" id="suChart" viewBox="0 0 640 240" role="img" aria-label="Willingness to speak up vs risk of being missed, by task-assignment penalty">
+      <g id="suGridLayer"></g>
+      <path id="suLineSpeak" class="su-line-speak"></path>
+      <path id="suLineMiss" class="su-line-miss"></path>
+      <g id="suDotsLayer"></g>
+      <line id="suMarker" class="su-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="suPointSpeak" class="su-point-speak" r="5"></circle>
+      <circle id="suPointMiss" class="su-point-miss" r="5"></circle>
+      <text id="suLabelSpeak" class="su-value-label su-value-label-speak"></text>
+      <text id="suLabelMiss" class="su-value-label su-value-label-miss"></text>
+      <rect id="suMarkerHit" class="su-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="su-legend">
+    <span><span class="sw speak"></span><span id="legendSpeak"></span></span>
+    <span><span class="sw miss"></span><span id="legendMiss"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card speak-card">
+      <div class="k" id="speakCardLabel"></div>
+      <div class="v" id="speakCardVal">60%</div>
+    </div>
+    <div class="tier-card loss-card">
+      <div class="k" id="lossCardLabel"></div>
+      <div class="v" id="lossCardVal">12.0人日</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">60</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="penaltyName"></span><small id="penaltySub"></small></div>
+      <div class="readout mono" id="penaltyReadout">50%</div>
+      <input type="range" id="penaltySlider" min="0" max="100" step="5" value="50">
+      <div class="num-row">
+        <label for="penaltyNum" id="numLabel1"></label>
+        <input type="number" id="penaltyNum" min="0" max="100" step="5" value="50">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="impactName"></span><small id="impactSub"></small></div>
+      <div class="readout mono" id="impactReadout">30</div>
+      <input type="range" id="impactSlider" min="5" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="impactNum" id="numLabel2"></label>
+        <input type="number" id="impactNum" min="5" max="100" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「発言する(問題やリスクを報告する)と、その対応タスクを本人が負わされる」という構造が
+   発言意欲をどう下げるかを表す簡易モデル。ゲーム理論の「ボランティアのジレンマ」
+   (Diekmann, 1985 — 誰かが手を挙げれば集団が助かるが、挙げた本人はコストを負うため、
+   黙って他者に任せる方が個人としては合理的になりうる状況)と、社会心理学の「MUM効果」
+   (Rosen & Tesser, 1970 — 悪い知らせを伝えると自分が責められる・負担を負うことを恐れて
+   伝達をためらう現象)を参考にした方向性を示す簡易モデルであり、特定の実証研究の
+   数値を再現したものではない。
+*/
+const PENALTY_MIN = 0, PENALTY_MAX = 100;
+const IMPACT_MIN = 5, IMPACT_MAX = 100;
+
+function willingnessOf(penalty) { return 100 - penalty * 0.8; }
+function missProbOf(penalty) { return 100 - willingnessOf(penalty); }
+function expectedLossOf(impact, penalty) { return impact * (missProbOf(penalty) / 100); }
+function scoreOf(penalty) { return Math.round(willingnessOf(penalty)); }
+function assess(impact, penalty) {
+  const willingness = willingnessOf(penalty);
+  const missProb = missProbOf(penalty);
+  const loss = expectedLossOf(impact, penalty);
+  const score = scoreOf(penalty);
+  const band = score >= 85 ? 0 : score >= 65 ? 1 : score >= 45 ? 2 : score >= 25 ? 3 : 4;
+  return { willingness, missProb, loss, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "その意見、言ったら自分の仕事になる? | 発言コスト・シミュレーター",
+  heroTitle: "その意見、言ったら<br>自分の仕事になる?",
+  heroLead: "ミーティングで問題やリスクを指摘すると、指摘した人がそのままタスクを負うことになる——そんなチームでは、発言することが自分の負担を増やす行為になってしまいます。ゲーム理論の「ボランティアのジレンマ」が示すように、誰かが対応すれば全体は助かるとしても、対応した本人がコストを負うなら、黙っている方が個人としては合理的になり得ます。「発言がタスク化される確率」と「見逃した場合の潜在的な損失」を動かして、その関係を確認してください。",
+  consoleLabel: "VOICE CONSOLE",
+  sumLabel: "発言する可能性",
+  scoreLabel: "発言しやすさスコア",
+  penaltyName: "発言がタスク化される確率", penaltySub: "発言すると、その対応を本人が担当することになる可能性",
+  impactName: "見逃した場合の潜在的な損失", impactSub: "そのリスクが放置され顕在化した場合の想定インパクト(人日)",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 発言者が必ず担当になる「言い出しっぺルール」",
+  chartCaption: "緑線は発言する可能性、赤線はリスクが見逃される可能性です。ペナルティ確率が上がるほど、2本の線は50%で交差し、それ以降は見逃しの方が優勢になります。",
+  chartNote: "ボランティアのジレンマ・MUM効果の方向性を示す簡易モデルです。特定の職場の正確な数値を予測するものではありません。",
+  suYTitle: "可能性(%)", suXTitle: "発言がタスク化される確率",
+  legendSpeak: "発言する可能性",
+  legendMiss: "リスクが見逃される可能性",
+  speakCardLabel: "発言する可能性",
+  lossCardLabel: "見逃しによる期待損失",
+  hint: (penalty, impact, a) => `発言がタスク化される確率${penalty}%・潜在的な損失規模${impact}人日のとき、発言する可能性はおよそ${Math.round(a.willingness)}%、見逃される可能性は${Math.round(a.missProb)}%。見逃しによる期待損失は約${a.loss.toFixed(1)}人日になります。`,
+  hintScenario: (impact, a) => `「言い出しっぺが担当」というルールのもと、発言は事実上タスク化を意味します。発言する可能性はおよそ${Math.round(a.willingness)}%まで下がり、見逃しによる期待損失は約${a.loss.toFixed(1)}人日に達します。`,
+  comments: [
+    "発言しやすい環境です。リスクは比較的早く報告されるでしょう。",
+    "概ね発言しやすい状態ですが、多少のためらいは残ります。",
+    "発言と沈黙が拮抗しています。見逃しのリスクが無視できなくなってきます。",
+    "沈黙が優勢です。多くのリスクが報告されないまま埋もれる可能性があります。",
+    "発言することが明確に損になる構造です。ほとんどのリスクが見逃されると考えるべきです。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "この現象は、複数の研究領域から説明できます。ゲーム理論の「ボランティアのジレンマ」(Diekmann, 1985)は、誰か一人が対応すれば集団全体が助かる状況でも、対応した本人がコストを一身に負うなら、それぞれが「誰か他の人がやってくれるはず」と沈黙を選びがちになることを示します。社会心理学の「MUM効果」(Rosen & Tesser, 1970)は、悪い知らせを伝える人が責められたり負担を負わされたりすることを恐れて、伝達そのものをためらう現象です。これらは、チームで発言することの対人的なリスク(無知・無能だと思われる恐れなど)を扱う「心理的安全性」(Edmondson)という、より広いテーマの一部でもあります。心理的安全性については、また別の角度から取り上げる予定です。",
+  adviceItems: [
+    "問題を報告した人と、対応を担当する人を、必ずしも同一人物にしない運用ルールを検討する",
+    "「言い出しっぺルール」を安易に採用しない。短期的には公平に見えても、発言そのものを減らすインセンティブになりうる",
+    "リスク報告を評価する仕組みをつくり、「見つけたこと」自体を可視化・称賛する",
+    "対応の割り振りは、発言内容とは切り離し、チーム全体のキャパシティを見て決める",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "ORGANIZATIONAL BEHAVIOR", title: "恐れのない組織", desc: "エイミー・C・エドモンドソン著。心理的安全性の提唱者による代表作。発言をためらう心理的メカニズムを体系的に解説する一冊。", link: "Amazonで見る →", url: "https://amzn.to/4guUNOJ" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "その意見、言ったら自分の仕事になる? | 発言コスト・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If you say that, does it become your job? | Speak-Up Cost Simulator",
+  heroTitle: "If you say that,<br>does it become your job?",
+  heroLead: "In a team where pointing out a problem in a meeting means you're the one who ends up owning the fix, speaking up becomes an act that increases your own workload. As game theory's \"volunteer's dilemma\" shows, even when the group as a whole benefits from someone stepping up, if the person who steps up bears the full cost alone, staying silent and hoping someone else deals with it can be the individually rational choice. Move the \"probability speaking up turns into a task\" and the \"potential cost of missing the risk\" to see the relationship.",
+  consoleLabel: "VOICE CONSOLE",
+  sumLabel: "Willingness to speak up",
+  scoreLabel: "Speak-up friendliness score",
+  penaltyName: "Probability speaking up becomes a task", penaltySub: "Chance that speaking up means you're now the one handling it",
+  impactName: "Potential cost if missed", impactSub: "Estimated impact if this risk goes unaddressed and materializes (person-days)",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: a strict \"whoever raises it, owns it\" rule",
+  chartCaption: "The green line is willingness to speak up; the red line is the risk of being missed. As the penalty probability rises, the two lines cross at 50%, and beyond that, being missed becomes the more likely outcome.",
+  chartNote: "A simplified model reflecting the direction of the volunteer's dilemma and the MUM effect — not a precise predictor for any specific workplace.",
+  suYTitle: "Probability (%)", suXTitle: "Probability speaking up becomes a task",
+  legendSpeak: "Willingness to speak up",
+  legendMiss: "Probability the risk is missed",
+  speakCardLabel: "Willingness to speak up",
+  lossCardLabel: "Expected loss from being missed",
+  hint: (penalty, impact, a) => `At a ${penalty}% chance that speaking up becomes a task, with a potential impact of ${impact} person-days if missed, willingness to speak up is about ${Math.round(a.willingness)}%, and the risk of it being missed is ${Math.round(a.missProb)}%. Expected loss from being missed comes to about ${a.loss.toFixed(1)} person-days.`,
+  hintScenario: (impact, a) => `Under a "whoever raises it, owns it" rule, speaking up effectively guarantees you the task. Willingness to speak up drops to about ${Math.round(a.willingness)}%, and expected loss from missed risks reaches about ${a.loss.toFixed(1)} person-days.`,
+  comments: [
+    "An environment where it's easy to speak up. Risks are likely to surface relatively quickly.",
+    "Broadly easy to speak up, though some hesitation remains.",
+    "Speaking up and staying silent are roughly balanced. The risk of things being missed is becoming hard to ignore.",
+    "Silence is winning out. A meaningful share of risks may go unreported and buried.",
+    "A structure where speaking up is a clear net loss. Assume most risks are going unreported.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "This connects to a few different research threads. Game theory's \"volunteer's dilemma\" (Diekmann, 1985) shows that even when the whole group benefits from someone stepping up, if that person bears the full cost alone, each individual tends to hope \"someone else will handle it\" and stays quiet. Social psychology's \"MUM effect\" (Rosen and Tesser, 1970) describes how people avoid delivering bad news for fear of being blamed or burdened with fixing it. Both connect to the broader idea of \"psychological safety\" (Edmondson), which covers the interpersonal risk of speaking up in a team (fear of looking ignorant or incompetent, for instance) — a topic worth its own deeper look another time.",
+  adviceItems: [
+    "Consider a policy where the person who reports a problem isn't automatically the one who owns fixing it",
+    "Don't casually adopt a \"whoever raises it, owns it\" rule — it can look fair short-term while quietly discouraging people from speaking up at all",
+    "Build a mechanism that recognizes risk-reporting itself — make \"catching this\" visible and valued",
+    "Decide task assignment based on team capacity, separately from who happened to raise the issue",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ORGANIZATIONAL BEHAVIOR", title: "The Fearless Organization", desc: "Amy C. Edmondson. The defining work by the researcher who coined psychological safety, systematically explaining the psychology behind reluctance to speak up.", link: "View on Amazon →", url: "https://amzn.to/4fw5IXm" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If you say that, does it become your job? — Speak-Up Cost Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (penalty, impact, a) => `タスク化確率${penalty}%。発言する可能性${Math.round(a.willingness)}%。「気づいてたけど言わなかった」が合言葉になっている職場。見逃し期待損失約${a.loss.toFixed(1)}人日。`,
+  hintScenario: (impact, a) => `言い出しっぺルール適用中。発言する可能性${Math.round(a.willingness)}%。ミーティングは沈黙という名の合意で進む。見逃し期待損失約${a.loss.toFixed(1)}人日。`,
+  comments: [
+    "誰でも気軽に「これ変じゃないですか」と言える。理想郷。",
+    "まだ発言できる。「言うと面倒なことになる」が合言葉になる前の段階。",
+    "発言する人としない人が半々。会議室の空気が読み合いになっている。",
+    "「誰か気づいてると思ってました」が、事後報告の定番フレーズになっている。",
+    "全員が「見て見ぬふり」の達人になっている。障害対応の時だけ全員が急に詳しくなる。",
+  ],
+},
+en: {
+  hint: (penalty, impact, a) => `Task-ification chance ${penalty}%. Willingness to speak up: ${Math.round(a.willingness)}%. The workplace catchphrase becomes "I noticed but didn't say anything." Expected loss: ~${a.loss.toFixed(1)} person-days.`,
+  hintScenario: (impact, a) => `"Whoever raises it, owns it" is in effect. Willingness to speak up: ${Math.round(a.willingness)}%. Meetings run on a silent consensus of nobody mentioning anything. Expected loss: ~${a.loss.toFixed(1)} person-days.`,
+  comments: [
+    "Anyone can casually say \"isn't this weird?\" without a second thought. Utopia.",
+    "People can still speak up. This is before \"saying something turns into a hassle\" becomes the office motto.",
+    "Speakers and silent types split about 50/50. The meeting room is one long staring contest.",
+    "\"I figured someone else noticed\" becomes the standard post-mortem line.",
+    "Everyone has mastered looking the other way. Suddenly everyone's an expert the moment there's an incident to respond to.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let penalty = 50;
+let impact = 30;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (p) => PAD_L + ((p - PENALTY_MIN) / (PENALTY_MAX - PENALTY_MIN)) * (PW - PAD_L - PAD_R);
+const pOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = PENALTY_MIN + frac * (PENALTY_MAX - PENALTY_MIN);
+  return Math.min(PENALTY_MAX, Math.max(PENALTY_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("suGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "su-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "su-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let p = PENALTY_MIN; p <= PENALTY_MAX; p += 20) {
+    const x = xOf(p);
+    gridLayer.appendChild(el("line", { class: "su-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "su-axis-label", x, y: PH - PAD_B + 14, "text-anchor": p === PENALTY_MIN ? "start" : p === PENALTY_MAX ? "end" : "middle" });
+    label.textContent = p + "%";
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "su-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.suYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "su-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.suXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const speakPts = [], missPts = [];
+  for (let p = PENALTY_MIN; p <= PENALTY_MAX; p += 2) {
+    speakPts.push(`${xOf(p)},${yOf(willingnessOf(p))}`);
+    missPts.push(`${xOf(p)},${yOf(missProbOf(p))}`);
+  }
+  document.getElementById("suLineSpeak").setAttribute("d", "M " + speakPts.join(" L "));
+  document.getElementById("suLineMiss").setAttribute("d", "M " + missPts.join(" L "));
+
+  const dotsLayer = document.getElementById("suDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let p = PENALTY_MIN; p <= PENALTY_MAX; p += 20) {
+    dotsLayer.appendChild(el("circle", { class: "su-dot", cx: xOf(p), cy: yOf(willingnessOf(p)), fill: "var(--q)" }));
+    dotsLayer.appendChild(el("circle", { class: "su-dot", cx: xOf(p), cy: yOf(missProbOf(p)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(penalty);
+  const marker = document.getElementById("suMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const speakY = yOf(willingnessOf(penalty));
+  const missY = yOf(missProbOf(penalty));
+  document.getElementById("suPointSpeak").setAttribute("cx", mx);
+  document.getElementById("suPointSpeak").setAttribute("cy", speakY);
+  document.getElementById("suPointMiss").setAttribute("cx", mx);
+  document.getElementById("suPointMiss").setAttribute("cy", missY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const speakIsHigher = speakY <= missY;
+
+  const labelSpeak = document.getElementById("suLabelSpeak");
+  labelSpeak.setAttribute("x", mx + labelDx);
+  labelSpeak.setAttribute("y", clampY(speakIsHigher ? speakY - 10 : speakY + 20));
+  labelSpeak.setAttribute("text-anchor", labelAnchor);
+  labelSpeak.textContent = Math.round(willingnessOf(penalty)) + "%";
+
+  const labelMiss = document.getElementById("suLabelMiss");
+  labelMiss.setAttribute("x", mx + labelDx);
+  labelMiss.setAttribute("y", clampY(speakIsHigher ? missY + 20 : missY - 10));
+  labelMiss.setAttribute("text-anchor", labelAnchor);
+  labelMiss.textContent = Math.round(missProbOf(penalty)) + "%";
+
+  const hit = document.getElementById("suMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(impact, penalty);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${Math.round(a.willingness)}%`;
+  document.getElementById("speakCardVal").textContent = `${Math.round(a.willingness)}%`;
+  document.getElementById("lossCardVal").textContent = t.htmlLang === "ja" ? `${a.loss.toFixed(1)}人日` : `${a.loss.toFixed(1)} PD`;
+  document.getElementById("hint").textContent = t.hint(penalty, impact, a);
+
+  document.getElementById("penaltyReadout").textContent = penalty + "%";
+  document.getElementById("impactReadout").textContent = impact;
+  if (document.activeElement !== document.getElementById("penaltySlider")) document.getElementById("penaltySlider").value = penalty;
+  if (document.activeElement !== document.getElementById("penaltyNum")) document.getElementById("penaltyNum").value = penalty;
+  if (document.activeElement !== document.getElementById("impactSlider")) document.getElementById("impactSlider").value = impact;
+  if (document.activeElement !== document.getElementById("impactNum")) document.getElementById("impactNum").value = impact;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 45 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/speak-up-cost/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("penaltyName").textContent = t.penaltyName;
+  document.getElementById("penaltySub").textContent = t.penaltySub;
+  document.getElementById("impactName").textContent = t.impactName;
+  document.getElementById("impactSub").textContent = t.impactSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("penaltySlider").setAttribute("aria-label", t.penaltyName);
+  document.getElementById("impactSlider").setAttribute("aria-label", t.impactName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.penaltyName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.impactName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendSpeak").textContent = t.legendSpeak;
+  document.getElementById("legendMiss").textContent = t.legendMiss;
+  document.getElementById("speakCardLabel").textContent = t.speakCardLabel;
+  document.getElementById("lossCardLabel").textContent = t.lossCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "speak-up-cost" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("penaltySlider").addEventListener("input", (e) => { penalty = +e.target.value; render(); });
+document.getElementById("penaltyNum").addEventListener("change", (e) => {
+  penalty = Math.min(PENALTY_MAX, Math.max(PENALTY_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("impactSlider").addEventListener("input", (e) => { impact = +e.target.value; render(); });
+document.getElementById("impactNum").addEventListener("change", (e) => {
+  impact = Math.min(IMPACT_MAX, Math.max(IMPACT_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  penalty = 50; impact = 30;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  penalty = 100;
+  render();
+  const a = assess(impact, penalty);
+  document.getElementById("hint").textContent = T().hintScenario(impact, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const suChart = document.getElementById("suChart");
+function svgPoint(evt) {
+  const pt = suChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(suChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  suChart.setPointerCapture(evt.pointerId);
+  document.getElementById("suMarker").classList.add("dragging");
+  document.getElementById("suMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  penalty = pOfX(p.x);
+  render();
+}
+document.getElementById("suMarkerHit").addEventListener("pointerdown", startDrag);
+suChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => suChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("suMarker").classList.remove("dragging");
+  document.getElementById("suMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
