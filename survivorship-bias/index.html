@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生き残った人だけを見て、その指導方法は正しいと言える? | 生存者バイアス・シミュレーター</title>
+<meta name="description" content="厳しい指導方法を耐え抜いた人だけが目に入る「生存者バイアス」が、指導方法の評価をどう歪めるかを可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/survivorship-bias/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/survivorship-bias/">
+<meta property="og:title" content="生き残った人だけを見て、その指導方法は正しいと言える? | 生存者バイアス・シミュレーター">
+<meta property="og:description" content="厳しい指導方法を耐え抜いた人だけが目に入る「生存者バイアス」が、指導方法の評価をどう歪めるかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/survivorship-bias.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "生存者バイアス・シミュレーター",
+  "alternateName": "Survivorship Bias Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/survivorship-bias/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "指導方法の厳しさが、方法に起因する離脱と配置ミスマッチによる離脱にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- dual-line chart (flat baseline + rising method-driven line) ---- */
+.sb-wrap{margin-top:14px}
+.sb-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.sb-grid{stroke:var(--line);stroke-width:1}
+.sb-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.sb-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.sb-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.sb-line-method{fill:none;stroke:var(--alert);stroke-width:2.2}
+.sb-line-base{fill:none;stroke:var(--ink-soft);stroke-width:2.2;stroke-dasharray:5 3}
+.sb-dot{r:3.5}
+.sb-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.sb-marker.dragging{cursor:grabbing}
+.sb-marker-hit{fill:transparent;cursor:grab}
+.sb-marker-hit.dragging{cursor:grabbing}
+.sb-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.sb-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.sb-legend .sw.method{background:var(--alert)}
+.sb-legend .sw.base{background:var(--ink-soft)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.method-card{border-left:4px solid var(--alert)}
+.tier-card.base-card{border-left:4px solid var(--ink-soft)}
+
+/* ---- non-judgment disclaimer, kept visually prominent ---- */
+.disclaimer{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC;font-size:12.5px;color:var(--ink-soft)}
+.disclaimer b{color:var(--ink)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+  <p class="disclaimer" id="disclaimer"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">10%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="sb-wrap">
+    <svg class="sb-svg" id="sbChart" viewBox="0 0 640 240" role="img" aria-label="Method-driven attrition vs baseline placement mismatch, by method harshness">
+      <g id="sbGridLayer"></g>
+      <path id="sbLineBase" class="sb-line-base"></path>
+      <path id="sbLineMethod" class="sb-line-method"></path>
+      <g id="sbDotsLayer"></g>
+      <line id="sbMarker" class="sb-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="sbMarkerHit" class="sb-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="sb-legend">
+    <span><span class="sw method"></span><span id="legendMethod"></span></span>
+    <span><span class="sw base"></span><span id="legendBase"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card method-card">
+      <div class="k" id="methodCardLabel"></div>
+      <div class="v" id="methodCardVal">25%</div>
+    </div>
+    <div class="tier-card base-card">
+      <div class="k" id="baseCardLabel"></div>
+      <div class="v" id="baseCardVal">15%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">75</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="harshName"></span><small id="harshSub"></small></div>
+      <div class="readout mono" id="harshReadout">50%</div>
+      <input type="range" id="harshSlider" min="0" max="100" step="5" value="50">
+      <div class="num-row">
+        <label for="harshNum" id="numLabel1"></label>
+        <input type="number" id="harshNum" min="0" max="100" step="5" value="50">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="baseName"></span><small id="baseSub"></small></div>
+      <div class="readout mono" id="baseReadout">15%</div>
+      <input type="range" id="baseSlider" min="0" max="30" step="5" value="15">
+      <div class="num-row">
+        <label for="baseNum2" id="numLabel2"></label>
+        <input type="number" id="baseNum2" min="0" max="30" step="5" value="15">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「生存者バイアス」(生き残った人だけが目に入り、離脱した人は見えなくなる)と
+   「根本的な帰属の誤り」(Ross, 1977 — 他者の失敗を状況要因よりも個人の資質のせいにしがちな
+   認知バイアス)を組み合わせた簡易モデル。
+   離脱を「指導方法によらない、配置段階で生じる基礎的なミスマッチ(一定)」と
+   「指導方法の厳しさに応じて追加的に生じる離脱(変動)」に分けて示す。
+   重要な留意点: このモデルは特定の個人の適性を判定するものではなく、
+   組織・チーム全体の傾向を示す簡易的な集団レベルのモデルである。
+   また「配置ミスマッチ」がゼロにできることを示すものでもない
+   ——どのような指導方法であっても一定の離脱は生じ得る、という前提に立っている。
+*/
+const HARSH_MIN = 0, HARSH_MAX = 100;
+const BASE_MIN = 0, BASE_MAX = 30;
+const METHOD_MAX_RATE = 50; // 厳しさ100%のときに生じる、方法起因の追加離脱率(%)の上限目安
+
+function methodDrivenRateOf(harshness) { return (harshness / 100) * METHOD_MAX_RATE; }
+function scoreOf(harshness) { return Math.round(100 - methodDrivenRateOf(harshness)); }
+function tierOf(harshness) { return Math.min(4, Math.floor(harshness / 20)); }
+function assess(harshness, baseMismatch) {
+  const methodRate = methodDrivenRateOf(harshness);
+  const total = Math.min(100, methodRate + baseMismatch);
+  const score = scoreOf(harshness);
+  const band = tierOf(harshness);
+  return { methodRate, baseMismatch, total, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "生き残った人だけを見て、その指導方法は正しいと言える? | 生存者バイアス・シミュレーター",
+  heroTitle: "生き残った人だけを見て、<br>その指導方法は正しいと言える?",
+  heroLead: "厳しい環境を乗り越えた人だけが管理職になる——そんな組織では、上に立つ人ほど「自分はこの方法でやってこれた」という成功体験を強く持っています。しかし、その方法で早期に離職・異動した人たちは、もう組織にいないため目に入りません。これは統計学でいう「生存者バイアス」です。さらに、他者の不振を「根性が足りない」という個人の資質のせいにしてしまう心理(根本的な帰属の誤り, Ross, 1977年)が重なると、指導方法そのものを見直す機会が失われがちです。指導方法の厳しさと、配置段階で一定生じるミスマッチの割合を動かして、その関係を確認してください。",
+  disclaimer: "※ このシミュレーターは、特定の個人の適性を判定するものではありません。ある集団において、指導方法とは無関係に一定生じる要因と、指導方法によって変わりうる要因を、組織のマネジメントとして切り分けるための簡易モデルです。",
+  consoleLabel: "RETENTION CONSOLE",
+  sumLabel: "指導方法に起因する追加離脱",
+  scoreLabel: "指導方法の妥当性スコア",
+  harshName: "指導方法の厳しさ・根性論への依存度", harshSub: "「耐えられた人だけが残ればよい」という前提にどれだけ依っているか",
+  baseName: "配置段階で生じる基礎的なミスマッチ", baseSub: "指導方法によらず一定と仮定する、配置・適性のミスマッチ率",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 「耐えられない者は去れ」という方針の職場",
+  chartCaption: "灰色の点線(配置ミスマッチ)は指導方法に関わらず一定です。赤線(方法起因の離脱)は、厳しさが増すほど上乗せされていきます。",
+  chartNote: "生存者バイアスと根本的な帰属の誤りの方向性を示す簡易モデルです。特定の組織の正確な割合を予測するものではありません。",
+  sbYTitle: "離脱率の目安(%)", sbXTitle: "指導方法の厳しさ・根性論への依存度",
+  legendMethod: "指導方法に起因する追加離脱",
+  legendBase: "配置段階の基礎的なミスマッチ(一定)",
+  methodCardLabel: "指導方法に起因する追加離脱",
+  baseCardLabel: "配置段階の基礎的なミスマッチ",
+  hint: (harsh, base, a) => `指導方法の厳しさ${harsh}%のとき、方法に起因する追加離脱は約${a.methodRate.toFixed(1)}%、配置段階の基礎的なミスマッチ${base}%とあわせて、離脱率の目安は合計約${a.total.toFixed(1)}%になります。`,
+  hintScenario: (base, a) => `「耐えられない者は去れ」という方針のもとでは、方法に起因する追加離脱が約${a.methodRate.toFixed(1)}%まで増加します。生き残った人だけを見ていると、この上乗せ分は見えなくなります。`,
+  comments: [
+    "指導方法に起因する追加離脱はごくわずかです。離脱の大半は配置段階のミスマッチによるものと考えられます。",
+    "指導方法による上乗せは小さく抑えられています。",
+    "指導方法による上乗せが、配置段階のミスマッチと同程度になってきています。",
+    "指導方法に起因する離脱が、配置段階のミスマッチを上回り始めています。",
+    "離脱の多くが指導方法に起因すると考えられる水準です。生存者だけを見ていると、この規模の大きさに気づきにくくなります。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "「生存者バイアス」は、成功事例(生き残った人・組織)だけを観察して結論を出すことで生じる誤りです。離脱した人はサンプルから消えるため、厳しい手法がなぜ機能した(ように見える)のかを正しく検証できません。加えて、Ross(1977年)が示した「根本的な帰属の誤り」は、他者の不振を状況要因(指導方法・配置の適合度)よりも個人の資質のせいにしすぎる傾向を指します。この2つが重なると、指導方法が問い直されないまま、根性論に頼った再生産が続きやすくなります。特に労働力人口が減少する局面では、離脱を前提とした「選抜型」の育成は成り立ちにくく、今いる人材にどう適応してもらうかという「育成型」への転換が求められます。",
+  adviceItems: [
+    "「今の管理職がこの方法で育った」ことを、その方法が正しい証拠として扱わない",
+    "離職・異動した人の声を、可能な範囲で組織の学習材料として扱う仕組みをつくる",
+    "不振の原因を個人の資質だけに帰属させず、指導方法・環境要因も合わせて点検する",
+    "人材の供給が限られる前提に立ち、選抜よりも適応支援に投資配分を見直す",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "COGNITIVE BIAS", title: "情報を正しく選択するための認知バイアス事典", desc: "情報文化研究所編。生存者バイアスを含む60項目の認知バイアスを、図解つきで体系的に解説するロングセラーの一冊。", link: "Amazonで見る →", url: "https://amzn.to/3Rf2lL0" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "生き残った人だけを見て、その指導方法は正しいと言える? | 生存者バイアス・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If you only look at who stayed, was the training method actually right? | Survivorship Bias Simulator",
+  heroTitle: "If you only look at who stayed,<br>was the training method actually right?",
+  heroLead: "In an organization where only people who endured a harsh environment become managers, those at the top tend to hold a strong personal belief: \"this method worked, because it worked for me.\" But the people who left early under that same method are no longer around to be seen — this is what statisticians call \"survivorship bias.\" On top of that, when people attribute others' struggles to a lack of \"grit\" rather than situational factors (a pattern known as the fundamental attribution error, Ross, 1977), the training method itself rarely gets questioned. Move the harshness of the method and the baseline placement-mismatch rate to see the relationship.",
+  disclaimer: "* This simulator does not assess any individual's aptitude. It's a simplified, population-level model for management to separate factors that occur regardless of training method from factors that shift with the method.",
+  consoleLabel: "RETENTION CONSOLE",
+  sumLabel: "Additional attrition from the method",
+  scoreLabel: "Method soundness score",
+  harshName: "Harshness of the method / reliance on \"grit\"", harshSub: "How much the approach assumes \"only those who endure should stay\"",
+  baseName: "Baseline placement mismatch", baseSub: "Mismatch rate at the placement/hiring stage, assumed independent of the method",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: a \"those who can't take it should leave\" workplace",
+  chartCaption: "The dashed gray line (placement mismatch) stays constant regardless of method. The red line (method-driven attrition) adds on top as harshness increases.",
+  chartNote: "A simplified model reflecting the direction of survivorship bias and the fundamental attribution error — not a precise predictor for any specific organization.",
+  sbYTitle: "Estimated attrition rate (%)", sbXTitle: "Harshness of the method / reliance on \"grit\"",
+  legendMethod: "Additional attrition from the method",
+  legendBase: "Baseline placement mismatch (constant)",
+  methodCardLabel: "Additional attrition from the method",
+  baseCardLabel: "Baseline placement mismatch",
+  hint: (harsh, base, a) => `At ${harsh}% method harshness, additional attrition from the method itself runs about ${a.methodRate.toFixed(1)}%. Combined with a ${base}% baseline placement mismatch, the total estimated attrition rate comes to about ${a.total.toFixed(1)}%.`,
+  hintScenario: (base, a) => `Under a "those who can't take it should leave" policy, method-driven attrition rises to about ${a.methodRate.toFixed(1)}%. If you only look at who stayed, this extra portion becomes invisible.`,
+  comments: [
+    "Attrition attributable to the method itself is minimal. Most attrition likely traces back to placement-stage mismatch.",
+    "The method's added toll stays fairly small.",
+    "The method's added toll is starting to match the baseline placement mismatch.",
+    "Method-driven attrition is starting to exceed the baseline placement mismatch.",
+    "A large share of attrition is likely attributable to the method itself. Looking only at survivors makes this scale easy to miss.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "\"Survivorship bias\" is the error of drawing conclusions from success stories (survivors) alone. Because people who left drop out of the sample, it becomes hard to properly test why a harsh method appears to \"work.\" On top of that, the \"fundamental attribution error\" (Ross, 1977) describes the tendency to attribute someone else's struggles to personal disposition rather than situational factors (the training method, or fit with the role). Together, these make it easy for a method to go unquestioned while a \"grit-based\" approach keeps reproducing itself. As the working-age population shrinks, a \"selection-based\" development model — one that assumes attrition is fine — becomes harder to sustain, and the shift toward \"development-based\" thinking, adapting to the people already there, becomes more important.",
+  adviceItems: [
+    "Don't treat \"today's managers were raised this way\" as proof that the method itself was correct",
+    "Where possible, build a mechanism for capturing feedback from people who left or moved on as organizational learning",
+    "Don't attribute struggles solely to individual disposition — also examine the training method and situational factors",
+    "Given a shrinking talent supply, shift investment from selection toward adaptive support",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "COGNITIVE BIAS", title: "Fooled by Randomness", desc: "Nassim Nicholas Taleb. Explores survivorship bias and other \"invisible failure\" effects, and the fragility of success narratives.", link: "View on Amazon →", url: "https://amzn.to/4fzKzur" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If you only look at who stayed, was the training method actually right? — Survivorship Bias Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (harsh, base, a) => `厳しさ${harsh}%。「俺はこれで育った」おじさんが量産される確率。方法起因の追加離脱約${a.methodRate.toFixed(1)}%。1on1が説教になっている職場、心当たりありませんか。`,
+  hintScenario: (base, a) => `「甘え」という単語が飛び交う職場。方法起因の追加離脱約${a.methodRate.toFixed(1)}%。退職理由は毎回「一身上の都合」としか記録に残らない。`,
+  comments: [
+    "1on1がちゃんと1on1になっている。奇跡。",
+    "「昔は大変だった」を過去形で言える程度には落ち着いている。",
+    "「今の若い人は」が口癖になり始めている、あの空気。",
+    "退職エントリがそこそこバズる頻度になってきた。",
+    "「石の上にも三年」を初日に言われる新人研修。誰も三年いない。",
+  ],
+},
+en: {
+  hint: (harsh, base, a) => `Harshness ${harsh}%. The rate at which "back in my day" managers get mass-produced. Method-driven attrition ~${a.methodRate.toFixed(1)}%. Sound familiar if 1-on-1s have quietly turned into lectures?`,
+  hintScenario: (base, a) => `A workplace where "toughen up" gets said out loud. Method-driven attrition ~${a.methodRate.toFixed(1)}%. Exit interviews always land on "personal reasons" and nothing more specific.`,
+  comments: [
+    "1-on-1s are actually 1-on-1s. A small miracle.",
+    "\"It used to be rough around here\" is at least spoken in the past tense now.",
+    "\"Kids these days\" is becoming a regular phrase. That vibe.",
+    "\"Why I quit\" blog posts are getting a little too frequent.",
+    "New hires get told to \"stick it out for three years\" on day one. Nobody makes it to year two.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let harshness = 50;
+let baseMismatch = 15;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 60;
+const xOf = (h) => PAD_L + ((h - HARSH_MIN) / (HARSH_MAX - HARSH_MIN)) * (PW - PAD_L - PAD_R);
+const hOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = HARSH_MIN + frac * (HARSH_MAX - HARSH_MIN);
+  return Math.min(HARSH_MAX, Math.max(HARSH_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("sbGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 12, 24, 36, 48, 60].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "sb-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "sb-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let h = HARSH_MIN; h <= HARSH_MAX; h += 20) {
+    const x = xOf(h);
+    gridLayer.appendChild(el("line", { class: "sb-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "sb-axis-label", x, y: PH - PAD_B + 14, "text-anchor": h === HARSH_MIN ? "start" : h === HARSH_MAX ? "end" : "middle" });
+    label.textContent = h + "%";
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "sb-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.sbYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "sb-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.sbXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const methodPts = [], basePts = [];
+  for (let h = HARSH_MIN; h <= HARSH_MAX; h += 2) {
+    methodPts.push(`${xOf(h)},${yOf(methodDrivenRateOf(h))}`);
+    basePts.push(`${xOf(h)},${yOf(baseMismatch)}`);
+  }
+  document.getElementById("sbLineMethod").setAttribute("d", "M " + methodPts.join(" L "));
+  document.getElementById("sbLineBase").setAttribute("d", "M " + basePts.join(" L "));
+
+  const dotsLayer = document.getElementById("sbDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let h = HARSH_MIN; h <= HARSH_MAX; h += 20) {
+    dotsLayer.appendChild(el("circle", { class: "sb-dot", cx: xOf(h), cy: yOf(methodDrivenRateOf(h)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(harshness);
+  const marker = document.getElementById("sbMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("sbMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(harshness, baseMismatch);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${a.methodRate.toFixed(1)}%`;
+  document.getElementById("methodCardVal").textContent = `${a.methodRate.toFixed(1)}%`;
+  document.getElementById("baseCardVal").textContent = `${baseMismatch}%`;
+  document.getElementById("hint").textContent = t.hint(harshness, baseMismatch, a);
+
+  document.getElementById("harshReadout").textContent = harshness + "%";
+  document.getElementById("baseReadout").textContent = baseMismatch + "%";
+  if (document.activeElement !== document.getElementById("harshSlider")) document.getElementById("harshSlider").value = harshness;
+  if (document.activeElement !== document.getElementById("harshNum")) document.getElementById("harshNum").value = harshness;
+  if (document.activeElement !== document.getElementById("baseSlider")) document.getElementById("baseSlider").value = baseMismatch;
+  if (document.activeElement !== document.getElementById("baseNum2")) document.getElementById("baseNum2").value = baseMismatch;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 60 ? " danger" : a.score < 80 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/survivorship-bias/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("disclaimer").innerHTML = t.disclaimer;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("harshName").textContent = t.harshName;
+  document.getElementById("harshSub").textContent = t.harshSub;
+  document.getElementById("baseName").textContent = t.baseName;
+  document.getElementById("baseSub").textContent = t.baseSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("harshSlider").setAttribute("aria-label", t.harshName);
+  document.getElementById("baseSlider").setAttribute("aria-label", t.baseName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.harshName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.baseName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendMethod").textContent = t.legendMethod;
+  document.getElementById("legendBase").textContent = t.legendBase;
+  document.getElementById("methodCardLabel").textContent = t.methodCardLabel;
+  document.getElementById("baseCardLabel").textContent = t.baseCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "survivorship-bias" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("harshSlider").addEventListener("input", (e) => { harshness = +e.target.value; render(); });
+document.getElementById("harshNum").addEventListener("change", (e) => {
+  harshness = Math.min(HARSH_MAX, Math.max(HARSH_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("baseSlider").addEventListener("input", (e) => { baseMismatch = +e.target.value; render(); });
+document.getElementById("baseNum2").addEventListener("change", (e) => {
+  baseMismatch = Math.min(BASE_MAX, Math.max(BASE_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  harshness = 50; baseMismatch = 15;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  harshness = 100;
+  render();
+  const a = assess(harshness, baseMismatch);
+  document.getElementById("hint").textContent = T().hintScenario(baseMismatch, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const sbChart = document.getElementById("sbChart");
+function svgPoint(evt) {
+  const pt = sbChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(sbChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  sbChart.setPointerCapture(evt.pointerId);
+  document.getElementById("sbMarker").classList.add("dragging");
+  document.getElementById("sbMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  harshness = hOfX(p.x);
+  render();
+}
+document.getElementById("sbMarkerHit").addEventListener("pointerdown", startDrag);
+sbChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => sbChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("sbMarker").classList.remove("dragging");
+  document.getElementById("sbMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

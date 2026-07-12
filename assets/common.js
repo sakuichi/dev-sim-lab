@@ -179,6 +179,12 @@ window.DevSimLab = (function () {
       ja: { name: "心理的安全性シミュレーター", title: "ミスの報告が少ないチームは、優れたチーム?", desc: "心理的安全性の水準が、報告される問題と隠れた問題の割合にどう影響するかをEdmondsonの研究にもとづいて可視化するシミュレーター。" },
       en: { name: "Psychological Safety Simulator", title: "Is a team with fewer reported mistakes the better team?", desc: "A simulator visualizing how psychological safety level affects the split between reported and hidden problems, based on Edmondson's research." },
     },
+    {
+      id: "survivorship-bias", href: "survivorship-bias/", status: "live",
+      tags: { ja: ["生存者バイアス", "組織"], en: ["Survivorship bias", "Organization"] },
+      ja: { name: "生存者バイアス・シミュレーター", title: "生き残った人だけを見て、その指導方法は正しいと言える?", desc: "指導方法の厳しさが、方法に起因する離脱と配置段階のミスマッチにどう影響するかを可視化するシミュレーター。" },
+      en: { name: "Survivorship Bias Simulator", title: "If you only look at who stayed, was the training method actually right?", desc: "A simulator visualizing how a training method's harshness affects method-driven attrition versus baseline placement mismatch." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
