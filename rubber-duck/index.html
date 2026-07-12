@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>誰かに説明した瞬間、答えに気づくのはなぜ? | ラバーダック・デバッグ・シミュレーター</title>
+<meta name="description" content="行き詰まった問題を言葉にして説明するほど、説明の途中で自分で答えに気づきやすくなる「ラバーダック・デバッグ」を可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/rubber-duck/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/rubber-duck/">
+<meta property="og:title" content="誰かに説明した瞬間、答えに気づくのはなぜ? | ラバーダック・デバッグ・シミュレーター">
+<meta property="og:description" content="行き詰まった問題を言葉にして説明するほど、説明の途中で自分で答えに気づきやすくなる「ラバーダック・デバッグ」を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/rubber-duck.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ラバーダック・デバッグ・シミュレーター",
+  "alternateName": "Rubber Duck Debugging Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/rubber-duck/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "説明の丁寧さが、説明の途中で自分で答えに気づく確率にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- S-curve chart (self-resolution rate by verbalization thoroughness) ---- */
+.rd-wrap{margin-top:14px}
+.rd-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.rd-grid{stroke:var(--line);stroke-width:1}
+.rd-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.rd-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.rd-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.rd-line-rate{fill:none;stroke:var(--q);stroke-width:2.2}
+.rd-dot{r:3.5}
+.rd-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.rd-marker.dragging{cursor:grabbing}
+.rd-marker-hit{fill:transparent;cursor:grab}
+.rd-marker-hit.dragging{cursor:grabbing}
+.rd-point{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.rd-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;fill:var(--q)}
+.rd-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.rd-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.rd-legend .sw.rate{background:var(--q)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box (what "thoroughness" looks like right now) ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.rate-card{border-left:4px solid var(--q)}
+.tier-card.saved-card{border-left:4px solid var(--d)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">40%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="rd-wrap">
+    <svg class="rd-svg" id="rdChart" viewBox="0 0 640 240" role="img" aria-label="Probability of solving the problem yourself mid-explanation, by verbalization thoroughness">
+      <g id="rdGridLayer"></g>
+      <path id="rdLineRate" class="rd-line-rate"></path>
+      <g id="rdDotsLayer"></g>
+      <line id="rdMarker" class="rd-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="rdPoint" class="rd-point" r="5"></circle>
+      <text id="rdLabel" class="rd-value-label"></text>
+      <rect id="rdMarkerHit" class="rd-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="rd-legend">
+    <span><span class="sw rate"></span><span id="legendRate"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card rate-card">
+      <div class="k" id="rateCardLabel"></div>
+      <div class="v" id="rateCardVal">40%</div>
+    </div>
+    <div class="tier-card saved-card">
+      <div class="k" id="savedCardLabel"></div>
+      <div class="v" id="savedCardVal">24分</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">50</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="thorName"></span><small id="thorSub"></small></div>
+      <div class="readout mono" id="thorReadout">50</div>
+      <input type="range" id="thorSlider" min="0" max="100" step="5" value="50">
+      <div class="num-row">
+        <label for="thorNum" id="numLabel1"></label>
+        <input type="number" id="thorNum" min="0" max="100" step="5" value="50">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="stuckName"></span><small id="stuckSub"></small></div>
+      <div class="readout mono" id="stuckReadout">60分</div>
+      <input type="range" id="stuckSlider" min="15" max="120" step="15" value="60">
+      <div class="num-row">
+        <label for="stuckNum" id="numLabel2"></label>
+        <input type="number" id="stuckNum" min="15" max="120" step="15" value="60">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「ラバーダック・デバッグ」——行き詰まった問題を、誰か(またはアヒルのおもちゃ)に
+   向かって一行ずつ説明すると、説明の途中で自分で答えに気づく現象。
+   『達人プログラマー』(Hunt & Thomas, 1999)の逸話——アヒルを持ち歩き、コードを
+   一行ずつアヒルに説明するプログラマー——が名前の由来。
+   学習科学では、自分の言葉で説明しながら学ぶ人ほど問題解決の成績が良いという
+   「自己説明効果」(Chi et al., 1989)が知られており、言語化が思考の穴を露呈させる
+   という方向性はこの研究系譜と整合する。
+   本モデルのS字カーブは方向性を示す例示用の簡易モデルであり、実証研究の数値を
+   再現したものではない。S字にしているのは「断片的なメモ程度ではあまり効かず、
+   順序立てて言語化し始めたところで急に効き、それ以降は頭打ちになる」という
+   質的な観察を形にしたもの。
+*/
+const THOR_MIN = 0, THOR_MAX = 100;
+const STUCK_MIN = 15, STUCK_MAX = 120;
+const RATE_LO = 5, RATE_HI = 75;
+
+function rateOf(thor) { return RATE_LO + (RATE_HI - RATE_LO) / (1 + Math.exp(-(thor - 50) / 12)); }
+function savedOf(stuck, thor) { return stuck * (rateOf(thor) / 100); }
+function scoreOf(thor) {
+  return Math.round(((rateOf(thor) - rateOf(THOR_MIN)) / (rateOf(THOR_MAX) - rateOf(THOR_MIN))) * 100);
+}
+function tierOf(thor) { return Math.min(4, Math.floor(thor / 20)); }
+function assess(thor, stuck) {
+  const rate = rateOf(thor);
+  const saved = savedOf(stuck, thor);
+  const score = scoreOf(thor);
+  const band = tierOf(thor);
+  return { rate, saved, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "誰かに説明した瞬間、答えに気づくのはなぜ? | ラバーダック・デバッグ・シミュレーター",
+  heroTitle: "誰かに説明した瞬間、<br>答えに気づくのはなぜ?",
+  heroLead: "何時間も悩んだバグを、同僚に相談しようと説明し始めた途端——「あ、わかりました。すみません」。誰もが経験するこの現象には名前があります。「ラバーダック・デバッグ」。『達人プログラマー』(1999年)で紹介された、ゴムのアヒルを机に置き、コードを一行ずつアヒルに説明するプログラマーの逸話が由来です。原著いわく「一行ずつ説明するだけで、問題が画面から飛び出して名乗りを上げてくる」。なぜ効くのか。頭の中の思考は並列で、曖昧なままでも先に進めてしまいます。しかし言葉にして説明するには、思考を一列に並べ、「当然こう動くはず」と飛ばしていた前提を一つずつ明示する必要があります。その瞬間、「やったつもりのこと」と「実際にやったこと」の食い違いが露呈するのです。このシミュレーターでは「説明の丁寧さ」——どこまで順序立てて言語化するか——を動かすと、「説明の途中で自分で答えに気づく確率」がどう変わるかを確認できます。",
+  consoleLabel: "DUCK CONSOLE",
+  sumLabel: "説明の途中で自分で気づく確率",
+  scoreLabel: "言語化の徹底度スコア",
+  thorName: "説明の丁寧さ", thorSub: "0=頭の中で考えるだけ、100=前提も含めて一行ずつ声に出して説明",
+  stuckName: "1回の行き詰まりで溶けている時間", stuckSub: "説明せずに一人で悩み続けた場合に費やす時間の想定",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: アヒルに一行ずつ説明してみる",
+  chartCaption: "カーブがS字なのがポイントです。左側(断片的なメモ程度)ではあまり効きませんが、中央(順序立てて言語化し始めるあたり)で急に効き始め、右側では頭打ちになります。「ちゃんと説明し始めた瞬間に気づく」という体感と対応しています。",
+  chartNote: "このS字カーブは方向性を示す例示用の簡易モデルであり、実証研究の数値を再現したものではありません。なお、自分の言葉で説明する人ほど問題解決の成績が良いという「自己説明効果」は学習科学で繰り返し報告されています(Chi et al., 1989ほか。元の研究は小規模であり、効果の範囲については現在も研究が続いています)。",
+  rdYTitle: "自分で気づく確率(%)", rdXTitle: "説明の丁寧さ",
+  legendRate: "説明の途中で自分で答えに気づく確率",
+  scenarioBoxTitle: "いまの「説明の丁寧さ」は、こんな状態",
+  scenarios: [
+    "頭の中だけで考え続けています。思考は並列のまま、同じ仮説の周りをぐるぐる回りがちです。",
+    "断片的なメモやキーワードを書き出しています。整理は始まりましたが、「当然こう動くはず」という思い込みはまだ温存されています。",
+    "症状と試したことを、文章として書き出しています。並べてみると矛盾に気づき始める段階です。",
+    "誰か(または何か)に向かって、最初から順序立てて説明しています。「あれ、ここおかしくない?」が出始めます。",
+    "前提や「説明するまでもない」と思っていた部分まで、一行ずつ声に出して説明しています。思い込みが最も露呈しやすい状態です。",
+  ],
+  rateCardLabel: "説明の途中で自分で気づく確率",
+  savedCardLabel: "1回の行き詰まりで節約できる時間の期待値",
+  hint: (thor, stuck, a) => `説明の丁寧さ${thor}のとき、説明の途中で自分で答えに気づく確率はおよそ${Math.round(a.rate)}%。一人で${stuck}分悩み続ける代わりに説明を始めれば、期待値でおよそ${Math.round(a.saved)}分を節約できる計算になります。`,
+  hintScenario: (stuck, a) => `『達人プログラマー』の逸話のように、アヒルに向かって一行ずつ説明しています。自分で気づく確率はおよそ${Math.round(a.rate)}%——アヒルは一言も話しません。それでも効くのは、答えを教えてもらうためではなく、自分の思考を一列に並べるための相手だからです。`,
+  comments: [
+    "言語化ゼロの状態です。頭の中の「わかっているつもり」は、外に出すまで検証できません。",
+    "メモを書き始めた段階です。もう一歩、「文章として」説明する形にすると効果が跳ね上がります。",
+    "言語化の効果が急上昇する領域です。説明の相手は人でも、アヒルでも、送信しないメッセージの下書きでも構いません。",
+    "順序立てた説明ができています。多くの行き詰まりは、この段階までに自己解決します。",
+    "完全なラバーダック状態です。ここまで言語化して解けない問題は、堂々と人に相談してよい問題です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "ラバーダック・デバッグの本質は、「答えを知っている相手」が不要だという点にあります。効果の源泉は相手の知識ではなく、自分の思考を強制的に直列化・明示化するプロセスそのものだからです。だからこそ相手はアヒルでも、観葉植物でも、送信しない質問文の下書きでも成立します。「質問を書き終えた瞬間に自己解決して、下書きだけが残った」経験は、まさにこの現象です。チームの観点では、これは「質問する前に自分で説明を書いてみる」文化として制度化できます。ただし注意点もあります。言語化のハードルを上げすぎると、質問そのものを抑制してしまいます(発言コストの問題)。「まず5分だけアヒルに説明してみて、それでも解けなければすぐ聞く」のような、軽い運用がおすすめです。",
+  adviceItems: [
+    "行き詰まったら、まず「何をしようとして、何を期待して、実際に何が起きたか」を順番に声に出す(または書き出す)",
+    "質問テンプレート(期待した動作/実際の動作/試したこと)を用意する。テンプレートを埋める行為自体がラバーダックになる",
+    "「説明を書いている途中で解決した」を歓迎する文化をつくる。下書きのまま消えた質問は、失敗ではなく成功",
+    "言語化のハードルを上げすぎない。数分説明して解けなければ、ためらわず人に聞く",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "PROGRAMMER CULTURE", title: "達人プログラマー(第2版)", desc: "Andrew Hunt / David Thomas著。ラバーダック・デバッグの名前の由来となった逸話が登場する古典の20周年記念版。", link: "Amazonで見る →", url: "https://amzn.to/4wHbKKH" },
+    { tag: "COGNITIVE SCIENCE", title: "プログラマー脳", desc: "フェリエンヌ・ヘルマンス著。プログラミング中の脳で何が起きているかを認知科学の知見から解説。言語化やメンタルモデルの働きを理解する助けになる一冊。", link: "Amazonで見る →", url: "https://amzn.to/4h9LFPD" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "誰かに説明した瞬間、答えに気づくのはなぜ? | ラバーダック・デバッグ・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Why do you find the answer the moment you explain it to someone? | Rubber Duck Debugging Simulator",
+  heroTitle: "Why do you find the answer<br>the moment you explain it to someone?",
+  heroLead: "You've been stuck on a bug for hours. You walk over to a colleague, start explaining — and halfway through: \"...oh. Never mind. Sorry.\" This universal experience has a name: rubber duck debugging. It comes from an anecdote in The Pragmatic Programmer (1999) about a programmer who kept a rubber duck on his desk and explained code to it line by line. As the book puts it, the simple act of explaining, step by step, often causes the problem \"to leap off the screen and announce itself.\" Why does it work? Thought inside your head runs in parallel and tolerates vagueness. Explaining out loud forces you to serialize it — to state, one by one, the assumptions you'd been skipping over as \"obviously works.\" That's the moment the gap between what you meant to do and what you actually did gets exposed. Move the \"thoroughness of explanation\" dial to see how the probability of solving it yourself mid-explanation changes.",
+  consoleLabel: "DUCK CONSOLE",
+  sumLabel: "Chance of solving it yourself mid-explanation",
+  scoreLabel: "Verbalization thoroughness score",
+  thorName: "Thoroughness of explanation", thorSub: "0 = thinking silently in your head, 100 = explaining aloud line by line, assumptions included",
+  stuckName: "Time burned per stuck episode", stuckSub: "Assumed time spent grinding alone if you never start explaining",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: explain it to the duck, line by line",
+  chartCaption: "The S-shape is the point. On the left (fragmentary notes) it barely helps; in the middle (once you start explaining in order) it kicks in sharply; on the right it plateaus. This matches the familiar feeling of \"the answer arrived the moment I started properly explaining.\"",
+  chartNote: "This S-curve is an illustrative, simplified model — not a reproduction of empirical numbers. That said, the \"self-explanation effect\" — people who explain material in their own words solve problems better — is a repeatedly reported finding in learning science (Chi et al., 1989, among others; the original study was small, and the effect's scope is still being researched).",
+  rdYTitle: "Chance of self-solving (%)", rdXTitle: "Thoroughness of explanation",
+  legendRate: "Chance of finding the answer yourself mid-explanation",
+  scenarioBoxTitle: "What this level of thoroughness looks like",
+  scenarios: [
+    "Thinking silently in your head. Thought stays parallel and vague, circling the same hypothesis.",
+    "Jotting fragmentary notes and keywords. Some structure is emerging, but the \"obviously works\" assumptions survive untouched.",
+    "Writing out the symptoms and what you've tried as full sentences. Laid side by side, contradictions start to surface.",
+    "Explaining to someone (or something) in order, from the beginning. The first \"wait, that's odd\" moments appear.",
+    "Explaining aloud line by line — including the parts that felt too obvious to mention. Assumptions are maximally exposed.",
+  ],
+  rateCardLabel: "Chance of solving it yourself mid-explanation",
+  savedCardLabel: "Expected time saved per stuck episode",
+  hint: (thor, stuck, a) => `At thoroughness ${thor}, the chance of finding the answer yourself mid-explanation is about ${Math.round(a.rate)}%. Instead of grinding alone for ${stuck} minutes, starting to explain saves an expected ${Math.round(a.saved)} minutes.`,
+  hintScenario: (stuck, a) => `Like the anecdote in The Pragmatic Programmer, you're explaining line by line to the duck. Chance of self-solving: about ${Math.round(a.rate)}% — and the duck never says a word. It works because the duck isn't there to give answers; it's there to force your thoughts into a straight line.`,
+  comments: [
+    "Zero verbalization. What feels understood inside your head can't be verified until it comes out.",
+    "Notes have begun. One more step — explaining in full sentences — and the effect jumps.",
+    "The steep part of the curve. The listener can be a person, a duck, or the draft of a message you never send.",
+    "Structured explanation achieved. Most stuck episodes resolve themselves by this stage.",
+    "Full rubber-duck mode. A problem that survives this much verbalization has earned the right to be escalated to a human.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The essence of rubber duck debugging is that the listener doesn't need to know anything. The effect comes not from the listener's knowledge but from the process of forcibly serializing and externalizing your own thinking — which is why a duck, a houseplant, or the draft of a question you never send all work. If you've ever finished writing a question and solved the problem before hitting send, you've experienced exactly this. At the team level, this can be institutionalized as a \"write out your explanation before asking\" culture. One caution: raising the verbalization bar too high suppresses questions themselves (the speak-up cost problem). A light-touch rule works best — \"give the duck five minutes; if it's still unsolved, ask a human immediately.\"",
+  adviceItems: [
+    "When stuck, say (or write) in order: what you were trying to do, what you expected, and what actually happened",
+    "Provide a question template (expected behavior / actual behavior / what you tried) — filling it in is itself a rubber duck",
+    "Celebrate \"solved it while writing the question.\" A question that dies as a draft is a success, not a failure",
+    "Don't raise the verbalization bar too high — a few minutes of explaining, then ask a human without hesitation",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "PROGRAMMER CULTURE", title: "The Pragmatic Programmer (20th Anniversary Edition)", desc: "Andrew Hunt and David Thomas. The 20th-anniversary edition of the classic where the rubber duck anecdote first appeared.", link: "View on Amazon →", url: "https://amzn.to/4wHbKKH" },
+    { tag: "COGNITIVE SCIENCE", title: "The Programmer's Brain", desc: "Felienne Hermans. What's happening in your brain while you code — a cognitive-science lens on verbalization, memory, and mental models.", link: "View on Amazon →", url: "https://amzn.to/4h9LFPD" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Why do you find the answer the moment you explain it to someone? — Rubber Duck Debugging Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (thor, stuck, a) => `丁寧さ${thor}。Slackの質問下書きが完成に近づくほど、送信ボタンが押される確率は下がっていく。自己解決率約${Math.round(a.rate)}%。今日も下書きフォルダに解決済みの質問が1件増えた。`,
+  hintScenario: (stuck, a) => `アヒル稼働中。自己解決率約${Math.round(a.rate)}%。アヒルの今月の解決件数はチームの若手を超えたが、1on1は実施されていない。`,
+  comments: [
+    "無言で3時間。モニターを睨む力でバグが直るなら、もう直っている。",
+    "付箋に「たぶんキャッシュ」とだけ書いてある。それは説明ではなく祈り。",
+    "質問を書き始めて3行目で「あっ」と言った。同僚は全てを察して頷いた。",
+    "「ちょっと聞いてもらっていいですか」の9割が、聞いてもらう前に終わる。",
+    "アヒルが今日も無言で3件解決した。今月のMVP。人事評価制度はアヒルに対応していない。",
+  ],
+},
+en: {
+  hint: (thor, stuck, a) => `Thoroughness ${thor}. The closer the Slack draft gets to done, the lower the odds it ever gets sent. Self-solve rate ~${Math.round(a.rate)}%. Another solved question retired to the drafts folder today.`,
+  hintScenario: (stuck, a) => `Duck deployed. Self-solve rate ~${Math.round(a.rate)}%. The duck's monthly solve count has passed the junior devs', yet it has never been given a 1-on-1.`,
+  comments: [
+    "Three hours of silent staring. If glaring at the monitor fixed bugs, it'd be fixed by now.",
+    "A sticky note that just says \"probably cache.\" That's not an explanation, that's a prayer.",
+    "Got three lines into writing the question and said \"oh.\" The colleague nodded, understanding everything.",
+    "90% of \"got a minute?\" conversations end before the minute starts.",
+    "The duck silently closed three tickets today. MVP of the month. HR has no review process for ducks.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let thor = 50;
+let stuck = 60;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - THOR_MIN) / (THOR_MAX - THOR_MIN)) * (PW - PAD_L - PAD_R);
+const tOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = THOR_MIN + frac * (THOR_MAX - THOR_MIN);
+  return Math.min(THOR_MAX, Math.max(THOR_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("rdGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "rd-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "rd-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = THOR_MIN; v <= THOR_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "rd-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "rd-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === THOR_MIN ? "start" : v === THOR_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "rd-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.rdYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "rd-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.rdXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const pts = [];
+  for (let v = THOR_MIN; v <= THOR_MAX; v += 2) {
+    pts.push(`${xOf(v)},${yOf(rateOf(v))}`);
+  }
+  document.getElementById("rdLineRate").setAttribute("d", "M " + pts.join(" L "));
+
+  const dotsLayer = document.getElementById("rdDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = THOR_MIN; v <= THOR_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "rd-dot", cx: xOf(v), cy: yOf(rateOf(v)), fill: "var(--q)" }));
+  }
+
+  const mx = xOf(thor);
+  const marker = document.getElementById("rdMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const py = yOf(rateOf(thor));
+  document.getElementById("rdPoint").setAttribute("cx", mx);
+  document.getElementById("rdPoint").setAttribute("cy", py);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const labelEl = document.getElementById("rdLabel");
+  labelEl.setAttribute("x", mx + labelDx);
+  labelEl.setAttribute("y", Math.max(PAD_T + 10, py - 10));
+  labelEl.setAttribute("text-anchor", labelAnchor);
+  labelEl.textContent = Math.round(rateOf(thor)) + "%";
+
+  const hit = document.getElementById("rdMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(thor, stuck);
+
+  drawChart();
+
+  const rateLabel = `${Math.round(a.rate)}%`;
+  const savedLabel = t.htmlLang === "ja" ? `${Math.round(a.saved)}分` : `${Math.round(a.saved)} min`;
+  document.getElementById("sumVal").textContent = rateLabel;
+  document.getElementById("rateCardVal").textContent = rateLabel;
+  document.getElementById("savedCardVal").textContent = savedLabel;
+  document.getElementById("hint").textContent = t.hint(thor, stuck, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.band];
+
+  document.getElementById("thorReadout").textContent = thor;
+  document.getElementById("stuckReadout").textContent = t.htmlLang === "ja" ? `${stuck}分` : `${stuck} min`;
+  if (document.activeElement !== document.getElementById("thorSlider")) document.getElementById("thorSlider").value = thor;
+  if (document.activeElement !== document.getElementById("thorNum")) document.getElementById("thorNum").value = thor;
+  if (document.activeElement !== document.getElementById("stuckSlider")) document.getElementById("stuckSlider").value = stuck;
+  if (document.activeElement !== document.getElementById("stuckNum")) document.getElementById("stuckNum").value = stuck;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 30 ? " danger" : a.score < 60 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/rubber-duck/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("thorName").textContent = t.thorName;
+  document.getElementById("thorSub").textContent = t.thorSub;
+  document.getElementById("stuckName").textContent = t.stuckName;
+  document.getElementById("stuckSub").textContent = t.stuckSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("thorSlider").setAttribute("aria-label", t.thorName);
+  document.getElementById("stuckSlider").setAttribute("aria-label", t.stuckName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.thorName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.stuckName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendRate").textContent = t.legendRate;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("rateCardLabel").textContent = t.rateCardLabel;
+  document.getElementById("savedCardLabel").textContent = t.savedCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "rubber-duck" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("thorSlider").addEventListener("input", (e) => { thor = +e.target.value; render(); });
+document.getElementById("thorNum").addEventListener("change", (e) => {
+  thor = Math.min(THOR_MAX, Math.max(THOR_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("stuckSlider").addEventListener("input", (e) => { stuck = +e.target.value; render(); });
+document.getElementById("stuckNum").addEventListener("change", (e) => {
+  stuck = Math.min(STUCK_MAX, Math.max(STUCK_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  thor = 50; stuck = 60;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  thor = 95;
+  render();
+  const a = assess(thor, stuck);
+  document.getElementById("hint").textContent = T().hintScenario(stuck, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const rdChart = document.getElementById("rdChart");
+function svgPoint(evt) {
+  const pt = rdChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(rdChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  rdChart.setPointerCapture(evt.pointerId);
+  document.getElementById("rdMarker").classList.add("dragging");
+  document.getElementById("rdMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  thor = tOfX(p.x);
+  render();
+}
+document.getElementById("rdMarkerHit").addEventListener("pointerdown", startDrag);
+rdChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => rdChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("rdMarker").classList.remove("dragging");
+  document.getElementById("rdMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

@@ -197,6 +197,12 @@ window.DevSimLab = (function () {
       ja: { name: "ヤク剃り・シミュレーター", title: "その作業、本題とどうつながってるんだっけ?", desc: "「先にアレが必要」の連鎖(ヤク剃り)の深さが、本題に着手できる時刻と1日の残り時間にどう影響するかを可視化するシミュレーター。" },
       en: { name: "Yak Shaving Simulator", title: "Wait — how is this task connected to what I was doing?", desc: "A simulator visualizing how the depth of a \"but first I need...\" chain pushes back the real task's start time and eats the workday." },
     },
+    {
+      id: "rubber-duck", href: "rubber-duck/", status: "live",
+      tags: { ja: ["ラバーダック", "デバッグ"], en: ["Rubber duck", "Debugging"] },
+      ja: { name: "ラバーダック・デバッグ・シミュレーター", title: "誰かに説明した瞬間、答えに気づくのはなぜ?", desc: "説明の丁寧さが「説明の途中で自分で答えに気づく確率」にどう効くかを、自己説明効果の研究を背景に可視化するシミュレーター。" },
+      en: { name: "Rubber Duck Debugging Simulator", title: "Why do you find the answer the moment you explain it to someone?", desc: "A simulator visualizing how thoroughness of explanation drives the chance of solving your own problem mid-explanation, grounded in self-explanation research." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
