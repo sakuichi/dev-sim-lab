@@ -106,6 +106,8 @@
 
 ## No.30 90-90ルール (slug: `ninety-ninety`, cat: `planning`)
 
+✅ 出荷済み
+
 **タイトル**: JA「進捗90%です(先週も、先々週も)」 / EN "We're 90% done (same as last week, and the week before)"
 **名前**: 90-90ルール・シミュレーター / Ninety-Ninety Rule Simulator
 **タグ**: ja:["進捗報告","見積もり"] en:["Progress reporting","Estimation"]

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>進捗90%です(先週も、先々週も) | 90-90ルール・シミュレーター</title>
+<meta name="description" content="「最初の90%が期間の90%を使い、残りの10%がもう一つの90%を使う」——90-90ルールによる進捗報告の非線形性を可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/ninety-ninety/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/ninety-ninety/">
+<meta property="og:title" content="進捗90%です(先週も、先々週も) | 90-90ルール・シミュレーター">
+<meta property="og:description" content="「最初の90%が期間の90%を使い、残りの10%がもう一つの90%を使う」——90-90ルールによる進捗報告の非線形性を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/ninety-ninety.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "90-90ルール・シミュレーター",
+  "alternateName": "Ninety-Ninety Rule Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/ninety-ninety/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "報告される進捗と実際の完了率の乖離を、90-90ルールにもとづいて可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- fast-rise-then-crawl reported progress vs straight actual completion ---- */
+.nn-wrap{margin-top:14px}
+.nn-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.nn-grid{stroke:var(--line);stroke-width:1}
+.nn-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.nn-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.nn-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.nn-line-reported{fill:none;stroke:var(--alert);stroke-width:2.2}
+.nn-line-actual{fill:none;stroke:var(--q);stroke-width:2;stroke-dasharray:5 3}
+.nn-est-line{stroke:var(--ink-soft);stroke-width:1.4;stroke-dasharray:2 3}
+.nn-est-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:10px;fill:var(--ink-soft)}
+.nn-dot{r:3.5}
+.nn-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.nn-marker.dragging{cursor:grabbing}
+.nn-marker-hit{fill:transparent;cursor:grab}
+.nn-marker-hit.dragging{cursor:grabbing}
+.nn-point-reported{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.nn-point-actual{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.nn-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.nn-value-label-reported{fill:var(--alert)}
+.nn-value-label-actual{fill:var(--q)}
+.nn-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.nn-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.nn-legend .sw.reported{background:var(--alert)}
+.nn-legend .sw.actual{background:var(--q)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.reported-card{border-left:4px solid var(--alert)}
+.tier-card.actual-card{border-left:4px solid var(--q)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">当初の90%ぶん</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="nn-wrap">
+    <svg class="nn-svg" id="nnChart" viewBox="0 0 640 240" role="img" aria-label="Reported progress vs actual completion over elapsed time">
+      <g id="nnGridLayer"></g>
+      <line id="nnEstLine" class="nn-est-line"></line>
+      <text id="nnEstLabel" class="nn-est-label"></text>
+      <path id="nnLineActual" class="nn-line-actual"></path>
+      <path id="nnLineReported" class="nn-line-reported"></path>
+      <g id="nnDotsLayer"></g>
+      <line id="nnMarker" class="nn-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="nnPointReported" class="nn-point-reported" r="5"></circle>
+      <circle id="nnPointActual" class="nn-point-actual" r="5"></circle>
+      <text id="nnLabelReported" class="nn-value-label nn-value-label-reported"></text>
+      <text id="nnLabelActual" class="nn-value-label nn-value-label-actual"></text>
+      <rect id="nnMarkerHit" class="nn-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="nn-legend">
+    <span><span class="sw reported"></span><span id="legendReported"></span></span>
+    <span><span class="sw actual"></span><span id="legendActual"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="tier-row">
+    <div class="tier-card reported-card">
+      <div class="k" id="reportedCardLabel"></div>
+      <div class="v" id="reportedCardVal">90%</div>
+    </div>
+    <div class="tier-card actual-card">
+      <div class="k" id="actualCardLabel"></div>
+      <div class="v" id="actualCardVal">50%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">50</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="elapsedName"></span><small id="elapsedSub"></small></div>
+      <div class="readout mono" id="elapsedReadout">90%</div>
+      <input type="range" id="elapsedSlider" min="0" max="180" step="5" value="90">
+      <div class="num-row">
+        <label for="elapsedNum" id="numLabel1"></label>
+        <input type="number" id="elapsedNum" min="0" max="180" step="5" value="90">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="mileName"></span><small id="mileSub"></small></div>
+      <div class="readout mono" id="mileReadout">×1.0</div>
+      <input type="range" id="mileSlider" min="0.5" max="2" step="0.1" value="1">
+      <div class="num-row">
+        <label for="mileNum" id="numLabel2"></label>
+        <input type="number" id="mileNum" min="0.5" max="2" step="0.1" value="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「90-90ルール」——「コードの最初の90%は開発期間の最初の90%を消費する。
+   残りの10%のコードが、もう一つの90%を消費する」。
+   ベル研究所のTom Cargillの言葉として、Jon BentleyがCommunications of the ACM
+   1985年9月号のBumper-Sticker Computer Scienceコラム(Programming Pearls連載)で
+   紹介し広まった。当初はRule of Credibilityと呼ばれたが定着しなかった。
+   ホフスタッターの法則(見積もり全体の自己言及的超過)に対し、本ページは
+   「進捗報告の非線形性」——報告される90%に残作業の大半が隠れている——を扱う。
+   モデル: 経過時間 t(当初見積もり比%)に対し、
+     報告進捗 = t (t<=90) / 90 + 10*(t-90)/(90*m) (t>90、上限100)
+   完了に必要な実時間 totalTime = 90 + 90*m (m=最後の10%の重さ。m=1でCargillの
+   言うとおり当初の180%)。実際の完了率 = 100*t/totalTime。
+   数値は方向性を示す演出であり、実測値の再現ではない。
+*/
+const ELAPSED_MIN = 0, ELAPSED_MAX = 180;
+const MILE_MIN = 0.5, MILE_MAX = 2.0;
+
+function totalTimeOf(m) { return 90 + 90 * m; }
+function progressOf(t, m) {
+  if (t <= 90) return t;
+  return Math.min(100, 90 + (10 * (t - 90)) / (90 * m));
+}
+function actualOf(t, m) { return Math.min(100, (100 * t) / totalTimeOf(m)); }
+function remainingAt90Of(m) { return 90 * m; }
+function gapOf(t, m) { return progressOf(t, m) - actualOf(t, m); }
+function scoreOf(t, m) { return Math.round(actualOf(t, m)); }
+function tierOf(t, m) {
+  const g = gapOf(t, m);
+  if (g < 5) return 4;
+  if (g < 15) return 3;
+  if (g < 25) return 2;
+  if (g < 35) return 1;
+  return 0;
+}
+function assess(t, m) {
+  const reported = progressOf(t, m);
+  const actual = actualOf(t, m);
+  const gap = gapOf(t, m);
+  const total = totalTimeOf(m);
+  const score = scoreOf(t, m);
+  const band = tierOf(t, m);
+  return { reported, actual, gap, total, score, band };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "進捗90%です(先週も、先々週も) | 90-90ルール・シミュレーター",
+  heroTitle: "進捗90%です<br>(先週も、先々週も)",
+  heroLead: "「コードの最初の90%は、開発期間の最初の90%を消費する。残りの10%のコードが、もう一つの90%を消費する」——ベル研究所のトム・カーギルの言葉です(ジョン・ベントリーがCommunications of the ACM誌1985年9月号のコラムで紹介して広まりました。合計180%という堂々とした矛盾が、このルールの本体です)。定例会議で「進捗90%です」という報告を聞いてから、実際に完成するまでの長い長い時間を、誰もが経験したことがあるはずです。90%まで一直線に伸びた進捗が、そこからほとんど動かなくなる——統合、エッジケース、環境差異、「動くけど遅い」の修正。残りの10%には、そういう見えにくい仕事が全部詰まっています。「経過時間」と「最後の10%の重さ」を動かして、報告される進捗と実際の完了率がどれだけ乖離するかを確認してください。",
+  consoleLabel: "PROGRESS CONSOLE",
+  sumLabel: "報告90%時点の実際の残り時間",
+  scoreLabel: "実際の完了率スコア",
+  elapsedName: "経過時間", elapsedSub: "当初見積もりに対する経過時間の割合(%)。チャートの縦線と連動",
+  mileName: "最後の10%の重さ", mileSub: "統合・エッジケース・磨き込みの密度。1.0でカーギルの言う「もう一つの90%」",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 3週連続「進捗90%」の定例",
+  chartCaption: "赤線は報告される進捗——90%までは経過時間どおりに順調に伸び、そこから先はほとんど動かなくなります。緑の点線は実際の完了率——完了に必要な実時間に対する直線です。灰色の縦点線が当初見積もりの100%地点。報告90%の時点で、実際は道半ばにも達していないことがあります。",
+  chartNote: "数値は方向性を示す独自の簡易モデルです。90-90ルール自体はCargillの警句(Bentley, CACM 1985で紹介)であり、実測の法則ではありません——ただし「報告進捗の最後の10%が長い」という体感は、多くの現場で再現されます。",
+  nnYTitle: "進捗(%)", nnXTitle: "経過時間(当初見積もり比%)",
+  nnEstTag: "当初見積もり(100%)",
+  legendReported: "報告される進捗",
+  legendActual: "実際の完了率",
+  reportedCardLabel: "報告される進捗",
+  actualCardLabel: "実際の完了率",
+  hint: (t, m, a) => `経過${t}%(当初見積もり比)のとき、報告される進捗は${a.reported.toFixed(0)}%、実際の完了率は${a.actual.toFixed(0)}%。完了には当初の${a.total.toFixed(0)}%の時間が必要です。縦線をドラッグして時間を進めてみてください。`,
+  hintScenario: (m, a) => `定例で3週連続「進捗90%」——報告は誤魔化しではありません。仕様どおりの機能は9割できています。しかし実際の完了率は${a.actual.toFixed(0)}%。残りの10%(統合・エッジケース・磨き込み)に、当初見積もりの${remainingAt90Of(m).toFixed(0)}%ぶんの時間がまだ隠れています。`,
+  comments: [
+    "報告と実態が大きく乖離するゾーンです。「90%」という数字だけでリリース日を約束すると、その日は守れません。",
+    "乖離が広がり始めています。残作業を「%」ではなく「タスクの残数と内容」で数え直す時期です。",
+    "報告と実態のズレは中程度です。「あと何%」ではなく「あと何が残っているか」を聞くと精度が上がります。",
+    "報告が実態をよく反映しています。進捗の測り方が機能しています。",
+    "報告と実態がほぼ一致しています。完了の定義が明確なチームの状態です。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "90-90ルールが生まれる理由は、報告者の怠慢ではありません。「機能が動き始めるまで」の進捗は目に見えやすく数えやすい一方、最後の10%——統合、エッジケース、性能、環境差異、ドキュメント——は、着手するまで存在自体が見えないからです。つまり「進捗90%」は嘘ではなく、分母が間違っているのです。対策の中心は、見えにくい仕事を最初から分母に入れることです。ホフスタッターの法則(見積もり全体の超過)と対になる話ですが、こちらは進捗の測り方で改善できる余地が大きい——「%」をやめて「残タスクの列挙」に変えるだけで、90%の停滞はかなり正直な数字に変わります。",
+  adviceItems: [
+    "進捗は「%」ではなく「完了したタスク数/全タスク数」で報告する。%は分母のごまかしが効くが、タスクの列挙は効かない",
+    "「完了の定義」に統合・テスト・ドキュメント・デプロイを最初から含める。「動いた」と「終わった」を区別する",
+    "「進捗90%」と聞いたら「残っているタスクを列挙すると?」と聞き返す。列挙できなければ、90%ではない",
+    "最後の10%に入る前に統合を始める(継続的インテグレーション)。隠れ作業は、早く着手するほど小さいうちに見つかる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "SCHEDULE & QUALITY", title: "人月の神話", desc: "F・P・ブルックス Jr.著。「プロジェクトはどうやって1年遅れるのか?——1日ずつだ」。工程が静かに溶けていく仕組みを描いた古典。", link: "Amazonで見る →", url: "https://amzn.to/4guw11g" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "進捗90%です(先週も、先々週も) | 90-90ルール・シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "We're 90% done (same as last week, and the week before) | Ninety-Ninety Rule Simulator",
+  heroTitle: "We're 90% done<br>(same as last week, and the week before)",
+  heroLead: "\"The first 90 percent of the code accounts for the first 90 percent of the development time. The remaining 10 percent of the code accounts for the other 90 percent of the development time.\" — Tom Cargill of Bell Labs, made famous by Jon Bentley's September 1985 column in Communications of the ACM. The rule's proud total of 180% is the entire point. Everyone has lived the long, long stretch between hearing \"we're 90% done\" in a status meeting and the thing actually shipping. Progress climbs in a straight line to 90% — then barely moves: integration, edge cases, environment quirks, \"it works but it's slow.\" The remaining 10% is where all the invisible work lives. Move the elapsed time and the weight of that last 10% to see how far reported progress drifts from actual completion.",
+  consoleLabel: "PROGRESS CONSOLE",
+  sumLabel: "Actual time left at the 90% report",
+  scoreLabel: "Actual completion score",
+  elapsedName: "Elapsed time", elapsedSub: "Time elapsed as % of the original estimate. Linked to the chart's vertical line",
+  mileName: "Weight of the last 10%", mileSub: "Density of integration, edge cases, and polish. 1.0 = Cargill's \"other 90 percent\"",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: third straight week of \"90% done\"",
+  chartCaption: "The red line is reported progress — it climbs on schedule to 90%, then crawls. The dashed green line is actual completion — a straight line against the real total time. The gray vertical line marks the original estimate (100%). At the 90% report, reality can be barely past halfway.",
+  chartNote: "The numbers are an original, simplified model. The ninety-ninety rule itself is Cargill's aphorism (via Bentley, CACM 1985), not an empirical law — though the long tail after the 90% report reproduces itself in plenty of real projects.",
+  nnYTitle: "Progress (%)", nnXTitle: "Elapsed time (% of original estimate)",
+  nnEstTag: "Original estimate (100%)",
+  legendReported: "Reported progress",
+  legendActual: "Actual completion",
+  reportedCardLabel: "Reported progress",
+  actualCardLabel: "Actual completion",
+  hint: (t, m, a) => `At ${t}% elapsed (vs the original estimate), reported progress is ${a.reported.toFixed(0)}% while actual completion is ${a.actual.toFixed(0)}%. Finishing requires ${a.total.toFixed(0)}% of the original estimate. Drag the vertical line to advance time.`,
+  hintScenario: (m, a) => `Third straight week of "90% done" — and the report isn't a lie. Nine-tenths of the specified features work. But actual completion is ${a.actual.toFixed(0)}%: the remaining tenth (integration, edge cases, polish) still hides ${remainingAt90Of(m).toFixed(0)}% of the original estimate in time.`,
+  comments: [
+    "The zone where reports and reality split widest. Promise a release date off the \"90%\" and the date will not hold.",
+    "The gap is opening. Time to recount the remaining work as tasks and content, not as a percentage.",
+    "A moderate gap. Asking \"what exactly remains?\" instead of \"what percent?\" sharpens the picture.",
+    "Reports track reality well. The way progress is measured is working.",
+    "Reports and reality nearly match — the mark of a team with a clear definition of done.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The ninety-ninety rule isn't born of lazy reporting. Progress toward \"the feature basically works\" is visible and countable; the last 10% — integration, edge cases, performance, environments, docs — is invisible until someone starts it. \"90% done\" isn't a lie; it has the wrong denominator. The core fix is putting the invisible work into the denominator from day one. This is the sibling of Hofstadter's law (whole-estimate overrun), but this one responds well to changing how progress is measured: replace percentages with an enumerated list of remaining tasks, and the 90% plateau becomes a far more honest number.",
+  adviceItems: [
+    "Report progress as completed tasks over total tasks, not a percentage — percentages let the denominator lie; an enumerated list doesn't",
+    "Put integration, testing, docs, and deployment into the definition of done from the start — distinguish \"it runs\" from \"it's finished\"",
+    "When you hear \"90% done,\" ask for the list of what remains. If it can't be enumerated, it isn't 90%",
+    "Start integrating before the last 10% begins (continuous integration) — hidden work found early is small work",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "SCHEDULE & QUALITY", title: "The Mythical Man-Month", desc: "Frederick P. Brooks Jr. \"How does a project get to be a year late? One day at a time.\" The classic on how schedules quietly dissolve.", link: "View on Amazon →", url: "https://amzn.to/3R0mWTt" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "We're 90% done (same as last week, and the week before) — Ninety-Ninety Rule Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (t, m, a) => `経過${t}%。報告${a.reported.toFixed(0)}%、実際${a.actual.toFixed(0)}%。「あとはテストだけです」——そのテストで何が見つかるかは、まだ誰も知らない。`,
+  hintScenario: (m, a) => `進捗90%、3週目。ガントチャートの最後のバーだけが、毎週少しずつ右に伸びている。誰もそのことには触れない。実際の完了率${a.actual.toFixed(0)}%。`,
+  comments: [
+    "「実質もう終わってます」。実質、が仕事をしている文章は信用してはいけない。",
+    "残り10%の内訳: 統合、テスト、例外処理、性能、ドキュメント、そして本物の10%。",
+    "「動いた!」の歓声から「終わった」の安堵まで、もう一つのプロジェクトぶんの距離がある。",
+    "残タスクが列挙で報告されるようになった。90%が90%を意味する日は近い。",
+    "「完了の定義」が壁に貼ってある。デプロイまで含まれている。この定例は退屈で、素晴らしい。",
+  ],
+},
+en: {
+  hint: (t, m, a) => `Elapsed ${t}%. Reported ${a.reported.toFixed(0)}%, actual ${a.actual.toFixed(0)}%. "Just testing left" — what the testing will find, nobody knows yet.`,
+  hintScenario: (m, a) => `90% done, week three. Only the last bar of the Gantt chart keeps quietly stretching rightward each week. Nobody mentions it. Actual completion: ${a.actual.toFixed(0)}%.`,
+  comments: [
+    "\"It's basically done.\" Never trust a sentence where \"basically\" is doing the work.",
+    "The remaining 10%: integration, tests, error handling, performance, docs — and then the actual 10%.",
+    "Between the cheer of \"it works!\" and the relief of \"it's done\" lies approximately one more project.",
+    "Remaining work is now reported as a list. The day 90% means 90% is near.",
+    "The definition of done is taped to the wall. It includes deployment. This standup is boring, and it is beautiful.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let elapsed = 90;
+let mile = 1.0;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (t) => PAD_L + ((t - ELAPSED_MIN) / (ELAPSED_MAX - ELAPSED_MIN)) * (PW - PAD_L - PAD_R);
+const tOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = ELAPSED_MIN + frac * (ELAPSED_MAX - ELAPSED_MIN);
+  return Math.min(ELAPSED_MAX, Math.max(ELAPSED_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("nnGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "nn-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "nn-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = ELAPSED_MIN; v <= ELAPSED_MAX; v += 30) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "nn-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "nn-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === ELAPSED_MIN ? "start" : v === ELAPSED_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "nn-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.nnYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "nn-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.nnXTitle;
+  gridLayer.appendChild(xTitle);
+
+  /* original-estimate (100%) vertical reference */
+  const estX = xOf(100);
+  const est = document.getElementById("nnEstLine");
+  est.setAttribute("x1", estX); est.setAttribute("x2", estX);
+  est.setAttribute("y1", PAD_T); est.setAttribute("y2", PH - PAD_B);
+  const estLabel = document.getElementById("nnEstLabel");
+  estLabel.setAttribute("x", estX + 4);
+  estLabel.setAttribute("y", PAD_T + 12);
+  estLabel.textContent = t.nnEstTag;
+
+  const repPts = [], actPts = [];
+  for (let v = ELAPSED_MIN; v <= ELAPSED_MAX; v += 2) {
+    repPts.push(`${xOf(v)},${yOf(progressOf(v, mile))}`);
+    actPts.push(`${xOf(v)},${yOf(actualOf(v, mile))}`);
+  }
+  document.getElementById("nnLineReported").setAttribute("d", "M " + repPts.join(" L "));
+  document.getElementById("nnLineActual").setAttribute("d", "M " + actPts.join(" L "));
+
+  const dotsLayer = document.getElementById("nnDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = ELAPSED_MIN; v <= ELAPSED_MAX; v += 30) {
+    dotsLayer.appendChild(el("circle", { class: "nn-dot", cx: xOf(v), cy: yOf(progressOf(v, mile)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(elapsed);
+  const marker = document.getElementById("nnMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const repY = yOf(progressOf(elapsed, mile));
+  const actY = yOf(actualOf(elapsed, mile));
+  document.getElementById("nnPointReported").setAttribute("cx", mx);
+  document.getElementById("nnPointReported").setAttribute("cy", repY);
+  document.getElementById("nnPointActual").setAttribute("cx", mx);
+  document.getElementById("nnPointActual").setAttribute("cy", actY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const repIsHigher = repY <= actY;
+
+  const labelRep = document.getElementById("nnLabelReported");
+  labelRep.setAttribute("x", mx + labelDx);
+  labelRep.setAttribute("y", clampY(repIsHigher ? repY - 10 : repY + 20));
+  labelRep.setAttribute("text-anchor", labelAnchor);
+  labelRep.textContent = Math.round(progressOf(elapsed, mile)) + "%";
+
+  const labelAct = document.getElementById("nnLabelActual");
+  labelAct.setAttribute("x", mx + labelDx);
+  labelAct.setAttribute("y", clampY(repIsHigher ? actY + 20 : actY - 10));
+  labelAct.setAttribute("text-anchor", labelAnchor);
+  labelAct.textContent = Math.round(actualOf(elapsed, mile)) + "%";
+
+  const hit = document.getElementById("nnMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(elapsed, mile);
+
+  drawChart();
+
+  const remain = remainingAt90Of(mile);
+  document.getElementById("sumVal").textContent = t.htmlLang === "ja" ? `当初の${remain.toFixed(0)}%ぶん` : `${remain.toFixed(0)}% of the estimate`;
+  document.getElementById("reportedCardVal").textContent = `${Math.round(a.reported)}%`;
+  document.getElementById("actualCardVal").textContent = `${Math.round(a.actual)}%`;
+  document.getElementById("hint").textContent = t.hint(elapsed, mile, a);
+
+  document.getElementById("elapsedReadout").textContent = `${elapsed}%`;
+  document.getElementById("mileReadout").textContent = `×${mile.toFixed(1)}`;
+  if (document.activeElement !== document.getElementById("elapsedSlider")) document.getElementById("elapsedSlider").value = elapsed;
+  if (document.activeElement !== document.getElementById("elapsedNum")) document.getElementById("elapsedNum").value = elapsed;
+  if (document.activeElement !== document.getElementById("mileSlider")) document.getElementById("mileSlider").value = mile;
+  if (document.activeElement !== document.getElementById("mileNum")) document.getElementById("mileNum").value = mile;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.gap >= 25 ? " danger" : a.gap >= 15 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/ninety-ninety/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("elapsedName").textContent = t.elapsedName;
+  document.getElementById("elapsedSub").textContent = t.elapsedSub;
+  document.getElementById("mileName").textContent = t.mileName;
+  document.getElementById("mileSub").textContent = t.mileSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("elapsedSlider").setAttribute("aria-label", t.elapsedName);
+  document.getElementById("mileSlider").setAttribute("aria-label", t.mileName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.elapsedName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.mileName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendReported").textContent = t.legendReported;
+  document.getElementById("legendActual").textContent = t.legendActual;
+  document.getElementById("reportedCardLabel").textContent = t.reportedCardLabel;
+  document.getElementById("actualCardLabel").textContent = t.actualCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "ninety-ninety" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("elapsedSlider").addEventListener("input", (e) => { elapsed = +e.target.value; render(); });
+document.getElementById("elapsedNum").addEventListener("change", (e) => {
+  elapsed = Math.min(ELAPSED_MAX, Math.max(ELAPSED_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("mileSlider").addEventListener("input", (e) => { mile = +e.target.value; render(); });
+document.getElementById("mileNum").addEventListener("change", (e) => {
+  mile = Math.min(MILE_MAX, Math.max(MILE_MIN, Math.round(+e.target.value * 10) / 10));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  elapsed = 90; mile = 1.0;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  elapsed = 90;
+  render();
+  const a = assess(elapsed, mile);
+  document.getElementById("hint").textContent = T().hintScenario(mile, a);
+});
+
+/* ---- drag the time cursor directly on the chart ---- */
+const nnChart = document.getElementById("nnChart");
+function svgPoint(evt) {
+  const pt = nnChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(nnChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  nnChart.setPointerCapture(evt.pointerId);
+  document.getElementById("nnMarker").classList.add("dragging");
+  document.getElementById("nnMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  elapsed = tOfX(p.x);
+  render();
+}
+document.getElementById("nnMarkerHit").addEventListener("pointerdown", startDrag);
+nnChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => nnChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("nnMarker").classList.remove("dragging");
+  document.getElementById("nnMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

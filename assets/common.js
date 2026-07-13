@@ -274,6 +274,12 @@ window.DevSimLab = (function () {
       ja: { name: "バス係数シミュレーター", title: "あの人が1週間休んだら、開発は止まる?", desc: "知識共有の実践度が「何人抜けたら開発が止まるか(バス係数)」をどう決めるかを、GitHub 133プロジェクトの実証研究をもとに可視化するシミュレーター。" },
       en: { name: "Bus Factor Simulator", title: "If that one person takes a week off, does development stop?", desc: "A simulator visualizing how knowledge sharing sets the bus factor — how many departures halt development — grounded in a study of 133 GitHub projects." },
     },
+    {
+      id: "ninety-ninety", href: "ninety-ninety/", status: "live", cat: "planning",
+      tags: { ja: ["進捗報告", "90-90ルール"], en: ["Progress reporting", "Ninety-ninety rule"] },
+      ja: { name: "90-90ルール・シミュレーター", title: "進捗90%です(先週も、先々週も)", desc: "「最初の90%が期間の90%を使い、残りの10%がもう一つの90%を使う」——報告される進捗と実際の完了率の乖離を可視化するシミュレーター。" },
+      en: { name: "Ninety-Ninety Rule Simulator", title: "We're 90% done (same as last week, and the week before)", desc: "A simulator of Cargill's ninety-ninety rule: how reported progress races to 90% and then crawls, while actual completion tells another story." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -397,12 +403,13 @@ window.DevSimLab = (function () {
     "rubber-duck": ["xy-problem", "curse-of-knowledge", "pause-cost"],
     "xy-problem": ["curse-of-knowledge", "rubber-duck", "tire-swing"],
     "confirmation-bias": ["survivorship-bias", "psychological-safety", "xy-problem"],
-    "hofstadters-law": ["estimation-uncertainty", "pause-cost", "bikeshedding"],
+    "hofstadters-law": ["estimation-uncertainty", "pause-cost", "ninety-ninety"],
     "chestertons-fence": ["technical-debt", "curse-of-knowledge", "code-review"],
     "who-says-it": ["speak-up-cost", "psychological-safety", "confirmation-bias"],
     "quantification-trap": ["survivorship-bias", "confirmation-bias", "utilization-trap"],
     "tire-swing": ["xy-problem", "curse-of-knowledge", "qcd-tradeoff"],
     "bus-factor": ["onboarding-ramp", "pause-cost", "brooks-law"],
+    "ninety-ninety": ["hofstadters-law", "estimation-uncertainty", "technical-debt"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */
