@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あの人が1週間休んだら、開発は止まる? | バス係数シミュレーター</title>
+<meta name="description" content="知識の属人化の度合いが「何人抜けたら開発が止まるか(バス係数)」をどう決めるかを、GitHub 133プロジェクトの実証研究をもとに可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/bus-factor/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/bus-factor/">
+<meta property="og:title" content="あの人が1週間休んだら、開発は止まる? | バス係数シミュレーター">
+<meta property="og:description" content="知識の属人化の度合いが「何人抜けたら開発が止まるか(バス係数)」をどう決めるかを可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/bus-factor.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "バス係数シミュレーター",
+  "alternateName": "Bus Factor Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/bus-factor/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "知識共有の実践度とチーム人数が、バス係数と開発停止リスクにどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- cliff step chart (stop probability by number of simultaneous departures) ---- */
+.bf-wrap{margin-top:14px}
+.bf-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.bf-grid{stroke:var(--line);stroke-width:1}
+.bf-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.bf-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.bf-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.bf-bar{fill:var(--d);opacity:.75}
+.bf-bar.danger{fill:var(--alert)}
+.bf-bar-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;fill:var(--ink-soft);text-anchor:middle}
+.bf-cliff{stroke:var(--alert);stroke-width:1.6;stroke-dasharray:5 3}
+.bf-cliff-label{font-family:"IBM Plex Sans JP",sans-serif;font-size:10px;fill:var(--alert)}
+.bf-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.bf-marker.dragging{cursor:grabbing}
+.bf-marker-hit{fill:transparent;cursor:grab}
+.bf-marker-hit.dragging{cursor:grabbing}
+.bf-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.bf-legend .sw{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border-radius:3px}
+.bf-legend .sw.safe{background:var(--d);opacity:.75}
+.bf-legend .sw.danger{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.bf-card{border-left:4px solid var(--q)}
+.tier-card.risk-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">2人</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="bf-wrap">
+    <svg class="bf-svg" id="bfChart" viewBox="0 0 640 240" role="img" aria-label="Probability that development halts, by number of members who leave at once">
+      <g id="bfGridLayer"></g>
+      <g id="bfBarsLayer"></g>
+      <line id="bfCliff" class="bf-cliff"></line>
+      <text id="bfCliffLabel" class="bf-cliff-label"></text>
+      <line id="bfMarker" class="bf-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <rect id="bfMarkerHit" class="bf-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="bf-legend">
+    <span><span class="sw safe"></span><span id="legendSafe"></span></span>
+    <span><span class="sw danger"></span><span id="legendDanger"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card bf-card">
+      <div class="k" id="bfCardLabel"></div>
+      <div class="v" id="bfCardVal">2人</div>
+    </div>
+    <div class="tier-card risk-card">
+      <div class="k" id="riskCardLabel"></div>
+      <div class="v" id="riskCardVal">10%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">33</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--q)">
+      <div class="axis-name"><span id="shareName"></span><small id="shareSub"></small></div>
+      <div class="readout mono" id="shareReadout">30</div>
+      <input type="range" id="shareSlider" min="0" max="100" step="5" value="30">
+      <div class="num-row">
+        <label for="shareNum" id="numLabel1"></label>
+        <input type="number" id="shareNum" min="0" max="100" step="5" value="30">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="teamName"></span><small id="teamSub"></small></div>
+      <div class="readout mono" id="teamReadout">6人</div>
+      <input type="range" id="teamSlider" min="3" max="12" step="1" value="6">
+      <div class="num-row">
+        <label for="teamNum" id="numLabel2"></label>
+        <input type="number" id="teamNum" min="3" max="12" step="1" value="6">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「バス係数(トラック係数)」——チームの何人が同時に離脱したら(俗に「バスに轢かれたら」。
+   縁起が悪いので「宝くじが当たって退職したら」= lottery factor とも言い換えられる)
+   プロジェクトが立ち行かなくなるか、という開発者フォークロア由来の指標。
+   実証: Avelino et al. (2016, "A Novel Approach for Estimating Truck Factors")は
+   GitHubの人気133プロジェクトを分析し、65%がバス係数2以下(46%が1、28%が2)、
+   10を超えるのは10%未満であることを示した。
+   モデル: バス係数 k = max(1, min(team, round(1 + (team-1) * (share/100) * 0.6)))
+   ——知識共有ゼロでも1(誰か1人は分かる)、共有100%でチームの約6割が代替可能。
+   停止確率: 離脱人数 n < k なら小さなリスク(5 + n*5 %)、n >= k で崖(60 + (n-k)*15、上限95%)。
+   数値は方向性を示す独自の簡易モデルであり、実証値の再現ではない。
+*/
+const SHARE_MIN = 0, SHARE_MAX = 100;
+const TEAM_MIN = 3, TEAM_MAX = 12;
+const N_MAX = 5;
+
+function busFactorOf(share, team) {
+  return Math.max(1, Math.min(team, Math.round(1 + (team - 1) * (share / 100) * 0.6)));
+}
+function stopProbOf(n, share, team) {
+  const k = busFactorOf(share, team);
+  if (n < k) return 5 + n * 5;
+  return Math.min(95, 60 + (n - k) * 15);
+}
+function scoreOf(share, team) {
+  /* そのチーム人数で到達可能な最大バス係数(share=100)を100点として正規化 */
+  const kMax = busFactorOf(100, team);
+  return Math.round(((busFactorOf(share, team) - 1) / Math.max(1, kMax - 1)) * 100);
+}
+function tierOf(share, team) {
+  const s = scoreOf(share, team);
+  if (s >= 85) return 4;
+  if (s >= 65) return 3;
+  if (s >= 45) return 2;
+  if (s >= 25) return 1;
+  return 0;
+}
+function boxTierOf(share) { return Math.min(4, Math.floor(share / 20)); }
+function assess(share, team, n) {
+  const k = busFactorOf(share, team);
+  const risk = stopProbOf(n, share, team);
+  const score = scoreOf(share, team);
+  const band = tierOf(share, team);
+  const box = boxTierOf(share);
+  return { k, risk, score, band, box };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "あの人が1週間休んだら、開発は止まる? | バス係数シミュレーター",
+  heroTitle: "あの人が1週間休んだら、<br>開発は止まる?",
+  heroLead: "デプロイ手順はあの人の頭の中、本番DBの癖もあの人だけが知っている——その「あの人」が突然いなくなったら、開発は何日止まるでしょうか。「チームの何人が同時に離脱したらプロジェクトが立ち行かなくなるか」を表す指標を、開発者たちは「バス係数」と呼んできました(「バスに轢かれたら」という物騒な由来なので、「宝くじが当たって突然退職したら」と言い換える流儀もあります)。これは冗談の指標ではありません。Avelinoらの研究(2016年)がGitHubの人気133プロジェクトを分析したところ、65%はバス係数が2以下——46%はたった1でした。つまり人気オープンソースの半数近くが、たった1人の離脱で継続困難になる構造で開発されています。「知識共有の実践度」と「チーム人数」を動かして、何人の同時離脱までチームが耐えられるかを確認してください。",
+  consoleLabel: "RESILIENCE CONSOLE",
+  sumLabel: "バス係数",
+  scoreLabel: "知識の分散度スコア",
+  shareName: "知識共有の実践度", shareSub: "ドキュメント・ペア作業・担当ローテーションなど、知識を複数人に置く活動の度合い",
+  teamName: "チーム人数", teamSub: "開発チームの人数",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: エース1人にすべてを任せた職場",
+  chartCaption: "横軸は同時に離脱する人数、棒の高さは開発が止まる確率です。バス係数(赤い点線)を超えた瞬間に崖のように跳ね上がります。知識共有を進めると、この崖が右へ動きます——それがこのページの全部です。",
+  chartNote: "バス係数と停止確率の数値は方向性を示す独自の簡易モデルです。一方、本文中のGitHub 133プロジェクトの統計(65%がバス係数2以下)はAvelinoらの2016年の実証研究の実数値です。",
+  bfYTitle: "開発が止まる確率(%)", bfXTitle: "同時に離脱する人数",
+  bfCliffTag: (k) => `バス係数 = ${k}`,
+  legendSafe: "バス係数未満の離脱(耐えられる)",
+  legendDanger: "バス係数以上の離脱(停止リスク)",
+  scenarioBoxTitle: "いまのチームは、こんな状態",
+  scenarios: [
+    "デプロイ手順はあの人の頭の中にだけあります。あの人の休暇予定が、チームのリリース計画を決めています。",
+    "ドキュメントは「書こうと言った議事録」だけが残っています。引き継ぎは退職が決まってから始まります。",
+    "主要な領域に「正・副」の担当が置かれ始めました。副担当がレビューに入ることで、知識の複製が進み始めます。",
+    "ペア作業とローテーションが定着し、たいていの作業は2〜3人が対応できます。休暇の調整が「誰が休むか」から「いつ休むか」の話になります。",
+    "誰が休んでも、ドキュメントとペア履歴で翌日から引き継げます。属人化は「その人しかできない」ではなく「その人が一番速い」程度に収まっています。",
+  ],
+  bfCardLabel: "バス係数(何人抜けたら止まるか)",
+  riskCardLabel: (n) => `${n}人が同時離脱したときの停止確率`,
+  hint: (share, team, n, a) => `知識共有${share}・${team}人チームのバス係数は${a.k}人。${n}人が同時に離脱した場合の停止確率は約${a.risk}%です。チャートの縦線をドラッグすると離脱人数を変えられます。`,
+  hintScenario: (team, n, a) => `エースにすべてを任せた${team}人チーム——バス係数は${a.k}人です。Avelinoらの調査では人気GitHubプロジェクトの46%がこの状態でした。エースの1週間の休暇が、チーム全体の1週間の停止になりえます。`,
+  comments: [
+    "たった1人の離脱で停止しうる構造です。GitHub人気プロジェクトの46%と同じ状態——珍しくはありませんが、安全でもありません。",
+    "知識の複製が始まったばかりの状態です。まだ「あの人がいないと分からない」領域が大半を占めます。",
+    "主要領域の半分程度に代替要員がいます。崖の位置をもう1人分、右に動かせるはずです。",
+    "知識がよく分散されています。同時離脱のような稀な事態を除けば、開発は継続できます。",
+    "チームの大半が互いを代替できる理想的な状態です。休暇も退職も、もはや障害イベントではありません。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "属人化は、エース本人の問題ではありません。エースの知識と速さはチームの資産であり、問題は組織がその知識を1か所にしか置いていないことです。バス係数を上げる活動(ドキュメント、ペア作業、ローテーション)は短期的にはエースを「遅く」します——2人でやれば工数は増え、教える時間も要ります。だからこそ放置され、気づけば46%側の統計に入ります。これは保険と同じで、事故が起きてからでは買えません。なお、バス係数は「人を交換可能な部品にする」話ではなく、休暇を取れる・安心して任せられる・退職が円満になる、という働く側の自由度の話でもあります。",
+  adviceItems: [
+    "「この作業、今この場で対応できる人は何人?」を主要領域ごとに数える。1人なら、それが最優先の共有対象",
+    "ペア作業・モブ作業を「教育コスト」ではなく「保険料」として予算化する",
+    "担当ローテーションを計画的に行う。緊急時の引き継ぎは最悪の学習環境、平時のローテーションは最良の学習環境",
+    "エースには「代替可能にされる不安」ではなく「解放される自由」を——共有が進むほど、エースは次の難題に移れる",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "ENGINEERING CULTURE", title: "Googleのソフトウェアエンジニアリング", desc: "Winters/Manshreck/Wright著の日本語版。知識共有の章では、属人知をチームの知識に変える文化と仕組み(ドキュメント、コードレビュー、教育)を体系的に扱う。", link: "Amazonで見る →", url: "https://amzn.to/4vrEZ2X" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "あの人が1週間休んだら、開発は止まる? | バス係数シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "If that one person takes a week off, does development stop? | Bus Factor Simulator",
+  heroTitle: "If that one person takes a week off,<br>does development stop?",
+  heroLead: "The deploy procedure lives in that one person's head; only they know the production database's quirks — so if that person suddenly disappeared, how many days would development stop? Developers call this the \"bus factor\": how many team members would have to vanish at once (folklore says \"get hit by a bus,\" though the gentler school says \"win the lottery and quit\") before the project can't continue. It is not a joke metric. Avelino et al. (2016) analyzed 133 popular GitHub projects and found 65% had a bus factor of 2 or less — 46% had a bus factor of just 1. Nearly half of popular open source is structured so that losing a single person threatens the project. Move the \"knowledge sharing\" and \"team size\" dials to see how many simultaneous departures your team could survive.",
+  consoleLabel: "RESILIENCE CONSOLE",
+  sumLabel: "Bus factor",
+  scoreLabel: "Knowledge distribution score",
+  shareName: "Knowledge sharing in practice", shareSub: "How much documentation, pairing, and rotation put knowledge in multiple heads",
+  teamName: "Team size", teamSub: "Number of people on the development team",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: everything entrusted to one ace",
+  chartCaption: "The X axis is how many people leave at once; bar height is the probability development halts. The moment departures reach the bus factor (red dashed line), the risk jumps off a cliff. Sharing knowledge moves that cliff to the right — which is this entire page.",
+  chartNote: "The bus factor and halt probabilities are an original, simplified model showing the direction. The GitHub statistics in the text (65% at bus factor ≤ 2) are actual figures from Avelino et al.'s 2016 study.",
+  bfYTitle: "Probability development halts (%)", bfXTitle: "People leaving at once",
+  bfCliffTag: (k) => `Bus factor = ${k}`,
+  legendSafe: "Below the bus factor (survivable)",
+  legendDanger: "At or beyond the bus factor (halt risk)",
+  scenarioBoxTitle: "What the team looks like right now",
+  scenarios: [
+    "The deploy procedure exists only in one person's head. That person's vacation schedule is the team's release plan.",
+    "Documentation consists of meeting notes saying documentation should be written. Handovers start after a resignation is announced.",
+    "Primary and secondary owners are being assigned to key areas. Knowledge starts replicating as the secondaries join reviews.",
+    "Pairing and rotation have taken hold; most tasks have two or three capable people. Vacation planning becomes about when, not who.",
+    "Anyone can be away — documents and pairing history let others pick up the next day. Specialization means \"they're fastest,\" not \"only they can.\"",
+  ],
+  bfCardLabel: "Bus factor (how many departures halt work)",
+  riskCardLabel: (n) => `Halt probability if ${n} leave at once`,
+  hint: (share, team, n, a) => `With knowledge sharing at ${share} on a team of ${team}, the bus factor is ${a.k}. If ${n} people left at once, the halt probability is about ${a.risk}%. Drag the vertical line to change how many leave.`,
+  hintScenario: (team, n, a) => `A team of ${team} with everything on the ace — bus factor ${a.k}. In Avelino et al.'s study, 46% of popular GitHub projects were in exactly this state. The ace's one-week vacation can become the whole team's one-week outage.`,
+  comments: [
+    "One departure can halt everything. The same state as 46% of popular GitHub projects — common, but not safe.",
+    "Knowledge replication has barely begun. Most areas are still \"only that person knows.\"",
+    "About half the key areas have a backup. One more person's worth of sharing moves the cliff right.",
+    "Knowledge is well distributed. Short of a rare mass departure, development continues.",
+    "Most of the team can cover for each other. Vacations and resignations are no longer incidents.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "Knowledge concentration is not the ace's fault. The ace's knowledge and speed are team assets; the problem is that the organization stores that knowledge in exactly one place. The activities that raise the bus factor — documentation, pairing, rotation — make the ace slower in the short term: two people cost more hours, and teaching takes time. That's precisely why it gets postponed, until the team joins the 46% statistic. It works like insurance: you can't buy it after the accident. And note the bus factor isn't about making people interchangeable parts — it's also about the freedom to take a vacation, to hand things over with confidence, and to leave on good terms.",
+  adviceItems: [
+    "For each key area, count \"how many people could handle this right now?\" If the answer is one, that's the top sharing priority",
+    "Budget pairing and mob sessions as insurance premiums, not training costs",
+    "Rotate ownership deliberately — an emergency handover is the worst classroom, a planned rotation is the best",
+    "Offer the ace liberation, not replaceability: the more that's shared, the sooner they can move to the next hard problem",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ENGINEERING CULTURE", title: "Software Engineering at Google", desc: "Winters, Manshreck, and Wright. The knowledge-sharing chapters cover exactly this: turning personal knowledge into team knowledge through docs, review, and teaching culture.", link: "View on Amazon →", url: "https://amzn.to/4vqTQe8" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "If that one person takes a week off, does development stop? — Bus Factor Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (share, team, n, a) => `バス係数${a.k}。あの人のカレンダーに「私用」の予定が入った瞬間、チームのSlackに緊張が走る。停止確率約${a.risk}%。`,
+  hintScenario: (team, n, a) => `エースが「ちょっと歯医者に」と席を立った30分間、誰もデプロイボタンを押せなかった。バス係数${a.k}。歯医者がチームのSPOF。`,
+  comments: [
+    "あの人の有給申請が、実質的にチームの停止申請になっている。",
+    "引き継ぎドキュメントのタイトルだけがある。本文は「あとで書く」。3年前から。",
+    "副担当制度が始まった。副担当の最初の仕事は「正担当の頭の中の目次を作る」こと。",
+    "ペア作業が定着して、「それ俺しか知らない」が「それ俺らしか知らない」に進化した。前進ではある。",
+    "エースが2週間の休暇から戻ったら、チームが普通に回っていて少し寂しそうだった。それが理想。",
+  ],
+},
+en: {
+  hint: (share, team, n, a) => `Bus factor ${a.k}. A "personal appointment" appears on that one calendar and the team Slack goes quiet with tension. Halt probability ~${a.risk}%.`,
+  hintScenario: (team, n, a) => `The ace stepped out for a 30-minute dentist appointment and nobody could press the deploy button. Bus factor ${a.k}. The dentist is now the team's single point of failure.`,
+  comments: [
+    "That person's PTO request is effectively a team outage request.",
+    "The handover doc has a title. The body says \"TODO: write later.\" Since three years ago.",
+    "The backup-owner program launched. The backup's first task: creating a table of contents for the owner's brain.",
+    "Pairing took hold, and \"only I know that\" evolved into \"only we know that.\" Progress, technically.",
+    "The ace returned from two weeks off to find the team running fine — and looked a little sad. That's the ideal.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let share = 30;
+let team = 6;
+let nLeave = 1;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const slotW = () => (PW - PAD_L - PAD_R) / (N_MAX + 1);
+const xOf = (n) => PAD_L + (n + 0.5) * slotW();
+const nOfX = (x) => {
+  const raw = (x - PAD_L) / slotW() - 0.5;
+  return Math.min(N_MAX, Math.max(0, Math.round(raw)));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("bfGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "bf-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "bf-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let n = 0; n <= N_MAX; n++) {
+    const x = xOf(n);
+    const label = el("text", { class: "bf-axis-label", x, y: PH - PAD_B + 14, "text-anchor": "middle" });
+    label.textContent = n;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "bf-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.bfYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "bf-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.bfXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const k = busFactorOf(share, team);
+  const barsLayer = document.getElementById("bfBarsLayer");
+  barsLayer.innerHTML = "";
+  const bw = slotW() * 0.55;
+  for (let n = 0; n <= N_MAX; n++) {
+    const p = stopProbOf(n, share, team);
+    const x = xOf(n) - bw / 2;
+    const y = yOf(p);
+    const bar = el("rect", {
+      class: "bf-bar" + (n >= k ? " danger" : ""),
+      x, y, width: bw, height: Math.max(1, yOf(0) - y), rx: 3,
+    });
+    barsLayer.appendChild(bar);
+    const vl = el("text", { class: "bf-bar-label", x: xOf(n), y: y - 5 });
+    vl.textContent = p + "%";
+    barsLayer.appendChild(vl);
+  }
+
+  /* cliff line between k-1 and k */
+  const cliffX = xOf(k) - slotW() / 2;
+  const cliff = document.getElementById("bfCliff");
+  if (k <= N_MAX) {
+    cliff.setAttribute("x1", cliffX); cliff.setAttribute("x2", cliffX);
+    cliff.setAttribute("y1", PAD_T); cliff.setAttribute("y2", PH - PAD_B);
+    cliff.style.display = "";
+    const cl = document.getElementById("bfCliffLabel");
+    cl.style.display = "";
+    cl.setAttribute("x", cliffX + 5);
+    cl.setAttribute("y", PAD_T + 12);
+    cl.textContent = t.bfCliffTag(k);
+  } else {
+    cliff.style.display = "none";
+    const cl = document.getElementById("bfCliffLabel");
+    cl.style.display = "none";
+  }
+
+  const mx = xOf(nLeave);
+  const marker = document.getElementById("bfMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const hit = document.getElementById("bfMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(share, team, nLeave);
+
+  drawChart();
+
+  const kLabel = t.htmlLang === "ja" ? `${a.k}人` : `${a.k}`;
+  document.getElementById("sumVal").textContent = kLabel;
+  document.getElementById("bfCardVal").textContent = kLabel;
+  document.getElementById("riskCardVal").textContent = `${a.risk}%`;
+  document.getElementById("riskCardLabel").textContent = t.riskCardLabel(nLeave);
+  document.getElementById("hint").textContent = t.hint(share, team, nLeave, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.box];
+
+  document.getElementById("shareReadout").textContent = share;
+  document.getElementById("teamReadout").textContent = t.htmlLang === "ja" ? `${team}人` : `${team}`;
+  if (document.activeElement !== document.getElementById("shareSlider")) document.getElementById("shareSlider").value = share;
+  if (document.activeElement !== document.getElementById("shareNum")) document.getElementById("shareNum").value = share;
+  if (document.activeElement !== document.getElementById("teamSlider")) document.getElementById("teamSlider").value = team;
+  if (document.activeElement !== document.getElementById("teamNum")) document.getElementById("teamNum").value = team;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 25 ? " danger" : a.score < 65 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/bus-factor/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("shareName").textContent = t.shareName;
+  document.getElementById("shareSub").textContent = t.shareSub;
+  document.getElementById("teamName").textContent = t.teamName;
+  document.getElementById("teamSub").textContent = t.teamSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("shareSlider").setAttribute("aria-label", t.shareName);
+  document.getElementById("teamSlider").setAttribute("aria-label", t.teamName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.shareName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.teamName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendSafe").textContent = t.legendSafe;
+  document.getElementById("legendDanger").textContent = t.legendDanger;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("bfCardLabel").textContent = t.bfCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "bus-factor" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("shareSlider").addEventListener("input", (e) => { share = +e.target.value; render(); });
+document.getElementById("shareNum").addEventListener("change", (e) => {
+  share = Math.min(SHARE_MAX, Math.max(SHARE_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("teamSlider").addEventListener("input", (e) => { team = +e.target.value; render(); });
+document.getElementById("teamNum").addEventListener("change", (e) => {
+  team = Math.min(TEAM_MAX, Math.max(TEAM_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  share = 30; team = 6; nLeave = 1;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  share = 0; nLeave = 1;
+  render();
+  const a = assess(share, team, nLeave);
+  document.getElementById("hint").textContent = T().hintScenario(team, nLeave, a);
+});
+
+/* ---- drag the departures marker directly on the chart ---- */
+const bfChart = document.getElementById("bfChart");
+function svgPoint(evt) {
+  const pt = bfChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(bfChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  bfChart.setPointerCapture(evt.pointerId);
+  document.getElementById("bfMarker").classList.add("dragging");
+  document.getElementById("bfMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  nLeave = nOfX(p.x);
+  render();
+}
+document.getElementById("bfMarkerHit").addEventListener("pointerdown", startDrag);
+bfChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => bfChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("bfMarker").classList.remove("dragging");
+  document.getElementById("bfMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>

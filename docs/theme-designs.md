@@ -75,6 +75,8 @@
 
 ## No.29 バス係数 (slug: `bus-factor`, cat: `team`)
 
+✅ 出荷済み (スコア正規化は設計から変更: (k-1)/(team-1)ではなく、share=100時の到達可能な最大バス係数kMaxで正規化する(k-1)/(kMax-1)。設計のままだと満点到達不能だった)
+
 **タイトル**: JA「あの人が1週間休んだら、開発は止まる?」 / EN "If that one person takes a week off, does development stop?"
 **名前**: バス係数シミュレーター / Bus Factor Simulator
 **タグ**: ja:["属人化","ナレッジ共有"] en:["Bus factor","Knowledge sharing"]

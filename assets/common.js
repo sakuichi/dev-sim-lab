@@ -268,6 +268,12 @@ window.DevSimLab = (function () {
       ja: { name: "タイヤのブランコ・シミュレーター", title: "仕様どおり完成したのに、なぜ喜ばれない?", desc: "顧客の言う仕様をそのまま実装しても本来の課題は解決しないことがある——「木のブランコ」風刺画の現象を、課題を掘る度合いで可視化するシミュレーター。" },
       en: { name: "Tire Swing Simulator", title: "Built exactly to spec — so why is nobody happy?", desc: "A simulator of the famous tree-swing cartoon: building exactly what was asked versus digging back to the problem the customer actually needs solved." },
     },
+    {
+      id: "bus-factor", href: "bus-factor/", status: "live", cat: "team",
+      tags: { ja: ["属人化", "ナレッジ共有"], en: ["Bus factor", "Knowledge sharing"] },
+      ja: { name: "バス係数シミュレーター", title: "あの人が1週間休んだら、開発は止まる?", desc: "知識共有の実践度が「何人抜けたら開発が止まるか(バス係数)」をどう決めるかを、GitHub 133プロジェクトの実証研究をもとに可視化するシミュレーター。" },
+      en: { name: "Bus Factor Simulator", title: "If that one person takes a week off, does development stop?", desc: "A simulator visualizing how knowledge sharing sets the bus factor — how many departures halt development — grounded in a study of 133 GitHub projects." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -381,7 +387,7 @@ window.DevSimLab = (function () {
     "pause-cost": ["context-switch", "yak-shaving", "wip-lead-time"],
     "zero-bugs": ["technical-debt", "cost-of-change", "release-frequency"],
     "curse-of-knowledge": ["xy-problem", "rubber-duck", "onboarding-ramp"],
-    "onboarding-ramp": ["brooks-law", "skill-variance", "curse-of-knowledge"],
+    "onboarding-ramp": ["brooks-law", "skill-variance", "bus-factor"],
     "skill-variance": ["onboarding-ramp", "estimation-uncertainty", "survivorship-bias"],
     "speak-up-cost": ["psychological-safety", "who-says-it", "xy-problem"],
     "psychological-safety": ["speak-up-cost", "survivorship-bias", "confirmation-bias"],
@@ -396,6 +402,7 @@ window.DevSimLab = (function () {
     "who-says-it": ["speak-up-cost", "psychological-safety", "confirmation-bias"],
     "quantification-trap": ["survivorship-bias", "confirmation-bias", "utilization-trap"],
     "tire-swing": ["xy-problem", "curse-of-knowledge", "qcd-tradeoff"],
+    "bus-factor": ["onboarding-ramp", "pause-cost", "brooks-law"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */
