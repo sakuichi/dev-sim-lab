@@ -137,6 +137,8 @@
 
 ## No.31 コンウェイの法則 (slug: `conways-law`, cat: `team`)
 
+✅ 出荷済み (**31テーマ達成**。EN書籍は2025年刊の第2版を採用)
+
 **タイトル**: JA「システムの形が、組織図とそっくりなのはなぜ?」 / EN "Why does your architecture look exactly like your org chart?"
 **名前**: コンウェイの法則シミュレーター / Conway's Law Simulator
 **タグ**: ja:["コンウェイの法則","組織設計"] en:["Conway's law","Org design"]

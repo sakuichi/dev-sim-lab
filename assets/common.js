@@ -280,6 +280,12 @@ window.DevSimLab = (function () {
       ja: { name: "90-90ルール・シミュレーター", title: "進捗90%です(先週も、先々週も)", desc: "「最初の90%が期間の90%を使い、残りの10%がもう一つの90%を使う」——報告される進捗と実際の完了率の乖離を可視化するシミュレーター。" },
       en: { name: "Ninety-Ninety Rule Simulator", title: "We're 90% done (same as last week, and the week before)", desc: "A simulator of Cargill's ninety-ninety rule: how reported progress races to 90% and then crawls, while actual completion tells another story." },
     },
+    {
+      id: "conways-law", href: "conways-law/", status: "live", cat: "team",
+      tags: { ja: ["コンウェイの法則", "組織設計"], en: ["Conway's law", "Org design"] },
+      ja: { name: "コンウェイの法則シミュレーター", title: "システムの形が、組織図とそっくりなのはなぜ?", desc: "部門間の分断度が部門横断機能の品質をどう蝕むかを、コンウェイの法則(1968年)とミラーリング仮説の実証研究をもとに可視化するシミュレーター。" },
+      en: { name: "Conway's Law Simulator", title: "Why does your architecture look exactly like your org chart?", desc: "A simulator visualizing how organizational silos erode cross-team feature quality, grounded in Conway's law and the mirroring-hypothesis research." },
+    },
   ];
 
   /* ---- share widget (networks differ by language, per requirements.md 4.4) ---- */
@@ -381,7 +387,7 @@ window.DevSimLab = (function () {
      landing-page grid. ---- */
   const RELATED = {
     "qcd-tradeoff": ["estimation-uncertainty", "cost-of-change", "release-frequency"],
-    "brooks-law": ["onboarding-ramp", "utilization-trap", "wip-lead-time"],
+    "brooks-law": ["onboarding-ramp", "utilization-trap", "conways-law"],
     "utilization-trap": ["wip-lead-time", "context-switch", "brooks-law"],
     "context-switch": ["pause-cost", "wip-lead-time", "utilization-trap"],
     "estimation-uncertainty": ["hofstadters-law", "skill-variance", "qcd-tradeoff"],
@@ -410,6 +416,7 @@ window.DevSimLab = (function () {
     "tire-swing": ["xy-problem", "curse-of-knowledge", "qcd-tradeoff"],
     "bus-factor": ["onboarding-ramp", "pause-cost", "brooks-law"],
     "ninety-ninety": ["hofstadters-law", "estimation-uncertainty", "technical-debt"],
+    "conways-law": ["brooks-law", "psychological-safety", "technical-debt"],
   };
 
   /* 図鑑No.: SIMS配列の位置+1(公開順)。ゼロ埋め2桁の表示用文字列を返す */

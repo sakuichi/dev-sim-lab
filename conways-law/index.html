@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>システムの形が、組織図とそっくりなのはなぜ? | コンウェイの法則シミュレーター</title>
+<meta name="description" content="「システムを設計する組織は、組織のコミュニケーション構造をコピーした設計を生み出す」——コンウェイの法則(1968年)を、部門の分断度と機能品質で可視化するシミュレーター。">
+<link rel="canonical" href="https://sakuichi.github.io/dev-sim-lab/conways-law/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sakuichi.github.io/dev-sim-lab/conways-law/">
+<meta property="og:title" content="システムの形が、組織図とそっくりなのはなぜ? | コンウェイの法則シミュレーター">
+<meta property="og:description" content="「システムを設計する組織は、組織のコミュニケーション構造をコピーした設計を生み出す」——コンウェイの法則(1968年)を可視化するシミュレーター。">
+<meta property="og:image" content="https://sakuichi.github.io/dev-sim-lab/assets/ogp/conways-law.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "コンウェイの法則シミュレーター",
+  "alternateName": "Conway's Law Simulator",
+  "url": "https://sakuichi.github.io/dev-sim-lab/conways-law/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+  "description": "部門間の分断度と部門横断機能の割合が、システムの品質にどう影響するかを可視化する無料シミュレーター。",
+  "inLanguage": ["ja", "en"],
+  "isPartOf": {"@type": "WebSite", "name": "開発あるある図鑑", "url": "https://sakuichi.github.io/dev-sim-lab/"}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+/* console/assess/controls shell, .hint, .chart-note, .related-grid: see ../assets/common.css */
+
+/* ---- near-flat within-team line vs plunging cross-team line ---- */
+.cw-wrap{margin-top:14px}
+.cw-svg{width:100%;height:auto;touch-action:none;user-select:none}
+.cw-grid{stroke:var(--line);stroke-width:1}
+.cw-tick{stroke:var(--line);stroke-width:1;stroke-dasharray:2 2}
+.cw-axis-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink-soft)}
+.cw-axis-title{font-family:"IBM Plex Sans JP",sans-serif;font-size:11px;fill:var(--ink-soft)}
+.cw-line-within{fill:none;stroke:var(--q);stroke-width:2.2}
+.cw-line-cross{fill:none;stroke:var(--alert);stroke-width:2.2}
+.cw-dot{r:3.5}
+.cw-marker{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;cursor:grab}
+.cw-marker.dragging{cursor:grabbing}
+.cw-marker-hit{fill:transparent;cursor:grab}
+.cw-marker-hit.dragging{cursor:grabbing}
+.cw-point-within{fill:var(--surface);stroke:var(--q);stroke-width:2}
+.cw-point-cross{fill:var(--surface);stroke:var(--alert);stroke-width:2}
+.cw-value-label{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+.cw-value-label-within{fill:var(--q)}
+.cw-value-label-cross{fill:var(--alert)}
+.cw-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-soft)}
+.cw-legend .sw{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:2px;border-radius:2px}
+.cw-legend .sw.within{background:var(--q)}
+.cw-legend .sw.cross{background:var(--alert)}
+.chart-caption{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:8px}
+
+/* ---- live concrete-situation box ---- */
+.scenario-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--d);border-radius:8px;background:#FDFDFC}
+.scenario-box .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.08em}
+.scenario-box .s{font-size:13.5px;margin-top:4px}
+
+/* ---- twin readout cards ---- */
+.tier-row{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.tier-row{grid-template-columns:1fr}}
+.tier-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FDFDFC}
+.tier-card .k{font-size:11.5px;color:var(--ink-soft)}
+.tier-card .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
+.tier-card.within-card{border-left:4px solid var(--q)}
+.tier-card.cross-card{border-left:4px solid var(--alert)}
+
+.controls{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){.controls{grid-template-columns:1fr}}
+.related-grid{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="eyebrow"><a href="../" data-brand-eyebrow></a></div>
+    <div class="lang-switch" data-lang-switch role="group" aria-label="Language">
+      <button data-lang="ja" aria-pressed="true">日本語</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroLead"></p>
+</header>
+
+<main>
+<section class="console" aria-labelledby="heroTitle">
+  <div class="console-head">
+    <span class="label" id="consoleLabel"></span>
+    <span class="sum"><span id="sumLabel"></span> <b id="sumVal">49%</b></span>
+  </div>
+  <div class="mode-row">
+    <button class="tone-btn" data-tone-btn aria-pressed="false"></button>
+    <span class="tone-note" data-tone-note hidden></span>
+  </div>
+
+  <div class="cw-wrap">
+    <svg class="cw-svg" id="cwChart" viewBox="0 0 640 240" role="img" aria-label="Within-team feature quality vs cross-team feature quality, by organizational silo level">
+      <g id="cwGridLayer"></g>
+      <path id="cwLineWithin" class="cw-line-within"></path>
+      <path id="cwLineCross" class="cw-line-cross"></path>
+      <g id="cwDotsLayer"></g>
+      <line id="cwMarker" class="cw-marker" x1="0" y1="0" x2="0" y2="0"></line>
+      <circle id="cwPointWithin" class="cw-point-within" r="5"></circle>
+      <circle id="cwPointCross" class="cw-point-cross" r="5"></circle>
+      <text id="cwLabelWithin" class="cw-value-label cw-value-label-within"></text>
+      <text id="cwLabelCross" class="cw-value-label cw-value-label-cross"></text>
+      <rect id="cwMarkerHit" class="cw-marker-hit" x="0" y="0" width="20" height="240"></rect>
+    </svg>
+  </div>
+  <div class="cw-legend">
+    <span><span class="sw within"></span><span id="legendWithin"></span></span>
+    <span><span class="sw cross"></span><span id="legendCross"></span></span>
+  </div>
+  <p class="chart-caption" id="chartCaption"></p>
+  <p class="chart-note" id="chartNote"></p>
+
+  <div class="scenario-box" aria-live="polite">
+    <div class="k" id="scenarioBoxTitle"></div>
+    <div class="s" id="scenarioBoxText"></div>
+  </div>
+
+  <div class="tier-row">
+    <div class="tier-card within-card">
+      <div class="k" id="withinCardLabel"></div>
+      <div class="v" id="withinCardVal">83%</div>
+    </div>
+    <div class="tier-card cross-card">
+      <div class="k" id="crossCardLabel"></div>
+      <div class="v" id="crossCardVal">49%</div>
+    </div>
+  </div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="assess" aria-live="polite">
+    <div class="assess-head">
+      <div>
+        <span class="score-label" id="scoreLabel"></span><br>
+        <span class="score-val mono" id="scoreVal">70</span><span class="score-max mono"> /100</span>
+      </div>
+      <p class="score-comment" id="scoreComment"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="axis-card" style="--axis:var(--alert)">
+      <div class="axis-name"><span id="siloName"></span><small id="siloSub"></small></div>
+      <div class="readout mono" id="siloReadout">60</div>
+      <input type="range" id="siloSlider" min="0" max="100" step="5" value="60">
+      <div class="num-row">
+        <label for="siloNum" id="numLabel1"></label>
+        <input type="number" id="siloNum" min="0" max="100" step="5" value="60">
+      </div>
+    </div>
+    <div class="axis-card" style="--axis:var(--d)">
+      <div class="axis-name"><span id="crossName"></span><small id="crossSub"></small></div>
+      <div class="readout mono" id="crossReadout">40%</div>
+      <input type="range" id="crossSlider" min="10" max="70" step="5" value="40">
+      <div class="num-row">
+        <label for="crossNum" id="numLabel2"></label>
+        <input type="number" id="crossNum" min="10" max="70" step="5" value="40">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="resetBtn"></button>
+    <button class="btn" id="scenarioBtn"></button>
+  </div>
+</section>
+
+<div class="share">
+  <span class="share-label" data-share-label></span>
+  <div class="share-btns" id="shareBtns"></div>
+</div>
+
+<section class="text" id="secAdvice"></section>
+
+<section class="text">
+  <h2 id="booksH"></h2>
+  <div class="books-grid" id="booksGrid"></div>
+</section>
+
+<section class="text">
+  <h2 data-related-h></h2>
+  <div class="related-grid" id="relatedGrid"></div>
+</section>
+</main>
+
+<footer>
+  <p data-foot-note></p>
+  <p data-foot-disclosure></p>
+  <p><a href="../privacy/" data-foot-privacy></a></p>
+  <p>© 2026 <span data-brand></span></p>
+</footer>
+
+</div>
+
+<script src="../assets/common.js"></script>
+<script>
+"use strict";
+
+/* ================= モデル =================
+   「コンウェイの法則」——Melvin Conwayが"How Do Committees Invent?"
+   (Datamation, 1968年4月)で示した観察:
+   「システムを設計する組織は、その組織のコミュニケーション構造を
+   コピーした設計を生み出すよう制約される」。
+   (この論文はHarvard Business Reviewに「主張の証明がない」として却下され、
+   Datamationに掲載された——後年、実証が追いつく)
+   実証1: ハーバード・ビジネス・スクールのミラーリング仮説研究
+   (MacCormack, Rusnak, Baldwin)——疎結合な組織は有意にモジュラーな製品を作る。
+   実証2: Microsoft Research (Nagappan, Murphy, Basili, 2008, Windows Vista)——
+   組織構造のメトリクスが、コードのメトリクス(churn・複雑度・カバレッジ)より
+   高い精度(精度・再現率85%)でバグの発生しやすさを予測した。
+   モデル: 部門内で完結する機能の品質はサイロ化の影響が小さい(ほぼ水平)が、
+   部門横断が必要な機能の品質はサイロ化で大きく劣化する——組織の境界が
+   そのまま製品の亀裂になる、という単純化した独自モデル。数値は演出であり
+   実証値の再現ではない。
+*/
+const SILO_MIN = 0, SILO_MAX = 100;
+const CROSS_MIN = 10, CROSS_MAX = 70;
+
+function withinQualityOf(silo) { return 88 - silo * 0.08; }
+function crossQualityOf(silo) { return 85 - silo * 0.6; }
+function overallOf(silo, crossNeed) {
+  return withinQualityOf(silo) * (1 - crossNeed / 100) + crossQualityOf(silo) * (crossNeed / 100);
+}
+function scoreOf(silo, crossNeed) { return Math.round(overallOf(silo, crossNeed)); }
+function tierOf(silo, crossNeed) {
+  const o = overallOf(silo, crossNeed);
+  if (o >= 80) return 4;
+  if (o >= 70) return 3;
+  if (o >= 60) return 2;
+  if (o >= 50) return 1;
+  return 0;
+}
+function boxTierOf(silo) { return Math.min(4, Math.floor(silo / 20)); }
+function assess(silo, crossNeed) {
+  const within = withinQualityOf(silo);
+  const cross = crossQualityOf(silo);
+  const overall = overallOf(silo, crossNeed);
+  const score = scoreOf(silo, crossNeed);
+  const band = tierOf(silo, crossNeed);
+  const box = boxTierOf(silo);
+  return { within, cross, overall, score, band, box };
+}
+
+/* ================= 多言語辞書 ================= */
+const I18N = {
+ja: {
+  htmlLang: "ja",
+  docTitle: "システムの形が、組織図とそっくりなのはなぜ? | コンウェイの法則シミュレーター",
+  heroTitle: "システムの形が、<br>組織図とそっくりなのはなぜ?",
+  heroLead: "1968年、メルヴィン・コンウェイは論文「How Do Committees Invent?」でこう書きました——「システムを設計する組織は、その組織のコミュニケーション構造をコピーした設計を生み出すよう制約される」。この論文、実はHarvard Business Reviewに「主張の証明がない」と却下され、Datamation誌に掲載されたという経緯があります。しかし半世紀後、証明は揃いました。ハーバードのミラーリング仮説研究は、疎結合な組織が有意にモジュラーな製品を作ることを実証。さらにMicrosoft Research(2008年、Windows Vista)は、組織構造のメトリクスがコードのメトリクスよりも高い精度(85%)でバグの発生しやすさを予測することを示しました——バグの場所を知りたければ、コードより組織図を見ろ、というわけです。「よく引かれる言い換え」も有名です: 4つのチームでコンパイラを作れば、4パスのコンパイラができあがる。「部門間の分断度」と「部門横断が必要な機能の割合」を動かして、組織の境界が製品の亀裂になる様子を確認してください。",
+  consoleLabel: "MIRRORING CONSOLE",
+  sumLabel: "部門横断機能の品質",
+  scoreLabel: "システム総合品質スコア",
+  siloName: "部門間の分断度", siloSub: "部門をまたぐ日常的なコミュニケーションの薄さ(0=境界なく話せる、100=公式ルート以外の会話がない)",
+  crossName: "部門横断が必要な機能の割合", crossSub: "ユーザー体験上、複数部門の連携が必要な機能の割合",
+  numLabel: "数値",
+  resetBtn: "リセット",
+  scenarioBtn: "シナリオ: 4チームで作ると4パスコンパイラになる",
+  chartCaption: "緑線は部門内で完結する機能の品質——分断が進んでもほとんど下がりません(サイロの中はむしろ快適です)。赤線は部門横断が必要な機能の品質——分断度に比例して急落します。組織の境界が、そのまま製品の亀裂として現れる、というのがこのチャートです。",
+  chartNote: "数値は方向性を示す独自の簡易モデルです。一方、本文中の実証(ハーバードのミラーリング研究、MicrosoftのVista研究の精度85%)は実在の研究の実数値です。",
+  cwYTitle: "機能の品質(%)", cwXTitle: "部門間の分断度",
+  legendWithin: "部門内で完結する機能の品質",
+  legendCross: "部門横断が必要な機能の品質",
+  scenarioBoxTitle: "いまのプロダクトは、ユーザーからこう見える",
+  scenarios: [
+    "どの画面も一貫した体験です。ユーザーは「どの部門が作ったか」を意識することがありません。",
+    "画面ごとに微妙にトーンが違いますが、日常の利用には支障がありません。",
+    "機能をまたぐと操作感が変わり、同じデータを二度入力させられることがあります。",
+    "「この画面はA部、その先はB部」という社内事情が、画面遷移の切れ目としてユーザーに見えています。",
+    "「その件は別の窓口にお問い合わせください」——ユーザーには関係のない組織図が、そのまま製品の形になっています。",
+  ],
+  withinCardLabel: "部門内で完結する機能の品質",
+  crossCardLabel: "部門横断が必要な機能の品質",
+  hint: (silo, crossNeed, a) => `分断度${silo}のとき、部門内機能の品質は約${a.within.toFixed(0)}%、部門横断機能は約${a.cross.toFixed(0)}%。横断機能が${crossNeed}%を占めるため、システム総合では約${a.overall.toFixed(0)}%です。`,
+  hintScenario: (crossNeed, a) => `「4つのチームでコンパイラを作れば、4パスのコンパイラができる」——よく引かれるコンウェイの法則の言い換えです。分断度85では横断機能の品質が約${a.cross.toFixed(0)}%まで落ち、チーム構成がそのままアーキテクチャに焼き付きます。`,
+  comments: [
+    "組織の境界が製品の亀裂として全面に出ています。ユーザーが組織図を「体験」している状態です。",
+    "横断機能の劣化が総合品質を引き下げ始めています。境界部分の障害が増えていませんか?",
+    "部門内は快適、境界は不安定——サイロ化の典型的な中間状態です。",
+    "境界のコミュニケーションが機能しています。横断機能もおおむね安定しています。",
+    "組織の境界を感じさせない製品です。コミュニケーション構造が製品の形を支えています。",
+  ],
+  adviceHeading: "現実には、どう向き合うか",
+  adviceIntro: "コンウェイの法則の実務的な含意は「法則に逆らうな、利用しろ」です。組織構造とアーキテクチャがミラーリングするなら、欲しいアーキテクチャに合わせて組織を設計すればよい——これは「逆コンウェイ戦略」と呼ばれ、『チームトポロジー』で広く知られるようになりました。マイクロサービスをきれいに分けたいならチームをそう分ける、シームレスなユーザー体験が欲しいなら体験単位のチームを作る。逆に、組織を放置したままアーキテクチャだけを直そうとすると、法則が静かに元へ引き戻します。Microsoftの研究が示すとおり、品質問題の予測因子としては組織要因がコード要因に勝ります——アーキテクチャレビューと同じ真剣さで、組織構造をレビューする価値があります。",
+  adviceItems: [
+    "アーキテクチャを設計するとき、同時に「この構造を維持できるチーム構成か」を設計する(逆コンウェイ戦略)",
+    "部門横断機能の障害が続いたら、コードより先にコミュニケーション経路を疑う(その境界に定常的な会話があるか)",
+    "ユーザー体験の単位とチームの単位を揃える。「この画面はA部、その先はB部」をユーザーに見せない",
+    "組織変更はアーキテクチャ変更でもあると認識する。部門統合・分割の際は、システムへの影響を事前に評価する",
+  ],
+  booksH: "もっと深く知るための本",
+  books: [
+    { tag: "ORG DESIGN", title: "チームトポロジー", desc: "マシュー・スケルトン&マニュエル・パイス著。コンウェイの法則を前提に、価値の流れに沿ったチーム設計(逆コンウェイ戦略)を体系化した定番書。", link: "Amazonで見る →", url: "https://amzn.to/4phEaYV" },
+  ],
+  toneBtn: "🔥 開発者モード",
+  toneNote: "※ ジョークモードです。お客様への提示には標準モードをどうぞ。",
+  shareText: "システムの形が、組織図とそっくりなのはなぜ? | コンウェイの法則シミュレーター",
+  shareHashtags: "開発あるある図鑑",
+},
+en: {
+  htmlLang: "en",
+  docTitle: "Why does your architecture look exactly like your org chart? | Conway's Law Simulator",
+  heroTitle: "Why does your architecture look<br>exactly like your org chart?",
+  heroLead: "In 1968, Melvin Conway wrote in \"How Do Committees Invent?\": organizations which design systems \"are constrained to produce designs which are copies of the communication structures of these organizations.\" Harvard Business Review rejected the paper for lacking proof, so it ran in Datamation instead. Half a century later, the proof arrived. Harvard's mirroring-hypothesis research showed loosely-coupled organizations produce significantly more modular products. And Microsoft Research (2008, Windows Vista) showed that organizational-structure metrics predict failure-proneness more accurately (85% precision and recall) than code metrics like churn, complexity, or coverage — if you want to know where the bugs are, look at the org chart before the code. The famous paraphrase: if four teams build a compiler, you get a four-pass compiler. Move the \"silo level\" and the \"share of cross-team features\" to watch organizational boundaries become product cracks.",
+  consoleLabel: "MIRRORING CONSOLE",
+  sumLabel: "Cross-team feature quality",
+  scoreLabel: "Overall system quality score",
+  siloName: "Silo level between departments", siloSub: "How thin day-to-day cross-team communication is (0 = boundaryless, 100 = official channels only)",
+  crossName: "Share of features needing cross-team work", crossSub: "How much of the user experience requires multiple departments to cooperate",
+  numLabel: "Value",
+  resetBtn: "Reset",
+  scenarioBtn: "Scenario: four teams build a four-pass compiler",
+  chartCaption: "The green line is the quality of features contained within one team — it barely drops as silos deepen (inside the silo, life stays comfortable). The red line is the quality of cross-team features — it plunges with silo level. Organizational boundaries surfacing as product cracks: that's the whole chart.",
+  chartNote: "The numbers are an original, simplified model. The evidence cited in the text — Harvard's mirroring study and Microsoft's 85% Vista result — are real figures from real studies.",
+  cwYTitle: "Feature quality (%)", cwXTitle: "Silo level between departments",
+  legendWithin: "Features contained within one team",
+  legendCross: "Features needing cross-team work",
+  scenarioBoxTitle: "How the product looks to users right now",
+  scenarios: [
+    "Every screen feels like one product. Users never sense which department built what.",
+    "Screens differ slightly in tone, but daily use is unaffected.",
+    "Crossing between features changes the feel, and users sometimes re-enter the same data twice.",
+    "Internal boundaries — \"this screen is Team A, past that is Team B\" — are visible to users as seams in the flow.",
+    "\"Please contact a different desk for that\" — an org chart the user never asked for has become the product's shape.",
+  ],
+  withinCardLabel: "Within-team feature quality",
+  crossCardLabel: "Cross-team feature quality",
+  hint: (silo, crossNeed, a) => `At silo level ${silo}, within-team features run at about ${a.within.toFixed(0)}% quality while cross-team features run at about ${a.cross.toFixed(0)}%. With ${crossNeed}% of the experience needing cross-team work, the system overall sits at about ${a.overall.toFixed(0)}%.`,
+  hintScenario: (crossNeed, a) => `\"Four teams building a compiler produce a four-pass compiler\" — the famous paraphrase of Conway's law. At silo level 85, cross-team quality falls to about ${a.cross.toFixed(0)}%, and the team structure bakes itself into the architecture.`,
+  comments: [
+    "Organizational boundaries dominate the product. Users are experiencing your org chart directly.",
+    "Cross-team degradation is dragging down overall quality. Are boundary-area incidents piling up?",
+    "Comfortable inside silos, shaky at the seams — the classic middle state of siloing.",
+    "Boundary communication is working; cross-team features are broadly stable.",
+    "A product with invisible seams. The communication structure is holding the product's shape up.",
+  ],
+  adviceHeading: "How to actually deal with this",
+  adviceIntro: "The practical lesson of Conway's law is: don't fight it — use it. If organizations and architectures mirror each other, then design the organization to match the architecture you want. This is the \"inverse Conway maneuver,\" popularized by Team Topologies. Want cleanly separated microservices? Separate the teams that way. Want a seamless user experience? Build teams around experiences. Try to fix the architecture while leaving the organization untouched, and the law quietly pulls it back. As Microsoft's research shows, organizational factors beat code factors as predictors of quality problems — the org structure deserves review with the same seriousness as the architecture.",
+  adviceItems: [
+    "When designing an architecture, simultaneously design the team structure that can sustain it (the inverse Conway maneuver)",
+    "When cross-team features keep failing, suspect the communication path before the code — is there routine conversation across that boundary?",
+    "Align team boundaries with user-experience boundaries; never let users see \"this screen is Team A, past that is Team B\"",
+    "Treat reorgs as architecture changes: evaluate the system impact of merging or splitting departments in advance",
+  ],
+  booksH: "Recommended reading",
+  books: [
+    { tag: "ORG DESIGN", title: "Team Topologies, 2nd Edition", desc: "Matthew Skelton and Manuel Pais. The standard playbook for designing team structures around the flow of value — Conway's law used deliberately. Updated 2025 edition.", link: "View on Amazon →", url: "https://amzn.to/4gvl1AD" },
+  ],
+  toneBtn: "🔥 Developer mode",
+  toneNote: "* Joke mode. Switch back to standard before client meetings.",
+  shareText: "Why does your architecture look exactly like your org chart? — Conway's Law Simulator",
+  shareHashtags: "DevSimLab",
+},
+};
+
+/* ================= 開発者モード上書き辞書 ================= */
+const DEV = {
+ja: {
+  hint: (silo, crossNeed, a) => `分断度${silo}。APIの設計書より先に、他部門との調整議事録が必要になる。横断機能の品質約${a.cross.toFixed(0)}%。`,
+  hintScenario: (crossNeed, a) => `マイクロサービスの境界図を眺めていたら、去年の組織図と完全に一致した。誰も意図していない。それがコンウェイの法則。横断品質約${a.cross.toFixed(0)}%。`,
+  comments: [
+    "システム構成図に部署名を重ねたら、1ピクセルもずれなかった。アーキテクトの敗北ではない。法則の勝利。",
+    "「その機能はうちの管轄じゃないです」がAPIのエラーメッセージより先に返ってくる。",
+    "部門間の連携機能のバグチケットだけ、なぜか担当者欄が空欄のまま熟成されていく。",
+    "組織変更の資料に「システムへの影響」の章がある。この会社は法則を知っている。",
+    "ユーザーが「どこの部門が作ったか」を一度も意識せずに使い終えた。組織図が製品から消えた日。",
+  ],
+},
+en: {
+  hint: (silo, crossNeed, a) => `Silo ${silo}. The API design doc now requires cross-department meeting minutes as a prerequisite. Cross-team quality ~${a.cross.toFixed(0)}%.`,
+  hintScenario: (crossNeed, a) => `Stared at the microservice boundary diagram and realized it exactly matches last year's org chart. Nobody planned that. That's Conway's law. Cross-team quality ~${a.cross.toFixed(0)}%.`,
+  comments: [
+    "Overlaid the org chart on the system diagram: not one pixel off. Not the architect's defeat — the law's victory.",
+    "\"That feature isn't our jurisdiction\" returns faster than the API's error message.",
+    "Bug tickets for cross-team features age gracefully with the assignee field permanently blank.",
+    "The reorg proposal includes a \"system impact\" chapter. This company knows the law.",
+    "A user finished the whole flow without once sensing which team built what. The day the org chart vanished from the product.",
+  ],
+},
+};
+
+let LANG = "ja";
+let TONE = "std";
+const T = () => (TONE === "dev" ? { ...I18N[LANG], ...DEV[LANG] } : I18N[LANG]);
+
+let silo = 60;
+let crossNeed = 40;
+
+/* ================= チャート描画 ================= */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+};
+const PW = 640, PH = 240, PAD_L = 40, PAD_R = 16, PAD_T = 30, PAD_B = 42;
+const Y_MAX = 100;
+const xOf = (v) => PAD_L + ((v - SILO_MIN) / (SILO_MAX - SILO_MIN)) * (PW - PAD_L - PAD_R);
+const sOfX = (x) => {
+  const frac = (x - PAD_L) / (PW - PAD_L - PAD_R);
+  const raw = SILO_MIN + frac * (SILO_MAX - SILO_MIN);
+  return Math.min(SILO_MAX, Math.max(SILO_MIN, Math.round(raw / 5) * 5));
+};
+const yOf = (v) => PAD_T + (1 - Math.min(v, Y_MAX) / Y_MAX) * (PH - PAD_T - PAD_B);
+
+function drawChart() {
+  const t = T();
+  const gridLayer = document.getElementById("cwGridLayer");
+  gridLayer.innerHTML = "";
+  [0, 20, 40, 60, 80, 100].forEach((v) => {
+    const y = yOf(v);
+    gridLayer.appendChild(el("line", { class: "cw-grid", x1: PAD_L, y1: y, x2: PW - PAD_R, y2: y }));
+    const label = el("text", { class: "cw-axis-label", x: PAD_L - 6, y: y + 3, "text-anchor": "end" });
+    label.textContent = v + "%";
+    gridLayer.appendChild(label);
+  });
+  for (let v = SILO_MIN; v <= SILO_MAX; v += 20) {
+    const x = xOf(v);
+    gridLayer.appendChild(el("line", { class: "cw-tick", x1: x, y1: PAD_T, x2: x, y2: PH - PAD_B }));
+    const label = el("text", { class: "cw-axis-label", x, y: PH - PAD_B + 14, "text-anchor": v === SILO_MIN ? "start" : v === SILO_MAX ? "end" : "middle" });
+    label.textContent = v;
+    gridLayer.appendChild(label);
+  }
+  const yTitle = el("text", { class: "cw-axis-title", x: 2, y: 12 });
+  yTitle.textContent = t.cwYTitle;
+  gridLayer.appendChild(yTitle);
+  const xTitle = el("text", { class: "cw-axis-title", x: PW / 2, y: PH - 4, "text-anchor": "middle" });
+  xTitle.textContent = t.cwXTitle;
+  gridLayer.appendChild(xTitle);
+
+  const withinPts = [], crossPts = [];
+  for (let v = SILO_MIN; v <= SILO_MAX; v += 2) {
+    withinPts.push(`${xOf(v)},${yOf(withinQualityOf(v))}`);
+    crossPts.push(`${xOf(v)},${yOf(crossQualityOf(v))}`);
+  }
+  document.getElementById("cwLineWithin").setAttribute("d", "M " + withinPts.join(" L "));
+  document.getElementById("cwLineCross").setAttribute("d", "M " + crossPts.join(" L "));
+
+  const dotsLayer = document.getElementById("cwDotsLayer");
+  dotsLayer.innerHTML = "";
+  for (let v = SILO_MIN; v <= SILO_MAX; v += 20) {
+    dotsLayer.appendChild(el("circle", { class: "cw-dot", cx: xOf(v), cy: yOf(withinQualityOf(v)), fill: "var(--q)" }));
+    dotsLayer.appendChild(el("circle", { class: "cw-dot", cx: xOf(v), cy: yOf(crossQualityOf(v)), fill: "var(--alert)" }));
+  }
+
+  const mx = xOf(silo);
+  const marker = document.getElementById("cwMarker");
+  marker.setAttribute("x1", mx); marker.setAttribute("x2", mx);
+  marker.setAttribute("y1", PAD_T); marker.setAttribute("y2", PH - PAD_B);
+
+  const withinY = yOf(withinQualityOf(silo));
+  const crossY = yOf(crossQualityOf(silo));
+  document.getElementById("cwPointWithin").setAttribute("cx", mx);
+  document.getElementById("cwPointWithin").setAttribute("cy", withinY);
+  document.getElementById("cwPointCross").setAttribute("cx", mx);
+  document.getElementById("cwPointCross").setAttribute("cy", crossY);
+
+  const labelAnchor = mx > PW - PAD_R - 55 ? "end" : mx < PAD_L + 55 ? "start" : "middle";
+  const labelDx = labelAnchor === "end" ? -10 : labelAnchor === "start" ? 10 : 0;
+  const clampY = (y) => Math.max(PAD_T + 10, Math.min(PH - PAD_B - 4, y));
+  const withinIsHigher = withinY <= crossY;
+
+  const labelWithin = document.getElementById("cwLabelWithin");
+  labelWithin.setAttribute("x", mx + labelDx);
+  labelWithin.setAttribute("y", clampY(withinIsHigher ? withinY - 10 : withinY + 20));
+  labelWithin.setAttribute("text-anchor", labelAnchor);
+  labelWithin.textContent = Math.round(withinQualityOf(silo)) + "%";
+
+  const labelCross = document.getElementById("cwLabelCross");
+  labelCross.setAttribute("x", mx + labelDx);
+  labelCross.setAttribute("y", clampY(withinIsHigher ? crossY + 20 : crossY - 10));
+  labelCross.setAttribute("text-anchor", labelAnchor);
+  labelCross.textContent = Math.round(crossQualityOf(silo)) + "%";
+
+  const hit = document.getElementById("cwMarkerHit");
+  hit.setAttribute("x", PAD_L); hit.setAttribute("y", 0);
+  hit.setAttribute("width", PW - PAD_L - PAD_R); hit.setAttribute("height", PH);
+}
+
+/* ================= 描画 ================= */
+function render() {
+  const t = T();
+  const a = assess(silo, crossNeed);
+
+  drawChart();
+
+  document.getElementById("sumVal").textContent = `${Math.round(a.cross)}%`;
+  document.getElementById("withinCardVal").textContent = `${Math.round(a.within)}%`;
+  document.getElementById("crossCardVal").textContent = `${Math.round(a.cross)}%`;
+  document.getElementById("hint").textContent = t.hint(silo, crossNeed, a);
+  document.getElementById("scenarioBoxText").textContent = t.scenarios[a.box];
+
+  document.getElementById("siloReadout").textContent = silo;
+  document.getElementById("crossReadout").textContent = crossNeed + "%";
+  if (document.activeElement !== document.getElementById("siloSlider")) document.getElementById("siloSlider").value = silo;
+  if (document.activeElement !== document.getElementById("siloNum")) document.getElementById("siloNum").value = silo;
+  if (document.activeElement !== document.getElementById("crossSlider")) document.getElementById("crossSlider").value = crossNeed;
+  if (document.activeElement !== document.getElementById("crossNum")) document.getElementById("crossNum").value = crossNeed;
+
+  const scoreEl = document.getElementById("scoreVal");
+  scoreEl.textContent = a.score;
+  scoreEl.className = "score-val mono" + (a.score < 60 ? " danger" : a.score < 75 ? " warn" : "");
+  document.getElementById("scoreComment").textContent = t.comments[a.band];
+
+  DevSimLab.renderShare(document.getElementById("shareBtns"), {
+    url: "https://sakuichi.github.io/dev-sim-lab/conways-law/",
+    shareText: t.shareText,
+    shareHashtags: t.shareHashtags,
+  });
+}
+
+/* ================= 静的コンテンツの言語適用 ================= */
+function applyStaticText() {
+  const t = T();
+  document.title = t.docTitle;
+  document.querySelector('meta[name="description"]').setAttribute("content", t.heroLead);
+  document.getElementById("heroTitle").innerHTML = t.heroTitle;
+  document.getElementById("heroLead").textContent = t.heroLead;
+  document.getElementById("consoleLabel").textContent = t.consoleLabel;
+  document.getElementById("sumLabel").textContent = t.sumLabel;
+  document.getElementById("scoreLabel").textContent = t.scoreLabel;
+  document.getElementById("siloName").textContent = t.siloName;
+  document.getElementById("siloSub").textContent = t.siloSub;
+  document.getElementById("crossName").textContent = t.crossName;
+  document.getElementById("crossSub").textContent = t.crossSub;
+  document.getElementById("numLabel1").textContent = t.numLabel;
+  document.getElementById("numLabel2").textContent = t.numLabel;
+  document.getElementById("siloSlider").setAttribute("aria-label", t.siloName);
+  document.getElementById("crossSlider").setAttribute("aria-label", t.crossName);
+  document.getElementById("numLabel1").setAttribute("aria-label", `${t.siloName} ${t.numLabel}`);
+  document.getElementById("numLabel2").setAttribute("aria-label", `${t.crossName} ${t.numLabel}`);
+  document.getElementById("resetBtn").textContent = t.resetBtn;
+  document.getElementById("scenarioBtn").textContent = t.scenarioBtn;
+  document.getElementById("chartCaption").textContent = t.chartCaption;
+  document.getElementById("chartNote").textContent = t.chartNote;
+  document.getElementById("legendWithin").textContent = t.legendWithin;
+  document.getElementById("legendCross").textContent = t.legendCross;
+  document.getElementById("scenarioBoxTitle").textContent = t.scenarioBoxTitle;
+  document.getElementById("withinCardLabel").textContent = t.withinCardLabel;
+  document.getElementById("crossCardLabel").textContent = t.crossCardLabel;
+
+  document.getElementById("secAdvice").innerHTML = `
+    <h2>${t.adviceHeading}</h2>
+    <p>${t.adviceIntro}</p>
+    <ul>${t.adviceItems.map((i) => `<li>${i}</li>`).join("")}</ul>
+  `;
+
+  document.getElementById("booksH").textContent = t.booksH;
+  const booksGrid = document.getElementById("booksGrid");
+  booksGrid.innerHTML = "";
+  t.books.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "book";
+    div.innerHTML = `<span class="tag">${b.tag}</span><h3>${b.title}</h3><p>${b.desc}</p>
+      <a href="${b.url}" target="_blank" rel="noopener nofollow sponsored">${b.link}</a>`;
+    booksGrid.appendChild(div);
+  });
+
+  DevSimLab.renderRelated(document.getElementById("relatedGrid"), { exclude: "conways-law" });
+}
+
+/* ================= イベント ================= */
+document.getElementById("siloSlider").addEventListener("input", (e) => { silo = +e.target.value; render(); });
+document.getElementById("siloNum").addEventListener("change", (e) => {
+  silo = Math.min(SILO_MAX, Math.max(SILO_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("crossSlider").addEventListener("input", (e) => { crossNeed = +e.target.value; render(); });
+document.getElementById("crossNum").addEventListener("change", (e) => {
+  crossNeed = Math.min(CROSS_MAX, Math.max(CROSS_MIN, Math.round(+e.target.value)));
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  silo = 60; crossNeed = 40;
+  document.getElementById("hint").textContent = "";
+  render();
+});
+document.getElementById("scenarioBtn").addEventListener("click", () => {
+  silo = 85;
+  render();
+  const a = assess(silo, crossNeed);
+  document.getElementById("hint").textContent = T().hintScenario(crossNeed, a);
+});
+
+/* ---- drag the marker directly on the chart ---- */
+const cwChart = document.getElementById("cwChart");
+function svgPoint(evt) {
+  const pt = cwChart.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(cwChart.getScreenCTM().inverse());
+}
+let dragging = false;
+function startDrag(evt) {
+  dragging = true;
+  cwChart.setPointerCapture(evt.pointerId);
+  document.getElementById("cwMarker").classList.add("dragging");
+  document.getElementById("cwMarkerHit").classList.add("dragging");
+  updateFromPointer(evt);
+  evt.preventDefault();
+}
+function updateFromPointer(evt) {
+  const p = svgPoint(evt);
+  silo = sOfX(p.x);
+  render();
+}
+document.getElementById("cwMarkerHit").addEventListener("pointerdown", startDrag);
+cwChart.addEventListener("pointermove", (evt) => { if (dragging) updateFromPointer(evt); });
+["pointerup", "pointercancel"].forEach((ev) => cwChart.addEventListener(ev, () => {
+  dragging = false;
+  document.getElementById("cwMarker").classList.remove("dragging");
+  document.getElementById("cwMarkerHit").classList.remove("dragging");
+}));
+
+DevSimLab.initChrome({
+  onRender: (lang, tone) => {
+    LANG = lang; TONE = tone;
+    applyStaticText();
+    render();
+  },
+});
+</script>
+</body>
+</html>
